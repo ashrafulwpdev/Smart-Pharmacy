@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">My Test</string>
+    <string name="forgot_password"><u>Forgot Password?</u></string>
+
+</resources>

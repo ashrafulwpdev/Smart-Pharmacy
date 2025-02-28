@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Background Color (Full-screen, Base Layer) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"/> <!-- Solid white background as the base -->
+
+    <!-- Blurred Background Image (Full-screen, On Top of Background Color) -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_blur_img"
+        android:background="@android:color/transparent" />
+
+    <!-- White Card with Rounded Corners and Elevation (Centered, On Top of Everything) -->
+    <RelativeLayout
+        android:id="@+id/signup_frame"
+        android:layout_width="342dp"
+        android:layout_height="570dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="130dp"
+        android:background="@drawable/login_bgframe"
+        android:elevation="5dp">
+
+        <!-- Logo (Blue "D+" in Circle, Top Center) -->
+        <ImageView
+            android:id="@+id/logo"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="50dp"
+            android:src="@drawable/pharmacyicon" />
+
+        <!-- Sign Up Title (Below Logo, Centered) -->
+        <TextView
+            android:id="@+id/signupTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/logo"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:text="Create Account"
+            android:textColor="#083EC9"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <!-- Subtitle (Below Title, Centered) -->
+        <TextView
+            android:id="@+id/subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/signupTitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="Please Enter Your Details to Sign Up"
+            android:textColor="#1F1F1F"
+            android:textSize="14sp"
+            android:textAlignment="center" />
+
+        <!-- Full Name Input Field (Below Subtitle, Centered, with Autofill) -->
+        <EditText
+            android:id="@+id/fullNameInput"
+            android:layout_width="280dp"
+            android:layout_height="50dp"
+            android:layout_below="@id/subtitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:hint="Enter Full Name"
+            android:textColor="#1F1F1F"
+            android:textColorHint="#757575"
+            android:textSize="16sp"
+            android:background="@drawable/edittext_bg"
+            android:padding="10dp"
+            android:inputType="textPersonName"
+            android:autofillHints="name" /> <!-- Enable autofill for full name -->
+
+        <!-- Email/Mobile Number Input Field (Below Full Name, Centered, with Autofill) -->
+        <EditText
+            android:id="@+id/credInput"
+            android:layout_width="280dp"
+            android:layout_height="50dp"
+            android:layout_below="@id/fullNameInput"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="15dp"
+            android:hint="Enter Email or Mobile Number"
+            android:textColor="#1F1F1F"
+            android:textColorHint="#757575"
+            android:textSize="16sp"
+            android:background="@drawable/edittext_bg"
+            android:padding="10dp"
+            android:inputType="text"
+            android:autofillHints="email|username|phone" /> <!-- Enable autofill for email, username, and phone -->
+
+        <!-- Password Input Field (Below Email/Mobile, Centered, with Autofill) -->
+        <EditText
+            android:id="@+id/passwordInput"
+            android:layout_width="280dp"
+            android:layout_height="50dp"
+            android:layout_below="@id/credInput"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="15dp"
+            android:hint="Enter Password"
+            android:textColor="#1F1F1F"
+            android:textColorHint="#757575"
+            android:textSize="16sp"
+            android:background="@drawable/edittext_bg"
+            android:padding="10dp"
+            android:inputType="textPassword"
+            android:autofillHints="password" /> <!-- Enable autofill for password -->
+
+        <!-- Interactive Sign Up Button (Below Password, Centered, Blue Background with Ripple) -->
+        <Button
+            android:id="@+id/signupBtn"
+            android:layout_width="280dp"
+            android:layout_height="50dp"
+            android:layout_below="@id/passwordInput"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/login_btn_bg"
+            android:text="Sign Up"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:stateListAnimator="@animator/button_elevation_anim"
+            android:foreground="?android:attr/selectableItemBackground" />
+
+        <!-- Progress Bar (Centered, Hidden by Default) -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:visibility="gone" /> <!-- Hidden initially -->
+
+        <!-- Login Option (Below Button, Centered) -->
+        <TextView
+            android:id="@+id/loginText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/signupBtn"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="Already have an account? Login"
+            android:textColor="#1F1F1F"
+            android:textSize="14sp"
+            android:clickable="true"
+            android:onClick="onLoginClick" />
+
+        <!-- Social Login Options (Below Login Text, Centered Horizontally) -->
+        <LinearLayout
+            android:id="@+id/socialOpts"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/loginText"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <ImageView
+                android:id="@+id/githublogin"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/github_ic"
+                android:layout_marginEnd="10dp" />
+
+            <ImageView
+                android:id="@+id/googleLogin"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/google_ic"
+                android:layout_marginEnd="10dp" />
+
+            <ImageView
+                android:id="@+id/facebookLogin"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/fb_ic" />
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>

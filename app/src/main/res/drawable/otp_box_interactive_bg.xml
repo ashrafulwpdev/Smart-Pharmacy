@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape>
+            <corners android:radius="8dp" />
+            <solid android:color="#E0F7FA" /> <!-- Light blue fill when focused -->
+            <stroke android:width="2dp" android:color="#0288D1" /> <!-- Darker blue border when focused -->
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape>
+            <corners android:radius="8dp" />
+            <solid android:color="#E0F7FA" /> <!-- Light blue fill when pressed -->
+            <stroke android:width="2dp" android:color="#0288D1" /> <!-- Darker blue border when pressed -->
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <corners android:radius="8dp" />
+            <solid android:color="#FFFFFF" /> <!-- White fill when not focused -->
+            <stroke android:width="2dp" android:color="#E0E0E0" /> <!-- Light gray border when not focused -->
+        </shape>
+    </item>
+</selector>

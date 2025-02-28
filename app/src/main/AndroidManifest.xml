@@ -1,0 +1,67 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Smart Pharmacy"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+
+        <!-- Splash Activity (First Screen, Launcher) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.SplashActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- OnBoarding Activity (Second Screen) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.OnBoardingActivity"
+            android:exported="true" />
+
+        <!-- Login Activity (Third Screen, after OnBoarding) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.LoginActivity"
+            android:exported="true" />
+
+        <!-- Signup Activity (Fourth Screen, from LoginActivity) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.SignupActivity"
+            android:exported="true" />
+
+        <!-- Forgot Password Activity (Accessible from LoginActivity) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.ForgotPassActivity"
+            android:exported="true" />
+
+        <!-- OTP Verification Activity (After Forgot Password) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.OtpVerificationActivity"
+            android:exported="true" />
+
+        <!-- Reset Password Activity (After OTP Verification or Email Link) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.ResetPasswordActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="smartpharmacyuni.page.link"
+                    android:pathPrefix="/resetpass" />
+            </intent-filter>
+        </activity>
+
+        <!-- Main Activity (Fifth Screen, after successful signup/login) -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.MainActivity"
+            android:exported="true" />
+    </application>
+</manifest>

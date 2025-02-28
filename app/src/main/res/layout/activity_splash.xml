@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E7EFFF">
+
+    <!-- Elliptical Background Photo (Overlay, Centered) -->
+    <ImageView
+        android:id="@+id/ellipseBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ellipse_bg"
+        android:background="@android:color/transparent"/>
+
+    <!-- Top PNG Pills -->
+    <ImageView
+        android:id="@+id/topPills"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_alignParentTop="true"
+        android:scaleType="fitCenter"
+        android:src="@drawable/pill_top"
+        android:alpha="1.0"/> <!-- Full Opacity -->
+
+    <!-- App Logo (Inside Ellipse) -->
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_centerInParent="true"
+        android:src="@drawable/spiconph"
+        android:scaleType="centerInside"
+        android:background="@android:color/transparent"
+        android:contentDescription="App Logo"/>
+
+    <!-- App Name (Below Logo, Inside Ellipse) -->
+    <TextView
+        android:id="@+id/appName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/logo"
+        android:layout_centerHorizontal="true"
+        android:text="Smart Pharmacy"
+        android:textColor="@color/blue"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginTop="12dp"/>
+
+    <!-- Bottom PNG Pills -->
+    <ImageView
+        android:id="@+id/bottomPills"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_alignParentBottom="true"
+        android:scaleType="fitCenter"
+        android:src="@drawable/pill_bottom"
+        android:alpha="1.0"/> <!-- Full Opacity -->
+
+</RelativeLayout>

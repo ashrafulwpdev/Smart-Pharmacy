@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:gravity="center">
+
+    <!-- Logo (Blue "D+" in Circle, Top Center) -->
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="40dp"
+        android:src="@drawable/pharmacyicon" />
+
+    <!-- Title (Below Logo, Centered) -->
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/logo"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="30dp"
+        android:text="Get Pharmacy Services"
+        android:textColor="#083EC9"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <!-- Subtitle (Below Title, Centered) -->
+    <TextView
+        android:id="@+id/subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/title"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="8dp"
+        android:text="At Your Doorstep"
+        android:textColor="#083EC9"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Additional Description (Below Subtitle, Centered) -->
+    <TextView
+        android:id="@+id/description"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/subtitle"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="12dp"
+        android:text="Order Medications And Health Products\nEasily With Our Smart Pharmacy App"
+        android:textColor="#666666"
+        android:textSize="14sp"
+        android:textAlignment="center"
+        android:maxWidth="280dp"
+        android:lineSpacingExtra="3dp" />
+
+    <!-- Illustration (Centered Below Description) -->
+    <ImageView
+        android:id="@+id/illustration"
+        android:layout_width="240dp"
+        android:layout_height="260dp"
+        android:layout_below="@id/description"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="30dp"
+        android:src="@drawable/onboarding" />
+
+    <!-- Dotted Line (Below Illustration, Centered) -->
+    <ImageView
+        android:id="@+id/dotted_line"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/illustration"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="50dp"
+        android:src="@drawable/dotted_line" />
+
+    <!-- Get Started Button (Near Bottom, Centered, Fixed Width/Height) -->
+    <Button
+        android:id="@+id/get_started_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="50dp"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/get_started"/>
+
+
+</RelativeLayout>
