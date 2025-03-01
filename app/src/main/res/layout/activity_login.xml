@@ -7,7 +7,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#A2A7A6"/> <!-- Solid white background as the base -->
+        android:background="#A2A7A6"/>
 
     <!-- Blurred Background Image (Full-screen, On Top of Background Color) -->
     <ImageView
@@ -35,7 +35,7 @@
             android:layout_height="60dp"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="50dp"
-            android:src="@drawable/pharmacyicon" /> <!-- Shortened name -->
+            android:src="@drawable/pharmacyicon" />
 
         <!-- Welcome Back Title (Below Logo, Centered) -->
         <TextView
@@ -63,7 +63,7 @@
             android:textSize="14sp"
             android:textAlignment="center" />
 
-        <!-- Email/Mobile Number Input Field (Below Subtitle, Centered, with Autofill) -->
+        <!-- Email/Mobile Number Input Field -->
         <EditText
             android:id="@+id/credInput"
             android:layout_width="280dp"
@@ -78,31 +78,59 @@
             android:background="@drawable/edittext_bg"
             android:padding="10dp"
             android:inputType="text"
-            android:autofillHints="email|username|phone" /> <!-- Enable autofill for email, username, and phone -->
+            android:autofillHints="email|username|phone" />
 
-        <!-- Password Input Field (Below Email/Mobile, Centered, with Autofill) -->
-        <EditText
-            android:id="@+id/passwordInput"
+        <!-- Password Input Field with Eye Icon -->
+        <RelativeLayout
+            android:id="@+id/passwordContainer"
             android:layout_width="280dp"
             android:layout_height="50dp"
             android:layout_below="@id/credInput"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="15dp"
-            android:hint="Enter Password"
-            android:textColor="#1F1F1F"
-            android:textColorHint="#757575"
-            android:textSize="16sp"
-            android:background="@drawable/edittext_bg"
-            android:padding="10dp"
-            android:inputType="textPassword"
-            android:autofillHints="password" /> <!-- Enable autofill for password -->
+            android:layout_marginTop="15dp">
 
-        <!-- Interactive Login Button (Below Password, Centered, Blue Background with Ripple) -->
+            <EditText
+                android:id="@+id/passwordInput"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:hint="Enter Password"
+                android:textColor="#1F1F1F"
+                android:textColorHint="#757575"
+                android:textSize="16sp"
+                android:background="@drawable/edittext_bg"
+                android:padding="10dp"
+                android:inputType="textPassword"
+                android:autofillHints="password" />
+
+            <ImageView
+                android:id="@+id/passwordToggle"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_eye_off"
+                android:contentDescription="Toggle password visibility" />
+        </RelativeLayout>
+
+        <!-- Remember Me Checkbox -->
+        <CheckBox
+            android:id="@+id/rememberMeCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/passwordContainer"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="Remember Me"
+            android:textColor="#1F1F1F"
+            android:textSize="14sp" />
+
+        <!-- Interactive Login Button -->
         <Button
             android:id="@+id/loginBtn"
             android:layout_width="280dp"
             android:layout_height="50dp"
-            android:layout_below="@id/passwordInput"
+            android:layout_below="@id/rememberMeCheckbox"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="20dp"
             android:background="@drawable/login_btn_interactive_bg"
@@ -113,15 +141,15 @@
             android:stateListAnimator="@animator/button_elevation_anim"
             android:foreground="?android:attr/selectableItemBackground" />
 
-        <!-- Progress Bar (Centered, Hidden by Default) -->
+        <!-- Progress Bar -->
         <ProgressBar
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
-            android:visibility="gone" /> <!-- Hidden initially -->
+            android:visibility="gone" />
 
-        <!-- Forgot Password (Below Button, Centered) -->
+        <!-- Forgot Password -->
         <TextView
             android:id="@+id/forgotText"
             android:layout_width="wrap_content"
@@ -133,9 +161,9 @@
             android:textColor="#083EC9"
             android:textSize="14sp"
             android:clickable="true"
-            android:onClick="onForgotClick" /> <!-- Handle click in Java -->
+            android:onClick="onForgotClick" />
 
-        <!-- Signup Option (Below Forgot, Centered) -->
+        <!-- Signup Option -->
         <TextView
             android:id="@+id/signupText"
             android:layout_width="wrap_content"
@@ -147,9 +175,9 @@
             android:textColor="#1F1F1F"
             android:textSize="14sp"
             android:clickable="true"
-            android:onClick="onSignupClick" /> <!-- Handle click in Java -->
+            android:onClick="onSignupClick" />
 
-        <!-- Social Login Options (Below Signup, Centered Horizontally) -->
+        <!-- Social Login Options -->
         <LinearLayout
             android:id="@+id/socialOpts"
             android:layout_width="wrap_content"

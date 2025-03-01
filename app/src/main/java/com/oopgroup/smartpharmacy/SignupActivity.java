@@ -2,10 +2,13 @@ package com.oopgroup.smartpharmacy;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.method.PasswordTransformationMethod;
+import android.text.method.SingleLineTransformationMethod;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,7 +22,9 @@ public class SignupActivity extends AppCompatActivity {
     private EditText fullNameInput, credInput, passwordInput;
     private ProgressBar progressBar;
     private TextView loginText;
+    private ImageView passwordToggle;
     private FirebaseAuth mAuth;
+    private boolean isPasswordVisible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +39,7 @@ public class SignupActivity extends AppCompatActivity {
         passwordInput = findViewById(R.id.passwordInput);
         progressBar = findViewById(R.id.progressBar);
         loginText = findViewById(R.id.loginText);
+        passwordToggle = findViewById(R.id.passwordToggle);
 
         signupBtn.setOnClickListener(v -> {
             String fullName = fullNameInput.getText().toString().trim();
@@ -46,6 +52,8 @@ public class SignupActivity extends AppCompatActivity {
             showCustomToast("Login clicked", false);
             startActivity(new Intent(SignupActivity.this, LoginActivity.class));
         });
+
+        passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
     }
 
     private void handleSignup(String fullName, String credentials, String password) {
@@ -76,7 +84,6 @@ public class SignupActivity extends AppCompatActivity {
             return;
         }
 
-        // Validate phone number (Bangladesh: +880) or email
         String email;
         if (credentials.contains("@") && credentials.contains(".")) {
             email = credentials; // It's an email
@@ -112,12 +119,25 @@ public class SignupActivity extends AppCompatActivity {
                 });
     }
 
+    private void togglePasswordVisibility() {
+        if (isPasswordVisible) {
+            passwordInput.setTransformationMethod(PasswordTransformationMethod.getInstance());
+            passwordToggle.setImageResource(R.drawable.ic_eye_off);
+        } else {
+            passwordInput.setTransformationMethod(SingleLineTransformationMethod.getInstance());
+            passwordToggle.setImageResource(R.drawable.ic_eye_on);
+        }
+        isPasswordVisible = !isPasswordVisible;
+        passwordInput.setSelection(passwordInput.getText().length());
+    }
+
     private void setUiEnabled(boolean enabled) {
         fullNameInput.setEnabled(enabled);
         credInput.setEnabled(enabled);
         passwordInput.setEnabled(enabled);
         findViewById(R.id.signupBtn).setEnabled(enabled);
         loginText.setEnabled(enabled);
+        passwordToggle.setEnabled(enabled);
     }
 
     private void applyErrorBorder(EditText editText) {

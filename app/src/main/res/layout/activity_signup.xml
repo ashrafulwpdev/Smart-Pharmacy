@@ -7,7 +7,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#FFFFFF"/> <!-- Solid white background as the base -->
+        android:background="#FFFFFF"/>
 
     <!-- Blurred Background Image (Full-screen, On Top of Background Color) -->
     <ImageView
@@ -17,7 +17,7 @@
         android:src="@drawable/bg_blur_img"
         android:background="@android:color/transparent" />
 
-    <!-- White Card with Rounded Corners and Elevation (Centered, On Top of Everything) -->
+    <!-- White Card with Rounded Corners and Elevation -->
     <RelativeLayout
         android:id="@+id/signup_frame"
         android:layout_width="342dp"
@@ -27,7 +27,7 @@
         android:background="@drawable/login_bgframe"
         android:elevation="5dp">
 
-        <!-- Logo (Blue "D+" in Circle, Top Center) -->
+        <!-- Logo -->
         <ImageView
             android:id="@+id/logo"
             android:layout_width="60dp"
@@ -36,7 +36,7 @@
             android:layout_marginTop="50dp"
             android:src="@drawable/pharmacyicon" />
 
-        <!-- Sign Up Title (Below Logo, Centered) -->
+        <!-- Sign Up Title -->
         <TextView
             android:id="@+id/signupTitle"
             android:layout_width="wrap_content"
@@ -49,7 +49,7 @@
             android:textSize="24sp"
             android:textStyle="bold" />
 
-        <!-- Subtitle (Below Title, Centered) -->
+        <!-- Subtitle -->
         <TextView
             android:id="@+id/subtitle"
             android:layout_width="wrap_content"
@@ -62,7 +62,7 @@
             android:textSize="14sp"
             android:textAlignment="center" />
 
-        <!-- Full Name Input Field (Below Subtitle, Centered, with Autofill) -->
+        <!-- Full Name Input Field -->
         <EditText
             android:id="@+id/fullNameInput"
             android:layout_width="280dp"
@@ -77,9 +77,9 @@
             android:background="@drawable/edittext_bg"
             android:padding="10dp"
             android:inputType="textPersonName"
-            android:autofillHints="name" /> <!-- Enable autofill for full name -->
+            android:autofillHints="name" />
 
-        <!-- Email/Mobile Number Input Field (Below Full Name, Centered, with Autofill) -->
+        <!-- Email/Mobile Number Input Field -->
         <EditText
             android:id="@+id/credInput"
             android:layout_width="280dp"
@@ -94,31 +94,47 @@
             android:background="@drawable/edittext_bg"
             android:padding="10dp"
             android:inputType="text"
-            android:autofillHints="email|username|phone" /> <!-- Enable autofill for email, username, and phone -->
+            android:autofillHints="email|username|phone" />
 
-        <!-- Password Input Field (Below Email/Mobile, Centered, with Autofill) -->
-        <EditText
-            android:id="@+id/passwordInput"
+        <!-- Password Input Field with Eye Icon -->
+        <RelativeLayout
+            android:id="@+id/passwordContainer"
             android:layout_width="280dp"
             android:layout_height="50dp"
             android:layout_below="@id/credInput"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="15dp"
-            android:hint="Enter Password"
-            android:textColor="#1F1F1F"
-            android:textColorHint="#757575"
-            android:textSize="16sp"
-            android:background="@drawable/edittext_bg"
-            android:padding="10dp"
-            android:inputType="textPassword"
-            android:autofillHints="password" /> <!-- Enable autofill for password -->
+            android:layout_marginTop="15dp">
 
-        <!-- Interactive Sign Up Button (Below Password, Centered, Blue Background with Ripple) -->
+            <EditText
+                android:id="@+id/passwordInput"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:hint="Enter Password"
+                android:textColor="#1F1F1F"
+                android:textColorHint="#757575"
+                android:textSize="16sp"
+                android:background="@drawable/edittext_bg"
+                android:padding="10dp"
+                android:inputType="textPassword"
+                android:autofillHints="password" />
+
+            <ImageView
+                android:id="@+id/passwordToggle"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_eye_off"
+                android:contentDescription="Toggle password visibility" />
+        </RelativeLayout>
+
+        <!-- Interactive Sign Up Button -->
         <Button
             android:id="@+id/signupBtn"
             android:layout_width="280dp"
             android:layout_height="50dp"
-            android:layout_below="@id/passwordInput"
+            android:layout_below="@id/passwordContainer"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="20dp"
             android:background="@drawable/login_btn_bg"
@@ -129,15 +145,15 @@
             android:stateListAnimator="@animator/button_elevation_anim"
             android:foreground="?android:attr/selectableItemBackground" />
 
-        <!-- Progress Bar (Centered, Hidden by Default) -->
+        <!-- Progress Bar -->
         <ProgressBar
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
-            android:visibility="gone" /> <!-- Hidden initially -->
+            android:visibility="gone" />
 
-        <!-- Login Option (Below Button, Centered) -->
+        <!-- Login Option -->
         <TextView
             android:id="@+id/loginText"
             android:layout_width="wrap_content"
@@ -151,7 +167,7 @@
             android:clickable="true"
             android:onClick="onLoginClick" />
 
-        <!-- Social Login Options (Below Login Text, Centered Horizontally) -->
+        <!-- Social Login Options -->
         <LinearLayout
             android:id="@+id/socialOpts"
             android:layout_width="wrap_content"

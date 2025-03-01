@@ -1,11 +1,16 @@
 package com.oopgroup.smartpharmacy;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.method.PasswordTransformationMethod;
+import android.text.method.SingleLineTransformationMethod;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,7 +24,11 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView forgotText, signupText;
     private Button loginBtn;
+    private ImageView passwordToggle;
+    private CheckBox rememberMeCheckbox;
     private FirebaseAuth mAuth;
+    private SharedPreferences prefs;
+    private boolean isPasswordVisible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,6 +36,7 @@ public class LoginActivity extends AppCompatActivity {
         setContentView(R.layout.activity_login);
 
         mAuth = FirebaseAuth.getInstance();
+        prefs = getSharedPreferences("SmartPharmacyPrefs", MODE_PRIVATE);
 
         loginBtn = findViewById(R.id.loginBtn);
         credInput = findViewById(R.id.credInput);
@@ -34,6 +44,15 @@ public class LoginActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         forgotText = findViewById(R.id.forgotText);
         signupText = findViewById(R.id.signupText);
+        passwordToggle = findViewById(R.id.passwordToggle);
+        rememberMeCheckbox = findViewById(R.id.rememberMeCheckbox);
+
+        // Check if user is remembered
+        if (prefs.getBoolean("rememberMe", false) && mAuth.getCurrentUser() != null) {
+            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+            finish();
+            return;
+        }
 
         loginBtn.setOnClickListener(v -> {
             String credentials = credInput.getText().toString().trim();
@@ -48,6 +67,8 @@ public class LoginActivity extends AppCompatActivity {
         signupText.setOnClickListener(v -> {
             startActivity(new Intent(LoginActivity.this, SignupActivity.class));
         });
+
+        passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
     }
 
     private void handleLogin(String credentials, String password) {
@@ -88,6 +109,11 @@ public class LoginActivity extends AppCompatActivity {
                     progressBar.setVisibility(View.GONE);
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
+                        if (rememberMeCheckbox.isChecked()) {
+                            SharedPreferences.Editor editor = prefs.edit();
+                            editor.putBoolean("rememberMe", true);
+                            editor.apply();
+                        }
                         showCustomToast("Login successful!", true);
                         startActivity(new Intent(LoginActivity.this, MainActivity.class));
                         finish();
@@ -98,6 +124,18 @@ public class LoginActivity extends AppCompatActivity {
                         clearErrorBorders();
                     }
                 });
+    }
+
+    private void togglePasswordVisibility() {
+        if (isPasswordVisible) {
+            passwordInput.setTransformationMethod(PasswordTransformationMethod.getInstance());
+            passwordToggle.setImageResource(R.drawable.ic_eye_off);
+        } else {
+            passwordInput.setTransformationMethod(SingleLineTransformationMethod.getInstance());
+            passwordToggle.setImageResource(R.drawable.ic_eye_on);
+        }
+        isPasswordVisible = !isPasswordVisible;
+        passwordInput.setSelection(passwordInput.getText().length());
     }
 
     private void applyErrorBorder(EditText editText) {
@@ -115,6 +153,8 @@ public class LoginActivity extends AppCompatActivity {
         loginBtn.setEnabled(enabled);
         forgotText.setEnabled(enabled);
         signupText.setEnabled(enabled);
+        passwordToggle.setEnabled(enabled);
+        rememberMeCheckbox.setEnabled(enabled);
     }
 
     private void showCustomToast(String message, boolean isSuccess) {

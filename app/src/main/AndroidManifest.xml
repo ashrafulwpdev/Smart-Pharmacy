@@ -8,7 +8,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- Splash Activity (First Screen, Launcher) -->
+        <!-- Splash Activity (Set as Launcher) -->
         <activity
             android:name="com.oopgroup.smartpharmacy.SplashActivity"
             android:exported="true">
@@ -18,32 +18,32 @@
             </intent-filter>
         </activity>
 
-        <!-- OnBoarding Activity (Second Screen) -->
+        <!-- OnBoarding Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.OnBoardingActivity"
             android:exported="true" />
 
-        <!-- Login Activity (Third Screen, after OnBoarding) -->
+        <!-- Login Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.LoginActivity"
             android:exported="true" />
 
-        <!-- Signup Activity (Fourth Screen, from LoginActivity) -->
+        <!-- Signup Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.SignupActivity"
             android:exported="true" />
 
-        <!-- Forgot Password Activity (Accessible from LoginActivity) -->
+        <!-- Forgot Password Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.ForgotPassActivity"
             android:exported="true" />
 
-        <!-- OTP Verification Activity (After Forgot Password) -->
+        <!-- OTP Verification Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.OtpVerificationActivity"
             android:exported="true" />
 
-        <!-- Reset Password Activity (After OTP Verification or Email Link) -->
+        <!-- Reset Password Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.ResetPasswordActivity"
             android:exported="true"
@@ -59,9 +59,20 @@
             </intent-filter>
         </activity>
 
-        <!-- Main Activity (Fifth Screen, after successful signup/login) -->
+        <!-- Main Activity -->
         <activity
             android:name="com.oopgroup.smartpharmacy.MainActivity"
             android:exported="true" />
+
+        <!-- Profile Activity -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.ProfileActivity"
+            android:exported="true" />
+
+        <!-- EditProfile Activity -->
+        <activity
+            android:name="com.oopgroup.smartpharmacy.EditProfileActivity"
+            android:exported="true" />
+
     </application>
 </manifest>
