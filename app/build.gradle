@@ -47,4 +47,8 @@ dependencies {
 
     // Other dependencies
     implementation 'com.hbb20:ccp:2.6.1' // For CountryCodePicker
+
+    implementation 'com.google.android.gms:play-services-auth:20.7.0' // Google Sign-In
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
 }

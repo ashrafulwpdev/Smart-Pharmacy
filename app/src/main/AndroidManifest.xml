@@ -1,4 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.oopgroup.smartpharmacy">
+
+    <!-- Permissions for internet and storage (for image uploads) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" /> <!-- For Android 13+ -->
 
     <application
         android:allowBackup="true"
@@ -10,7 +17,7 @@
 
         <!-- Splash Activity (Set as Launcher) -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.SplashActivity"
+            android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -20,32 +27,32 @@
 
         <!-- OnBoarding Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.OnBoardingActivity"
+            android:name=".OnBoardingActivity"
             android:exported="true" />
 
         <!-- Login Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.LoginActivity"
+            android:name=".LoginActivity"
             android:exported="true" />
 
         <!-- Signup Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.SignupActivity"
+            android:name=".SignupActivity"
             android:exported="true" />
 
         <!-- Forgot Password Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.ForgotPassActivity"
+            android:name=".ForgotPassActivity"
             android:exported="true" />
 
         <!-- OTP Verification Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.OtpVerificationActivity"
+            android:name=".OtpVerificationActivity"
             android:exported="true" />
 
         <!-- Reset Password Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.ResetPasswordActivity"
+            android:name=".ResetPasswordActivity"
             android:exported="true"
             android:launchMode="singleTask">
             <intent-filter>
@@ -61,18 +68,19 @@
 
         <!-- Main Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.MainActivity"
+            android:name=".MainActivity"
             android:exported="true" />
 
         <!-- Profile Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.ProfileActivity"
+            android:name=".ProfileActivity"
             android:exported="true" />
 
         <!-- EditProfile Activity -->
         <activity
-            android:name="com.oopgroup.smartpharmacy.EditProfileActivity"
+            android:name=".EditProfileActivity"
             android:exported="true" />
+
 
     </application>
 </manifest>

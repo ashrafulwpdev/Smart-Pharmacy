@@ -14,17 +14,33 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import java.util.Map;
+import java.util.HashMap;
 
 public class SignupActivity extends AppCompatActivity {
 
+    private static final int RC_GOOGLE_SIGN_IN = 9001;
     private EditText fullNameInput, credInput, passwordInput;
     private ProgressBar progressBar;
     private TextView loginText;
-    private ImageView passwordToggle;
+    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin;
     private FirebaseAuth mAuth;
+    private DatabaseReference databaseReference;
     private boolean isPasswordVisible = false;
+    private GoogleSignInClient mGoogleSignInClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +48,13 @@ public class SignupActivity extends AppCompatActivity {
         setContentView(R.layout.activity_signup);
 
         mAuth = FirebaseAuth.getInstance();
+        databaseReference = FirebaseDatabase.getInstance().getReference("users");
+
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id))
+                .requestEmail()
+                .build();
+        mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
         Button signupBtn = findViewById(R.id.signupBtn);
         fullNameInput = findViewById(R.id.fullNameInput);
@@ -40,12 +63,15 @@ public class SignupActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         loginText = findViewById(R.id.loginText);
         passwordToggle = findViewById(R.id.passwordToggle);
+        googleLogin = findViewById(R.id.googleLogin);
+        facebookLogin = findViewById(R.id.facebookLogin);
+        githubLogin = findViewById(R.id.githublogin);
 
         signupBtn.setOnClickListener(v -> {
             String fullName = fullNameInput.getText().toString().trim();
             String credentials = credInput.getText().toString().trim();
             String password = passwordInput.getText().toString().trim();
-            handleSignup(fullName, credentials, password);
+            handleEmailSignup(fullName, credentials, password);
         });
 
         loginText.setOnClickListener(v -> {
@@ -54,9 +80,13 @@ public class SignupActivity extends AppCompatActivity {
         });
 
         passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
+
+        googleLogin.setOnClickListener(v -> signInWithGoogle());
+        facebookLogin.setOnClickListener(v -> signInWithFacebook());
+        githubLogin.setOnClickListener(v -> signInWithGitHub());
     }
 
-    private void handleSignup(String fullName, String credentials, String password) {
+    private void handleEmailSignup(String fullName, String credentials, String password) {
         boolean fullNameEmpty = fullName.isEmpty();
         boolean credEmpty = credentials.isEmpty();
         boolean passEmpty = password.isEmpty();
@@ -84,15 +114,17 @@ public class SignupActivity extends AppCompatActivity {
             return;
         }
 
-        String email;
+        String emailOrPhone;
         if (credentials.contains("@") && credentials.contains(".")) {
-            email = credentials; // It's an email
+            emailOrPhone = credentials; // Email
         } else {
             if (!credentials.startsWith("+880")) {
-                credentials = "+880" + credentials; // Add Bangladesh country code
+                credentials = "+880" + credentials;
             }
-            email = credentials + "@smartpharmacy.com"; // Convert phone to email format
+            emailOrPhone = credentials; // Phone
         }
+
+        String email = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
 
         progressBar.setVisibility(View.VISIBLE);
         setUiEnabled(false);
@@ -102,9 +134,21 @@ public class SignupActivity extends AppCompatActivity {
                     progressBar.setVisibility(View.GONE);
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
+                        FirebaseUser user = mAuth.getCurrentUser();
+                        if (user != null) {
+                            Map<String, Object> userData = new HashMap<>();
+                            userData.put("fullName", fullName);
+                            userData.put("email", emailOrPhone.contains("@") ? emailOrPhone : "");
+                            userData.put("phoneNumber", emailOrPhone.contains("@") ? "" : emailOrPhone);
+                            userData.put("gender", "Not specified");
+                            userData.put("birthday", "");
+                            userData.put("username", "@" + fullName.replaceAll("\\s+", "").toLowerCase());
+                            userData.put("imageUrl", "");
+
+                            databaseReference.child(user.getUid()).setValue(userData);
+                        }
                         showCustomToast("Sign up successful!", true);
-                        Intent intent = new Intent(SignupActivity.this, MainActivity.class);
-                        startActivity(intent);
+                        startActivity(new Intent(SignupActivity.this, MainActivity.class));
                         finish();
                     } else {
                         if (task.getException() instanceof FirebaseAuthUserCollisionException) {
@@ -117,6 +161,65 @@ public class SignupActivity extends AppCompatActivity {
                         clearErrorBorders();
                     }
                 });
+    }
+
+    private void signInWithGoogle() {
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_GOOGLE_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                firebaseAuthWithGoogle(account.getIdToken(), account.getDisplayName(), account.getEmail());
+            } catch (ApiException e) {
+                showCustomToast("Google Sign-In failed: " + e.getMessage(), false);
+            }
+        }
+    }
+
+    private void firebaseAuthWithGoogle(String idToken, String displayName, String email) {
+        AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+        progressBar.setVisibility(View.VISIBLE);
+        setUiEnabled(false);
+
+        mAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, task -> {
+                    progressBar.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    if (task.isSuccessful()) {
+                        FirebaseUser user = mAuth.getCurrentUser();
+                        if (user != null) {
+                            Map<String, Object> userData = new HashMap<>();
+                            userData.put("fullName", displayName != null ? displayName : "User");
+                            userData.put("email", email != null ? email : "");
+                            userData.put("phoneNumber", "");
+                            userData.put("gender", "Not specified");
+                            userData.put("birthday", "");
+                            userData.put("username", "@" + displayName.replaceAll("\\s+", "").toLowerCase());
+                            userData.put("imageUrl", "");
+
+                            databaseReference.child(user.getUid()).setValue(userData);
+                        }
+                        showCustomToast("Google signup successful!", true);
+                        startActivity(new Intent(SignupActivity.this, MainActivity.class));
+                        finish();
+                    } else {
+                        showCustomToast("Google signup failed: " + task.getException().getMessage(), false);
+                    }
+                });
+    }
+
+    private void signInWithFacebook() {
+        showCustomToast("Facebook signup not implemented yet", false);
+    }
+
+    private void signInWithGitHub() {
+        showCustomToast("GitHub signup not implemented yet", false);
     }
 
     private void togglePasswordVisibility() {
@@ -138,6 +241,9 @@ public class SignupActivity extends AppCompatActivity {
         findViewById(R.id.signupBtn).setEnabled(enabled);
         loginText.setEnabled(enabled);
         passwordToggle.setEnabled(enabled);
+        googleLogin.setEnabled(enabled);
+        facebookLogin.setEnabled(enabled);
+        githubLogin.setEnabled(enabled);
     }
 
     private void applyErrorBorder(EditText editText) {
