@@ -5,17 +5,23 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.method.PasswordTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import com.airbnb.lottie.LottieAnimationView;
+import com.facebook.CallbackManager;
+import com.facebook.FacebookCallback;
+import com.facebook.FacebookException;
+import com.facebook.login.LoginManager;
+import com.facebook.login.LoginResult;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -23,22 +29,27 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.auth.OAuthProvider;
+import java.util.Arrays;
 
 public class LoginActivity extends AppCompatActivity {
 
-    private static final int RC_GOOGLE_SIGN_IN = 9001; // Request code for Google Sign-In
+    private static final int RC_GOOGLE_SIGN_IN = 9001;
+    private static final String TAG = "LoginActivity";
     private EditText credInput, passwordInput;
-    private ProgressBar progressBar;
+    private LottieAnimationView loadingSpinner;
     private TextView forgotText, signupText;
     private Button loginBtn;
-    private ImageView passwordToggle, googleLogin;
+    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin;
     private CheckBox rememberMeCheckbox;
     private FirebaseAuth mAuth;
     private SharedPreferences prefs;
     private boolean isPasswordVisible = false;
     private GoogleSignInClient mGoogleSignInClient;
+    private CallbackManager callbackManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,23 +59,53 @@ public class LoginActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         prefs = getSharedPreferences("SmartPharmacyPrefs", MODE_PRIVATE);
 
-        // Initialize Google Sign-In
+        // Google Sign-In Setup
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
+        // Facebook Sign-In Setup
+        callbackManager = CallbackManager.Factory.create();
+        LoginManager.getInstance().registerCallback(callbackManager,
+                new FacebookCallback<LoginResult>() {
+                    @Override
+                    public void onSuccess(LoginResult loginResult) {
+                        firebaseAuthWithFacebook(loginResult.getAccessToken().getToken());
+                    }
+
+                    @Override
+                    public void onCancel() {
+                        showCustomToast("Facebook login canceled", false);
+                    }
+
+                    @Override
+                    public void onError(FacebookException exception) {
+                        showCustomToast("Facebook login failed: " + exception.getMessage(), false);
+                    }
+                });
+
         // Initialize UI elements
         loginBtn = findViewById(R.id.loginBtn);
         credInput = findViewById(R.id.credInput);
         passwordInput = findViewById(R.id.passwordInput);
-        progressBar = findViewById(R.id.progressBar);
+        loadingSpinner = findViewById(R.id.loadingSpinner);
         forgotText = findViewById(R.id.forgotText);
         signupText = findViewById(R.id.signupText);
         passwordToggle = findViewById(R.id.passwordToggle);
         rememberMeCheckbox = findViewById(R.id.rememberMeCheckbox);
         googleLogin = findViewById(R.id.googleLogin);
+        facebookLogin = findViewById(R.id.facebookLogin);
+        githubLogin = findViewById(R.id.githublogin);
+
+        // Set Lottie animation programmatically
+        try {
+            loadingSpinner.setAnimation(R.raw.loading_global); // Use your new file
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to load Lottie animation: " + e.getMessage(), e);
+            loadingSpinner.setVisibility(View.GONE); // Hide if file is missing
+        }
 
         // Check if user is remembered
         if (prefs.getBoolean("rememberMe", false) && mAuth.getCurrentUser() != null) {
@@ -73,23 +114,19 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
+        // Set click listeners
         loginBtn.setOnClickListener(v -> {
             String credentials = credInput.getText().toString().trim();
             String password = passwordInput.getText().toString().trim();
             handleEmailLogin(credentials, password);
         });
 
-        forgotText.setOnClickListener(v -> {
-            startActivity(new Intent(LoginActivity.this, ForgotPassActivity.class));
-        });
-
-        signupText.setOnClickListener(v -> {
-            startActivity(new Intent(LoginActivity.this, SignupActivity.class));
-        });
-
+        forgotText.setOnClickListener(v -> startActivity(new Intent(LoginActivity.this, ForgotPassActivity.class)));
+        signupText.setOnClickListener(v -> startActivity(new Intent(LoginActivity.this, SignupActivity.class)));
         passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
-
         googleLogin.setOnClickListener(v -> signInWithGoogle());
+        facebookLogin.setOnClickListener(v -> signInWithFacebook());
+        githubLogin.setOnClickListener(v -> signInWithGitHub());
     }
 
     // Email/Password Login
@@ -113,22 +150,14 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        String email;
-        if (credentials.contains("@") && credentials.contains(".")) {
-            email = credentials; // It's an email
-        } else {
-            if (!credentials.startsWith("+880")) {
-                credentials = "+880" + credentials; // Add Bangladesh country code
-            }
-            email = credentials + "@smartpharmacy.com"; // Convert phone to email format
-        }
+        String email = credentials.contains("@") ? credentials : "+880" + credentials + "@smartpharmacy.com";
 
         setUiEnabled(false);
-        progressBar.setVisibility(View.VISIBLE);
+        loadingSpinner.setVisibility(View.VISIBLE);
 
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
-                    progressBar.setVisibility(View.GONE);
+                    loadingSpinner.setVisibility(View.GONE);
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         if (rememberMeCheckbox.isChecked()) {
@@ -154,28 +183,14 @@ public class LoginActivity extends AppCompatActivity {
         startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == RC_GOOGLE_SIGN_IN) {
-            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            try {
-                GoogleSignInAccount account = task.getResult(ApiException.class);
-                firebaseAuthWithGoogle(account.getIdToken());
-            } catch (ApiException e) {
-                showCustomToast("Google Sign-In failed: " + e.getMessage(), false);
-            }
-        }
-    }
-
     private void firebaseAuthWithGoogle(String idToken) {
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
         setUiEnabled(false);
-        progressBar.setVisibility(View.VISIBLE);
+        loadingSpinner.setVisibility(View.VISIBLE);
 
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
-                    progressBar.setVisibility(View.GONE);
+                    loadingSpinner.setVisibility(View.GONE);
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         if (rememberMeCheckbox.isChecked()) {
@@ -190,6 +205,81 @@ public class LoginActivity extends AppCompatActivity {
                         showCustomToast("Google login failed: " + task.getException().getMessage(), false);
                     }
                 });
+    }
+
+    // Facebook Sign-In
+    private void signInWithFacebook() {
+        LoginManager.getInstance().logInWithReadPermissions(this, Arrays.asList("email", "public_profile"));
+    }
+
+    private void firebaseAuthWithFacebook(String token) {
+        AuthCredential credential = FacebookAuthProvider.getCredential(token);
+        setUiEnabled(false);
+        loadingSpinner.setVisibility(View.VISIBLE);
+
+        mAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, task -> {
+                    loadingSpinner.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    if (task.isSuccessful()) {
+                        if (rememberMeCheckbox.isChecked()) {
+                            SharedPreferences.Editor editor = prefs.edit();
+                            editor.putBoolean("rememberMe", true);
+                            editor.apply();
+                        }
+                        showCustomToast("Facebook login successful!", true);
+                        startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                        finish();
+                    } else {
+                        showCustomToast("Facebook login failed: " + task.getException().getMessage(), false);
+                    }
+                });
+    }
+
+    // GitHub Sign-In
+    private void signInWithGitHub() {
+        OAuthProvider.Builder provider = OAuthProvider.newBuilder("github.com");
+        provider.addCustomParameter("client_id", "YOUR_GITHUB_CLIENT_ID"); // Replace with your GitHub Client ID
+        provider.setScopes(Arrays.asList("user:email"));
+
+        setUiEnabled(false);
+        loadingSpinner.setVisibility(View.VISIBLE);
+
+        mAuth.startActivityForSignInWithProvider(this, provider.build())
+                .addOnSuccessListener(authResult -> {
+                    loadingSpinner.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    if (rememberMeCheckbox.isChecked()) {
+                        SharedPreferences.Editor editor = prefs.edit();
+                        editor.putBoolean("rememberMe", true);
+                        editor.apply();
+                    }
+                    showCustomToast("GitHub login successful!", true);
+                    startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    loadingSpinner.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    Log.e(TAG, "GitHub login failed: " + e.getMessage());
+                    showCustomToast("GitHub login failed: " + e.getMessage(), false);
+                });
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_GOOGLE_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                firebaseAuthWithGoogle(account.getIdToken());
+            } catch (ApiException e) {
+                showCustomToast("Google Sign-In failed: " + e.getMessage(), false);
+            }
+        } else {
+            callbackManager.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     private void togglePasswordVisibility() {
@@ -222,6 +312,8 @@ public class LoginActivity extends AppCompatActivity {
         passwordToggle.setEnabled(enabled);
         rememberMeCheckbox.setEnabled(enabled);
         googleLogin.setEnabled(enabled);
+        facebookLogin.setEnabled(enabled);
+        githubLogin.setEnabled(enabled);
     }
 
     private void showCustomToast(String message, boolean isSuccess) {

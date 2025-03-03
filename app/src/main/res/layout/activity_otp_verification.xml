@@ -22,7 +22,7 @@
     <RelativeLayout
         android:id="@+id/otp_frame"
         android:layout_width="342dp"
-        android:layout_height="570dp"
+        android:layout_height="wrap_content"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="150dp"
         android:background="@drawable/login_bgframe"
@@ -46,7 +46,7 @@
             android:layout_below="@id/otp_icon"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="20dp"
-            android:text="Enter OTP"
+            android:text="Verify Your Identity"
             android:textColor="#1F1F1F"
             android:textSize="24sp"
             android:textStyle="bold" />
@@ -59,20 +59,34 @@
             android:layout_below="@id/otp_title"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="10dp"
-            android:text="A verification code has been sent to\n+8801234567890"
+            android:text=""
             android:textColor="#757575"
             android:textSize="14sp"
             android:textAlignment="center"
             android:maxWidth="280dp" />
+
+        <!-- Instructions Text -->
+        <TextView
+            android:id="@+id/instructions_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/otp_subtitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:text=""
+            android:textColor="#555555"
+            android:textSize="14sp"
+            android:textAlignment="center"
+            android:maxWidth="300dp" />
 
         <!-- OTP Input Boxes -->
         <LinearLayout
             android:id="@+id/otp_inputs"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/otp_subtitle"
+            android:layout_below="@id/instructions_text"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="40dp"
+            android:layout_marginTop="30dp"
             android:orientation="horizontal"
             android:gravity="center"
             android:padding="10dp">
@@ -233,16 +247,16 @@
             android:id="@+id/email_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/otp_subtitle"
+            android:layout_below="@id/instructions_text"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="40dp"
+            android:layout_marginTop="30dp"
             android:orientation="vertical"
             android:visibility="gone">
 
             <Button
                 android:id="@+id/openEmailBtn"
-                android:layout_width="280dp"
-                android:layout_height="50dp"
+                android:layout_width="300dp"
+                android:layout_height="55dp"
                 android:text="Open Email App"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"

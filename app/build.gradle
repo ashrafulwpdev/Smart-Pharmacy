@@ -46,9 +46,11 @@ dependencies {
     implementation("com.google.firebase:firebase-storage-ktx")
 
     // Other dependencies
-    implementation 'com.hbb20:ccp:2.6.1' // For CountryCodePicker
+    implementation 'com.hbb20:ccp:2.5.2'
 
     implementation 'com.google.android.gms:play-services-auth:20.7.0' // Google Sign-In
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'com.facebook.android:facebook-login:17.0.1'
+    implementation 'com.airbnb.android:lottie:6.4.0'
 }

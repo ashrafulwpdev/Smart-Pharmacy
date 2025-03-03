@@ -57,6 +57,7 @@ public class ProfileActivity extends AppCompatActivity {
 
     // Cached Profile Data
     private String cachedFullName, cachedPhoneNumber, cachedEmail, cachedImageUrl;
+    private String signInMethod;
     private boolean isPhonePrimary;
 
     @Override
@@ -221,7 +222,7 @@ public class ProfileActivity extends AppCompatActivity {
             userPhone.setText("Not provided");
         }
 
-        profileImage.setImageDrawable(null);
+        profileImage.setImageResource(R.drawable.default_profile);
         if (cachedImageUrl != null && !cachedImageUrl.isEmpty()) {
             Glide.with(this)
                     .load(cachedImageUrl)
@@ -231,14 +232,6 @@ public class ProfileActivity extends AppCompatActivity {
                             .skipMemoryCache(true)
                             .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
                     .error(R.drawable.default_profile)
-                    .into(profileImage);
-        } else {
-            Glide.with(this)
-                    .load(R.drawable.default_profile)
-                    .apply(new com.bumptech.glide.request.RequestOptions()
-                            .circleCrop()
-                            .override(INNER_SIZE, INNER_SIZE)
-                            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
                     .into(profileImage);
         }
     }
@@ -263,6 +256,7 @@ public class ProfileActivity extends AppCompatActivity {
                             Map<String, Object> userData = (Map<String, Object>) dataSnapshot.getValue();
                             cachedFullName = (String) userData.get("fullName");
                             cachedImageUrl = (String) userData.get("imageUrl");
+                            signInMethod = (String) userData.get("signInMethod");
 
                             userName.setText(cachedFullName != null ? cachedFullName : "User");
                             if (isPhonePrimary && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
@@ -273,7 +267,7 @@ public class ProfileActivity extends AppCompatActivity {
                                 userPhone.setText("Not provided");
                             }
 
-                            profileImage.setImageDrawable(null);
+                            profileImage.setImageResource(R.drawable.default_profile);
                             if (cachedImageUrl != null && !cachedImageUrl.isEmpty()) {
                                 Glide.with(ProfileActivity.this)
                                         .load(cachedImageUrl)
@@ -283,14 +277,6 @@ public class ProfileActivity extends AppCompatActivity {
                                                 .skipMemoryCache(true)
                                                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
                                         .error(R.drawable.default_profile)
-                                        .into(profileImage);
-                            } else {
-                                Glide.with(ProfileActivity.this)
-                                        .load(R.drawable.default_profile)
-                                        .apply(new com.bumptech.glide.request.RequestOptions()
-                                                .circleCrop()
-                                                .override(INNER_SIZE, INNER_SIZE)
-                                                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
                                         .into(profileImage);
                             }
                         } else {
@@ -302,14 +288,7 @@ public class ProfileActivity extends AppCompatActivity {
                             } else {
                                 userPhone.setText("Not provided");
                             }
-                            profileImage.setImageDrawable(null);
-                            Glide.with(ProfileActivity.this)
-                                    .load(R.drawable.default_profile)
-                                    .apply(new com.bumptech.glide.request.RequestOptions()
-                                            .circleCrop()
-                                            .override(INNER_SIZE, INNER_SIZE)
-                                            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
-                                    .into(profileImage);
+                            profileImage.setImageResource(R.drawable.default_profile);
                         }
                         swipeRefreshLayout.setRefreshing(false);
                     }
@@ -325,14 +304,7 @@ public class ProfileActivity extends AppCompatActivity {
                         } else {
                             userPhone.setText("Not provided");
                         }
-                        profileImage.setImageDrawable(null);
-                        Glide.with(ProfileActivity.this)
-                                .load(R.drawable.default_profile)
-                                .apply(new com.bumptech.glide.request.RequestOptions()
-                                        .circleCrop()
-                                        .override(INNER_SIZE, INNER_SIZE)
-                                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
-                                .into(profileImage);
+                        profileImage.setImageResource(R.drawable.default_profile);
                         swipeRefreshLayout.setRefreshing(false);
                     }
                 });
@@ -345,7 +317,7 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void logoutAndRedirectToLogin() {
         mAuth.signOut();
-        Intent intent = new Intent(ProfileActivity.this, LoginActivity.class); // Replace with your login activity
+        Intent intent = new Intent(ProfileActivity.this, LoginActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();

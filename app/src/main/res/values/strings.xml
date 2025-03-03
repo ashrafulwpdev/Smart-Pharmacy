@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">My Test</string>
     <string name="forgot_password"><u>Forgot Password?</u></string>
+    <string name="facebook_app_id">9653945951295736</string>
+    <string name="facebook_client_token">cdf5e7c5d2bcd746f4bddb2d4a4c6475</string>
+    <string name="fb_login_protocol_scheme">fb9653945951295736</string>
 
 </resources>

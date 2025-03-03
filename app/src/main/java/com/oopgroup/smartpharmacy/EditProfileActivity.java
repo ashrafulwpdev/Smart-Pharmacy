@@ -35,8 +35,11 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.PhoneAuthCredential;
 import com.google.firebase.auth.PhoneAuthProvider;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
@@ -48,8 +51,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * EditProfileActivity allows users to modify their profile details, including name, gender, birthday,
- * phone number, email, username, and profile image, with data saved to Firebase and cached locally.
+ * EditProfileActivity allows users to modify their profile details based on sign-in method.
  */
 public class EditProfileActivity extends AppCompatActivity {
 
@@ -86,7 +88,9 @@ public class EditProfileActivity extends AppCompatActivity {
     private Uri selectedImageUri;
     private String currentImageUrl, currentEmail, currentPhoneNumber;
     private String previousEmail, previousPhoneNumber;
+    private String signInMethod;
     private boolean isPhonePrimary;
+
     private ActivityResultLauncher<String> pickImage = registerForActivityResult(
             new ActivityResultContracts.GetContent(),
             result -> {
@@ -113,7 +117,7 @@ public class EditProfileActivity extends AppCompatActivity {
         currentUser = auth.getCurrentUser();
         if (currentUser == null) {
             showCustomToast("User not authenticated. Please log in.", false);
-            startActivity(new Intent(this, LoginActivity.class)); // Replace with your login activity
+            startActivity(new Intent(this, LoginActivity.class));
             finish();
             return;
         }
@@ -211,12 +215,14 @@ public class EditProfileActivity extends AppCompatActivity {
         String cachedEmail = sharedPreferences.getString("email", "");
         String cachedUsername = sharedPreferences.getString("username", "");
         String cachedImageUrl = sharedPreferences.getString("imageUrl", "");
+        signInMethod = sharedPreferences.getString("signInMethod", "email");
 
         fullNameEditText.setText(cachedFullName);
         genderSpinner.setSelection(((ArrayAdapter<String>) genderSpinner.getAdapter()).getPosition(cachedGender));
         birthdayEditText.setText(cachedBirthday);
-        phoneNumberEditText.setText(cachedPhoneNumber.replaceAll("[^0-9+]", "")); // Strip non-numeric except +
+        phoneNumberEditText.setText(cachedPhoneNumber.replaceAll("[^0-9]", ""));
         emailEditText.setText(cachedEmail);
+        emailEditText.setEnabled(!"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod));
         usernameEditText.setText(cachedUsername);
         displayFullNameTextView.setText(cachedFullName);
         displayPhoneNumberTextView.setText(cachedPhoneNumber.isEmpty() ? "" : cachedPhoneNumber);
@@ -247,12 +253,14 @@ public class EditProfileActivity extends AppCompatActivity {
                     String email = (String) userData.get("email");
                     String username = (String) userData.get("username");
                     currentImageUrl = (String) userData.get("imageUrl");
+                    signInMethod = (String) userData.get("signInMethod");
 
                     fullNameEditText.setText(fullName);
                     genderSpinner.setSelection(((ArrayAdapter<String>) genderSpinner.getAdapter()).getPosition(gender != null ? gender : DEFAULT_GENDER));
                     birthdayEditText.setText(birthday != null ? birthday : DEFAULT_BIRTHDAY);
-                    phoneNumberEditText.setText(phoneNumber != null ? phoneNumber.replaceAll("[^0-9]", "") : ""); // Show only digits
-                    emailEditText.setText(currentEmail); // Use Auth email
+                    phoneNumberEditText.setText(phoneNumber != null ? phoneNumber.replaceAll("[^0-9]", "") : "");
+                    emailEditText.setText(currentEmail);
+                    emailEditText.setEnabled(!"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod));
                     usernameEditText.setText(username);
                     displayFullNameTextView.setText(fullName);
                     displayPhoneNumberTextView.setText(phoneNumber != null && !phoneNumber.isEmpty() ? phoneNumber : "");
@@ -265,6 +273,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     editor.putString("email", currentEmail);
                     editor.putString("username", username);
                     editor.putString("imageUrl", currentImageUrl != null ? currentImageUrl : "");
+                    editor.putString("signInMethod", signInMethod != null ? signInMethod : "email");
                     editor.apply();
 
                     currentPhoneNumber = phoneNumber;
@@ -285,7 +294,7 @@ public class EditProfileActivity extends AppCompatActivity {
     }
 
     private void loadProfileImage(Uri imageUri) {
-        profileImage.setImageDrawable(null);
+        profileImage.setImageResource(R.drawable.default_profile);
         if (imageUri != null) {
             Glide.with(this)
                     .load(imageUri)
@@ -295,13 +304,6 @@ public class EditProfileActivity extends AppCompatActivity {
                             .skipMemoryCache(true)
                             .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
                     .error(R.drawable.default_profile)
-                    .into(profileImage);
-        } else {
-            Glide.with(this)
-                    .load(R.drawable.default_profile)
-                    .apply(new com.bumptech.glide.request.RequestOptions()
-                            .circleCrop()
-                            .override(INNER_SIZE, INNER_SIZE))
                     .into(profileImage);
         }
     }
@@ -331,35 +333,79 @@ public class EditProfileActivity extends AppCompatActivity {
         String gender = genderSpinner.getSelectedItem() != null ? genderSpinner.getSelectedItem().toString() : DEFAULT_GENDER;
         String birthday = birthdayEditText.getText().toString().trim().isEmpty() ? DEFAULT_BIRTHDAY : birthdayEditText.getText().toString().trim();
         String phoneNumberInput = phoneNumberEditText.getText().toString().trim();
-        String phoneNumber = phoneNumberInput.isEmpty() ? "" : ccp.getSelectedCountryCodeWithPlus() + phoneNumberInput; // Only append country code once
+        String phoneNumber = phoneNumberInput.isEmpty() ? "" : ccp.getSelectedCountryCodeWithPlus() + phoneNumberInput;
         String email = emailEditText.getText().toString().trim();
         String username = usernameEditText.getText().toString().trim();
 
-        if (fullName.isEmpty() || email.isEmpty() || username.isEmpty()) {
-            showCustomToast("Full name, email, and username are required.", false);
-            return;
-        }
-
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            showCustomToast("Please enter a valid email address.", false);
+        if (fullName.isEmpty() || username.isEmpty()) {
+            showCustomToast(fullName.isEmpty() ? "Full name is required." : "Username is required.", false);
+            applyErrorBorder(fullName.isEmpty() ? fullNameEditText : usernameEditText);
             return;
         }
 
         if (!phoneNumberInput.isEmpty() && phoneNumberInput.length() < 8) {
             showCustomToast("Phone number must be at least 8 digits if provided.", false);
+            applyErrorBorder(phoneNumberEditText);
             return;
         }
 
-        boolean emailChanged = !email.equalsIgnoreCase(currentEmail);
+        if (!"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod) && email.isEmpty()) {
+            showCustomToast("Email is required for email sign-in.", false);
+            applyErrorBorder(emailEditText);
+            return;
+        }
+
+        if (!"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod) && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            showCustomToast("Please enter a valid email address.", false);
+            applyErrorBorder(emailEditText);
+            return;
+        }
+
+        boolean emailChanged = !"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod) && !email.equalsIgnoreCase(currentEmail);
         boolean phoneChanged = !phoneNumber.equals(currentPhoneNumber == null ? "" : currentPhoneNumber);
 
-        if (emailChanged && !isPhonePrimary) {
-            showCustomPasswordDialog(fullName, gender, birthday, phoneNumber, email, username, true);
-        } else if (phoneChanged && isPhonePrimary) {
-            verifyPhoneNumber(fullName, gender, birthday, phoneNumber, email, username);
-        } else {
-            saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri == null ? currentImageUrl : null);
-        }
+        checkUsernameUnique(username, isUnique -> {
+            if (!isUnique && !username.equals(sharedPreferences.getString("username", ""))) {
+                showCustomToast("Username '" + username + "' is already taken. Please choose another.", false);
+                applyErrorBorder(usernameEditText);
+            } else if (emailChanged && !isPhonePrimary) {
+                showCustomPasswordDialog(fullName, gender, birthday, phoneNumber, email, username, true);
+            } else if (phoneChanged && isPhonePrimary) {
+                verifyPhoneNumber(fullName, gender, birthday, phoneNumber, email, username);
+            } else {
+                saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri == null ? currentImageUrl : null);
+            }
+        });
+    }
+
+    private void checkUsernameUnique(String username, OnUsernameCheckListener listener) {
+        databaseReference.orderByChild("username").equalTo(username).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                listener.onResult(!dataSnapshot.exists());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                showCustomToast("Failed to check username: " + databaseError.getMessage(), false);
+                listener.onResult(false);
+            }
+        });
+    }
+
+    interface OnUsernameCheckListener {
+        void onResult(boolean isUnique);
+    }
+
+    private void applyErrorBorder(EditText editText) {
+        editText.setBackgroundResource(R.drawable.edittext_error_bg);
+    }
+
+    private void clearErrorBorders() {
+        fullNameEditText.setBackgroundResource(R.drawable.edittext_bg);
+        phoneNumberEditText.setBackgroundResource(R.drawable.edittext_bg);
+        emailEditText.setBackgroundResource(R.drawable.edittext_bg);
+        usernameEditText.setBackgroundResource(R.drawable.edittext_bg);
     }
 
     private void showCustomPasswordDialog(String fullName, String gender, String birthday, String phoneNumber, String email, String username, boolean isEmailReauth) {
@@ -538,7 +584,6 @@ public class EditProfileActivity extends AppCompatActivity {
                                                 loadingSpinner.setVisibility(View.GONE);
                                                 saveButton.setEnabled(true);
                                                 showCustomToast("A verification email has been sent to " + email + ". Please verify it to update your email.", true);
-                                                // Update database with new email immediately
                                                 databaseReference.child(currentUser.getUid()).child("email").setValue(email);
                                                 saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri == null ? currentImageUrl : null);
                                             })
@@ -636,6 +681,7 @@ public class EditProfileActivity extends AppCompatActivity {
         user.put("email", email);
         user.put("username", username);
         user.put("imageUrl", imageUrl);
+        user.put("signInMethod", signInMethod);
 
         databaseReference.child(currentUser.getUid()).setValue(user)
                 .addOnSuccessListener(aVoid -> {
@@ -647,6 +693,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     editor.putString("email", email);
                     editor.putString("username", username);
                     editor.putString("imageUrl", imageUrl);
+                    editor.putString("signInMethod", signInMethod);
                     editor.apply();
 
                     currentPhoneNumber = phoneNumber;
@@ -679,14 +726,14 @@ public class EditProfileActivity extends AppCompatActivity {
     }
 
     private void showCustomToast(String message, boolean isSuccess) {
-        LayoutInflater inflater = getLayoutInflater();
-        View toastView = inflater.inflate(R.layout.custom_toast, null);
+        Toast toast = new Toast(this);
+        toast.setDuration(Toast.LENGTH_LONG);
+        toast.setGravity(Gravity.CENTER, 0, 0);
+        View toastView = getLayoutInflater().inflate(R.layout.custom_toast, null);
         TextView toastText = toastView.findViewById(R.id.toast_text);
         toastText.setText(message);
         toastText.setTextColor(ContextCompat.getColor(this, android.R.color.white));
         toastView.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
-        Toast toast = new Toast(this);
-        toast.setDuration(Toast.LENGTH_LONG);
         toast.setView(toastView);
         toast.show();
     }

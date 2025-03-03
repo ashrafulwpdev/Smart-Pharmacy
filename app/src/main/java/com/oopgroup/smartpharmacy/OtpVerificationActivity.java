@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 public class OtpVerificationActivity extends AppCompatActivity {
 
     private static final String TAG = "OtpVerificationActivity";
-    private EditText otpBox1, otpBox2, otpBox3, otpBox4, otpBox5, otpBox6; // Now 6 boxes
+    private EditText otpBox1, otpBox2, otpBox3, otpBox4, otpBox5, otpBox6;
     private Button verifyBtn, openEmailBtn;
-    private TextView resendText, subtitle;
+    private TextView resendText, subtitle, title, instructionsText;
     private LottieAnimationView loadingSpinner;
     private LinearLayout otpInputs, verifyContainer, emailContainer;
     private String credentials, verificationId;
@@ -56,6 +56,8 @@ public class OtpVerificationActivity extends AppCompatActivity {
         verifyContainer = findViewById(R.id.verify_container);
         emailContainer = findViewById(R.id.email_container);
         subtitle = findViewById(R.id.otp_subtitle);
+        title = findViewById(R.id.otp_title);
+        instructionsText = findViewById(R.id.instructions_text);
 
         credentials = getIntent().getStringExtra("credentials");
         verificationId = getIntent().getStringExtra("verificationId");
@@ -74,7 +76,9 @@ public class OtpVerificationActivity extends AppCompatActivity {
             verifyContainer.setVisibility(View.GONE);
             resendText.setVisibility(View.GONE);
             emailContainer.setVisibility(View.VISIBLE);
+            title.setText("Reset Your Password");
             subtitle.setText("A password reset link has been sent to\n" + credentials);
+            instructionsText.setText("Please check your email inbox (and spam/junk folder)\nfor a password reset link from us.");
         } else {
             // Phone OTP UI
             if (verificationId == null) {
@@ -86,7 +90,9 @@ public class OtpVerificationActivity extends AppCompatActivity {
             verifyContainer.setVisibility(View.VISIBLE);
             resendText.setVisibility(View.VISIBLE);
             emailContainer.setVisibility(View.GONE);
+            title.setText("Enter Verification Code");
             subtitle.setText("A 6-digit verification code has been sent to\n" + credentials);
+            instructionsText.setText("Enter the 6-digit code we sent to your phone.\nIt may take a few moments to arrive.");
             setupOtpForPhone();
         }
 
