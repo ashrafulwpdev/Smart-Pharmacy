@@ -1,69 +1,88 @@
 package com.oopgroup.smartpharmacy;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
-import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
+import com.bumptech.glide.request.RequestOptions;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthInvalidUserException;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.auth.PhoneAuthProvider;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+
 import java.util.Map;
 
-/**
- * ProfileActivity displays the user's profile information, including name, phone/email, and profile image.
- * It handles navigation to other activities and provides a logout feature.
- */
 public class ProfileActivity extends AppCompatActivity {
 
-    // Constants
     private static final int IMAGE_SIZE = 102;
     private static final int INNER_SIZE = IMAGE_SIZE - 4;
+    private static final String PREFS_NAME = "UserProfile";
+    private static final String TAG = "ProfileActivity";
+    private static final String KEY_DATA_FRESH = "data_fresh";
+    private static final String KEY_LAST_FETCH_SUCCESS = "last_fetch_success";
+    private static final int EDIT_PROFILE_REQUEST = 1;
 
-    // UI Elements - Navigation
     private LinearLayout navHome, navCategories, navScanner, navProfile, navLabTest;
     private ImageView icHome, icCategories, icScanner, icProfile, icLabTest;
     private View homeIndicator, categoriesIndicator, scannerIndicator, labTestIndicator, profileIndicator;
     private LinearLayout selectedNavItem;
     private ImageView selectedIcon;
 
-    // UI Elements - Profile Display
     private ImageView profileImage;
     private TextView userName, userPhone;
-    private RelativeLayout editProfileLayout;
+    private RelativeLayout editProfileLayout, changePasswordLayout;
     private Button logoutBtn;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private ProgressBar loadingProgress;
 
-    // Firebase Components
     private FirebaseAuth mAuth;
     private DatabaseReference databaseReference;
     private FirebaseUser currentUser;
 
-    // Cached Profile Data
     private String cachedFullName, cachedPhoneNumber, cachedEmail, cachedImageUrl;
     private String signInMethod;
-    private boolean isPhonePrimary;
+
+    private SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile);
+
+        // Initialize SharedPreferences
+        sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        // Preload cached data
+        cachedFullName = sharedPreferences.getString("fullName", "User");
+        cachedPhoneNumber = sharedPreferences.getString("phoneNumber", "");
+        cachedEmail = sharedPreferences.getString("email", "");
+        cachedImageUrl = sharedPreferences.getString("imageUrl", "");
+        signInMethod = sharedPreferences.getString("signInMethod", "email");
 
         initializeFirebase();
 
@@ -76,10 +95,71 @@ public class ProfileActivity extends AppCompatActivity {
         setupNavigationListeners();
         setupMenuListeners();
         setupLogoutListener();
-        swipeRefreshLayout.setOnRefreshListener(this::loadProfileDataFromFirebase);
+        swipeRefreshLayout.setOnRefreshListener(this::onRefresh);
 
-        loadCachedProfileData();
-        loadProfileDataFromFirebase();
+        // Display cached data immediately
+        Log.d(TAG, "Displaying cached data with image URL: " + cachedImageUrl);
+        displayCachedProfileData();
+
+        // Fetch fresh data in the background if needed
+        if (!sharedPreferences.getBoolean(KEY_DATA_FRESH, false) || !sharedPreferences.getBoolean(KEY_LAST_FETCH_SUCCESS, false)) {
+            loadingProgress.setVisibility(View.VISIBLE);
+            loadProfileDataFromFirebase();
+        } else {
+            loadingProgress.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mAuth.getCurrentUser() == null) {
+            logoutAndRedirectToLogin();
+        } else {
+            currentUser = mAuth.getCurrentUser();
+            displayCachedProfileData();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == EDIT_PROFILE_REQUEST && resultCode == RESULT_OK && data != null) {
+            Log.d(TAG, "Received save result from EditProfileActivity");
+            String newImageUrl = data.getStringExtra("imageUrl");
+            String newFullName = data.getStringExtra("fullName");
+            String newPhoneNumber = data.getStringExtra("phoneNumber");
+            String newEmail = data.getStringExtra("email");
+            String newUsername = data.getStringExtra("username");
+
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            if (newImageUrl != null) {
+                cachedImageUrl = newImageUrl;
+                editor.putString("imageUrl", cachedImageUrl);
+            }
+            if (newFullName != null) {
+                cachedFullName = newFullName;
+                editor.putString("fullName", cachedFullName);
+            }
+            if (newPhoneNumber != null) {
+                cachedPhoneNumber = newPhoneNumber;
+                editor.putString("phoneNumber", cachedPhoneNumber);
+            }
+            if (newEmail != null) {
+                cachedEmail = newEmail;
+                editor.putString("email", cachedEmail);
+            }
+            if (newUsername != null) {
+                editor.putString("username", newUsername);
+            }
+            editor.putBoolean(KEY_DATA_FRESH, true);
+            editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
+            editor.apply();
+
+            displayCachedProfileData();
+            loadingProgress.setVisibility(View.VISIBLE);
+            loadProfileDataFromFirebase();
+        }
     }
 
     private void initializeFirebase() {
@@ -87,8 +167,6 @@ public class ProfileActivity extends AppCompatActivity {
         currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             databaseReference = FirebaseDatabase.getInstance().getReference("users").child(currentUser.getUid());
-            isPhonePrimary = currentUser.getProviderData().stream()
-                    .anyMatch(info -> PhoneAuthProvider.PROVIDER_ID.equals(info.getProviderId()) && info.getPhoneNumber() != null);
         } else {
             logoutAndRedirectToLogin();
         }
@@ -117,9 +195,11 @@ public class ProfileActivity extends AppCompatActivity {
         userName = findViewById(R.id.userName);
         userPhone = findViewById(R.id.userPhone);
         LinearLayout menuItems = findViewById(R.id.menuItems);
-        editProfileLayout = (RelativeLayout) menuItems.getChildAt(0);
+        editProfileLayout = (RelativeLayout) menuItems.getChildAt(0); // Edit Profile
+        changePasswordLayout = (RelativeLayout) menuItems.getChildAt(1); // Change Password
         logoutBtn = findViewById(R.id.logoutBtn);
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+        loadingProgress = findViewById(R.id.loadingProgress);
 
         setSelectedNavItem(navProfile, icProfile, profileIndicator);
     }
@@ -154,14 +234,22 @@ public class ProfileActivity extends AppCompatActivity {
                 v.startAnimation(scaleAnimation);
 
                 if (v == editProfileLayout) {
-                    startActivity(new Intent(ProfileActivity.this, EditProfileActivity.class));
+                    Intent intent = new Intent(ProfileActivity.this, EditProfileActivity.class);
+                    intent.putExtra("currentImageUrl", cachedImageUrl);
+                    startActivityForResult(intent, EDIT_PROFILE_REQUEST);
+                } else if (v == changePasswordLayout) {
+                    Intent intent = new Intent(ProfileActivity.this, ChangePasswordActivity.class);
+                    startActivity(intent);
                 }
             });
         }
     }
 
     private void setupLogoutListener() {
-        logoutBtn.setOnClickListener(v -> logoutAndRedirectToLogin());
+        logoutBtn.setOnClickListener(v -> {
+            LogoutConfirmationDialog dialog = new LogoutConfirmationDialog(this, () -> logoutAndRedirectToLogin());
+            dialog.show();
+        });
     }
 
     private void setSelectedNavItem(LinearLayout newSelectedLayout, ImageView newSelectedIcon, View indicator) {
@@ -196,7 +284,7 @@ public class ProfileActivity extends AppCompatActivity {
         if (selectedNavItem != navScanner) {
             selectedIcon.setColorFilter(ContextCompat.getColor(this, R.color.nav_active));
             if (selectedNavItem.getChildCount() > 2) {
-                TextView textView = (TextView) selectedNavItem.getChildAt(2);
+                TextView textView = (TextView) selectedNavItem.getChildAt(2); // Fixed typo
                 textView.setTextColor(ContextCompat.getColor(this, R.color.nav_active));
             }
         }
@@ -210,30 +298,37 @@ public class ProfileActivity extends AppCompatActivity {
         }
     }
 
-    private void loadCachedProfileData() {
+    private void displayCachedProfileData() {
         userName.setText(cachedFullName != null ? cachedFullName : "User");
-        if (isPhonePrimary && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
-            userPhone.setText(cachedPhoneNumber);
-        } else if (cachedEmail != null && !cachedEmail.isEmpty()) {
-            userPhone.setText(cachedEmail);
-        } else if (currentUser != null && currentUser.getEmail() != null) {
-            userPhone.setText(currentUser.getEmail());
-        } else {
-            userPhone.setText("Not provided");
-        }
+        String contactInfo = getPrimaryContactInfo();
+        userPhone.setText(contactInfo != null ? contactInfo : "Not provided");
 
-        profileImage.setImageResource(R.drawable.default_profile);
+        profileImage.setImageDrawable(null);
+
+        RequestOptions options = new RequestOptions()
+                .circleCrop()
+                .override(INNER_SIZE, INNER_SIZE)
+                .placeholder(R.drawable.default_profile)
+                .error(R.drawable.default_profile)
+                .diskCacheStrategy(DiskCacheStrategy.ALL);
+
         if (cachedImageUrl != null && !cachedImageUrl.isEmpty()) {
             Glide.with(this)
                     .load(cachedImageUrl)
-                    .apply(new com.bumptech.glide.request.RequestOptions()
-                            .circleCrop()
-                            .override(INNER_SIZE, INNER_SIZE)
-                            .skipMemoryCache(true)
-                            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
-                    .error(R.drawable.default_profile)
+                    .apply(options)
+                    .transition(DrawableTransitionOptions.withCrossFade())
                     .into(profileImage);
+        } else {
+            profileImage.setImageResource(R.drawable.default_profile);
         }
+        Log.d(TAG, "Displayed image URL: " + cachedImageUrl);
+    }
+
+    private void onRefresh() {
+        Log.d(TAG, "Swipe refresh triggered");
+        loadingProgress.setVisibility(View.VISIBLE);
+        swipeRefreshLayout.setRefreshing(true);
+        loadProfileDataFromFirebase();
     }
 
     private void loadProfileDataFromFirebase() {
@@ -243,76 +338,114 @@ public class ProfileActivity extends AppCompatActivity {
         }
 
         currentUser.reload().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                cachedEmail = currentUser.getEmail();
-                cachedPhoneNumber = currentUser.getPhoneNumber();
-                isPhonePrimary = currentUser.getProviderData().stream()
-                        .anyMatch(info -> PhoneAuthProvider.PROVIDER_ID.equals(info.getProviderId()) && info.getPhoneNumber() != null);
-
-                databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(DataSnapshot dataSnapshot) {
-                        if (dataSnapshot.exists()) {
-                            Map<String, Object> userData = (Map<String, Object>) dataSnapshot.getValue();
-                            cachedFullName = (String) userData.get("fullName");
-                            cachedImageUrl = (String) userData.get("imageUrl");
-                            signInMethod = (String) userData.get("signInMethod");
-
-                            userName.setText(cachedFullName != null ? cachedFullName : "User");
-                            if (isPhonePrimary && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
-                                userPhone.setText(cachedPhoneNumber);
-                            } else if (cachedEmail != null && !cachedEmail.isEmpty()) {
-                                userPhone.setText(cachedEmail);
-                            } else {
-                                userPhone.setText("Not provided");
-                            }
-
-                            profileImage.setImageResource(R.drawable.default_profile);
-                            if (cachedImageUrl != null && !cachedImageUrl.isEmpty()) {
-                                Glide.with(ProfileActivity.this)
-                                        .load(cachedImageUrl)
-                                        .apply(new com.bumptech.glide.request.RequestOptions()
-                                                .circleCrop()
-                                                .override(INNER_SIZE, INNER_SIZE)
-                                                .skipMemoryCache(true)
-                                                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE))
-                                        .error(R.drawable.default_profile)
-                                        .into(profileImage);
-                            }
-                        } else {
-                            userName.setText("User");
-                            if (isPhonePrimary && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
-                                userPhone.setText(cachedPhoneNumber);
-                            } else if (cachedEmail != null && !cachedEmail.isEmpty()) {
-                                userPhone.setText(cachedEmail);
-                            } else {
-                                userPhone.setText("Not provided");
-                            }
-                            profileImage.setImageResource(R.drawable.default_profile);
-                        }
-                        swipeRefreshLayout.setRefreshing(false);
-                    }
-
-                    @Override
-                    public void onCancelled(DatabaseError databaseError) {
-                        Toast.makeText(ProfileActivity.this, "Failed to load profile: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                        userName.setText("User");
-                        if (isPhonePrimary && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
-                            userPhone.setText(cachedPhoneNumber);
-                        } else if (cachedEmail != null && !cachedEmail.isEmpty()) {
-                            userPhone.setText(cachedEmail);
-                        } else {
-                            userPhone.setText("Not provided");
-                        }
-                        profileImage.setImageResource(R.drawable.default_profile);
-                        swipeRefreshLayout.setRefreshing(false);
-                    }
-                });
-            } else {
-                Toast.makeText(ProfileActivity.this, "Failed to refresh user data: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                logoutAndRedirectToLogin();
+            if (!task.isSuccessful()) {
+                Exception e = task.getException();
+                if (e instanceof FirebaseAuthInvalidUserException) {
+                    Toast.makeText(ProfileActivity.this, "Session expired. Please log in again.", Toast.LENGTH_LONG).show();
+                    logoutAndRedirectToLogin();
+                    return;
+                } else {
+                    Toast.makeText(ProfileActivity.this, "Error refreshing session: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
             }
+
+            databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    boolean dataUpdated = false;
+                    if (dataSnapshot.exists()) {
+                        Map<String, Object> userData = (Map<String, Object>) dataSnapshot.getValue();
+                        String newFullName = (String) userData.get("fullName");
+                        String newPhoneNumber = (String) userData.get("phoneNumber");
+                        String newEmail = (String) userData.get("email");
+                        String newImageUrl = (String) userData.get("imageUrl");
+                        String newSignInMethod = (String) userData.get("signInMethod");
+
+                        if (!newFullName.equals(cachedFullName) || !newPhoneNumber.equals(cachedPhoneNumber) ||
+                                !newEmail.equals(cachedEmail) || !newImageUrl.equals(cachedImageUrl) ||
+                                !newSignInMethod.equals(signInMethod)) {
+                            cachedFullName = newFullName;
+                            cachedPhoneNumber = newPhoneNumber;
+                            cachedEmail = newEmail;
+                            cachedImageUrl = newImageUrl;
+                            signInMethod = newSignInMethod;
+                            dataUpdated = true;
+
+                            SharedPreferences.Editor editor = sharedPreferences.edit();
+                            editor.putString("fullName", cachedFullName);
+                            editor.putString("phoneNumber", cachedPhoneNumber);
+                            editor.putString("email", cachedEmail);
+                            editor.putString("imageUrl", cachedImageUrl);
+                            editor.putString("signInMethod", signInMethod);
+                            editor.putBoolean(KEY_DATA_FRESH, true);
+                            editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
+                            editor.apply();
+
+                            displayCachedProfileData();
+                        }
+                    } else {
+                        Toast.makeText(ProfileActivity.this, "No profile data found.", Toast.LENGTH_SHORT).show();
+                        SharedPreferences.Editor editor = sharedPreferences.edit();
+                        editor.putBoolean(KEY_LAST_FETCH_SUCCESS, false);
+                        editor.apply();
+                    }
+                    loadingProgress.setVisibility(View.GONE);
+                    swipeRefreshLayout.setRefreshing(false);
+                    Log.d(TAG, "Fetch completed, dataUpdated: " + dataUpdated);
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+                    handleDatabaseError(databaseError);
+                }
+            });
         });
+    }
+
+    private void handleDatabaseError(DatabaseError databaseError) {
+        loadingProgress.setVisibility(View.GONE);
+        swipeRefreshLayout.setRefreshing(false);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putBoolean(KEY_LAST_FETCH_SUCCESS, false);
+        editor.apply();
+
+        String errorMessage;
+        switch (databaseError.getCode()) {
+            case DatabaseError.PERMISSION_DENIED:
+                errorMessage = "Permission denied. Contact support.";
+                break;
+            case DatabaseError.NETWORK_ERROR:
+                errorMessage = "Network error. Retrying in 2 seconds...";
+                new Handler().postDelayed(() -> {
+                    if (!isFinishing()) {
+                        loadProfileDataFromFirebase();
+                    }
+                }, 2000);
+                break;
+            case DatabaseError.DISCONNECTED:
+                errorMessage = "Disconnected from server. Please try again later.";
+                break;
+            default:
+                errorMessage = "Failed to load profile: " + databaseError.getMessage();
+                break;
+        }
+        Toast.makeText(ProfileActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Database error: " + databaseError.getDetails());
+    }
+
+    private String getPrimaryContactInfo() {
+        if ("phone".equals(signInMethod) && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
+            return cachedPhoneNumber;
+        } else if (cachedEmail != null && !cachedEmail.isEmpty()) {
+            return cachedEmail;
+        } else if (currentUser != null) {
+            if (currentUser.getPhoneNumber() != null && !currentUser.getPhoneNumber().isEmpty()) {
+                return currentUser.getPhoneNumber();
+            } else if (currentUser.getEmail() != null && !currentUser.getEmail().isEmpty()) {
+                return currentUser.getEmail();
+            }
+        }
+        return null;
     }
 
     private void logoutAndRedirectToLogin() {
@@ -321,16 +454,5 @@ public class ProfileActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (mAuth.getCurrentUser() == null) {
-            logoutAndRedirectToLogin();
-        } else {
-            currentUser = mAuth.getCurrentUser();
-            loadProfileDataFromFirebase();
-        }
     }
 }

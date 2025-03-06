@@ -1,22 +1,20 @@
 package com.oopgroup.smartpharmacy;
 
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.airbnb.lottie.LottieAnimationView;
 import com.facebook.CallbackManager;
@@ -41,15 +39,14 @@ import com.google.firebase.auth.PhoneAuthCredential;
 import com.google.firebase.auth.PhoneAuthOptions;
 import com.google.firebase.auth.PhoneAuthProvider;
 import com.hbb20.CountryCodePicker;
+
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 public class ForgotPassActivity extends AppCompatActivity {
 
     private static final String TAG = "ForgotPassActivity";
     private static final int RC_GOOGLE_SIGN_IN = 9001;
-    private static final int REQUEST_PHONE_STATE_PERMISSION = 1001;
     private EditText credInput;
     private Button resetBtn;
     private LottieAnimationView loadingSpinner;
@@ -60,23 +57,6 @@ public class ForgotPassActivity extends AppCompatActivity {
     private GoogleSignInClient mGoogleSignInClient;
     private CallbackManager callbackManager;
     private boolean isPhoneInput = false;
-
-    // Updated regex for BD, MY, SG with strict length requirements
-    // BD: +8801738861411, 8801738861411, 01738861411, 1738861411 (10 digits after +880 or 01)
-    // MY: +60123456789, 60123456789, 0123456789 (9-10 digits after +60 or 01)
-    // SG: +6581234567, 6581234567, 81234567 (8 digits after +65)
-    private static final String PHONE_REGEX = "^((\\+?8801[3-9]\\d{8})|01[3-9]\\d{8}|1[3-9]\\d{8}|(\\+?601[0-9]\\d{7,8})|01\\d{7,8}|(\\+?65[89]\\d{6})|[89]\\d{6})$";
-    private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@(.+)$";
-
-    private static boolean isValidPhoneNumber(String phone) {
-        // Clean the input by removing spaces and non-numeric characters (except +)
-        String cleanedPhone = phone.replaceAll("[^0-9+]", "");
-        return Pattern.matches(PHONE_REGEX, cleanedPhone);
-    }
-
-    private static boolean isValidEmail(String email) {
-        return Pattern.matches(EMAIL_REGEX, email) && email.contains(".");
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -126,59 +106,29 @@ public class ForgotPassActivity extends AppCompatActivity {
         ccp = findViewById(R.id.ccp);
 
         // Set default country based on device locale, restricted to BD, MY, SG
-        TelephonyManager tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        String countryCode = tm.getSimCountryIso().toUpperCase();
-        if (countryCode.equals("BD") || countryCode.equals("MY") || countryCode.equals("SG")) {
-            ccp.setCountryForNameCode(countryCode);
-        } else {
-            ccp.setCountryForNameCode("BD");
-        }
         ccp.setCustomMasterCountries("BD,MY,SG");
+        ccp.setCountryForNameCode("MY"); // Default to Malaysia for testing
 
         // Attempt to fetch the SIM number
-        fetchSimNumber();
+        AuthInputHandler.fetchSimNumber(this, credInput);
 
-        // TextWatcher for seamless detection
+        // Setup dynamic input and adjust padding
+        AuthInputHandler.setupDynamicInput(this, credInput, ccp, emailIcon, phoneIcon, validationMessage);
+        adjustCredInputPadding();
+
+        // TextWatcher for border reset and phone detection
         credInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+                adjustCredInputPadding();
                 String input = s.toString().trim();
-                credInput.setError(null);
-
-                if (isValidEmail(input)) {
-                    isPhoneInput = false;
-                    emailIcon.setVisibility(View.VISIBLE);
-                    phoneIcon.setVisibility(View.GONE);
-                    ccp.setVisibility(View.GONE);
-                    validationMessage.setText("Valid email");
-                    validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_green_dark));
-                } else {
-                    // Clean the input for phone number validation
-                    String cleanedInput = input.replaceAll("[^0-9+]", "");
-                    if (!input.contains("@") && cleanedInput.length() >= 8 && isValidPhoneNumber(cleanedInput)) {
-                        isPhoneInput = true;
-                        emailIcon.setVisibility(View.GONE);
-                        phoneIcon.setVisibility(View.VISIBLE);
-                        ccp.setVisibility(View.VISIBLE);
-                        updateCountryFlag(cleanedInput);
-                        validationMessage.setText("Valid phone number");
-                        validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_green_dark));
-                    } else {
-                        isPhoneInput = false;
-                        emailIcon.setVisibility(View.GONE);
-                        phoneIcon.setVisibility(View.GONE);
-                        ccp.setVisibility(View.GONE);
-                        if (!input.isEmpty()) {
-                            validationMessage.setText("Invalid format (e.g., +60123456789, 0123456789, +6581234567, or email@example.com)");
-                            validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
-                        } else {
-                            validationMessage.setText("");
-                        }
-                    }
-                }
+                String cleanedInput = input.replaceAll("[^0-9+]", "");
+                isPhoneInput = !input.contains("@") && AuthInputHandler.isValidPhoneNumber(cleanedInput);
+                Log.d(TAG, "Input: " + input + ", isPhoneInput: " + isPhoneInput);
             }
 
             @Override
@@ -188,27 +138,41 @@ public class ForgotPassActivity extends AppCompatActivity {
         // Reset button logic
         resetBtn.setOnClickListener(v -> {
             String input = credInput.getText().toString().trim();
+            resetInputBorders();
+
             if (input.isEmpty()) {
                 showCustomToast("Please enter an email or phone number.", false);
+                setErrorBorder(credInput);
                 validationMessage.setText("Input cannot be empty");
                 validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
                 return;
             }
 
-            // Clean the input for phone number validation
-            String cleanedInput = input.replaceAll("[^0-9+]", "");
-            if (isPhoneInput && isValidPhoneNumber(cleanedInput)) {
-                String normalizedPhone = normalizePhoneNumber(cleanedInput);
-                checkUserExists(normalizedPhone, true);
-            } else {
-                if (cleanedInput.length() >= 8 && !input.contains("@")) {
+            String emailOrPhone;
+            if (AuthInputHandler.isValidEmail(input)) {
+                emailOrPhone = input;
+            } else if (isPhoneInput) {
+                String cleanedInput = input.replaceAll("[^0-9+]", "");
+                emailOrPhone = AuthInputHandler.normalizePhoneNumber(cleanedInput, ccp);
+                Log.d(TAG, "Input: " + input + ", Cleaned: " + cleanedInput + ", Normalized: " + emailOrPhone + ", CCP: " + ccp.getSelectedCountryCodeWithPlus());
+                if (!emailOrPhone.matches("\\+[0-9]{10,13}")) {
                     showCustomToast("Invalid phone number format. Please use a valid number (e.g., +60123456789).", false);
+                    setErrorBorder(credInput);
                     validationMessage.setText("Invalid phone number format");
                     validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
-                } else {
-                    checkUserExists(input, false);
+                    return;
                 }
+            } else {
+                showCustomToast("Invalid email or phone number format", false);
+                setErrorBorder(credInput);
+                validationMessage.setText("Invalid email or phone number format");
+                validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
+                return;
             }
+
+            String emailToCheck = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
+            Log.d(TAG, "Checking user existence with email: " + emailToCheck);
+            checkUserExists(emailToCheck, emailOrPhone, isPhoneInput);
         });
 
         backToLoginText.setOnClickListener(v -> {
@@ -227,127 +191,62 @@ public class ForgotPassActivity extends AppCompatActivity {
         }
     }
 
-    private void fetchSimNumber() {
-        // Check for READ_PHONE_STATE permission
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.READ_PHONE_STATE},
-                    REQUEST_PHONE_STATE_PERMISSION);
-        } else {
-            retrieveSimNumber();
-        }
-    }
-
-    private void retrieveSimNumber() {
-        try {
-            TelephonyManager tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-            String simNumber = tm.getLine1Number(); // Fetch the phone number from the SIM
-            if (simNumber != null && !simNumber.isEmpty()) {
-                // Clean the number (remove spaces, non-numeric chars except +)
-                simNumber = simNumber.replaceAll("[^0-9+]", "");
-                if (isValidPhoneNumber(simNumber)) {
-                    credInput.setText(simNumber);
+    private void adjustCredInputPadding() {
+        ccp.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                ccp.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                if (ccp.getVisibility() == View.VISIBLE) {
+                    int ccpWidth = ccp.getWidth();
+                    int paddingStart = ccpWidth + (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(paddingStart, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
                 } else {
-                    Log.d(TAG, "SIM number found but invalid: " + simNumber);
+                    int defaultPadding = (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(defaultPadding, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
                 }
-            } else {
-                Log.d(TAG, "SIM number not available.");
             }
-        } catch (SecurityException e) {
-            Log.e(TAG, "Permission denied to read SIM number: " + e.getMessage());
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching SIM number: " + e.getMessage());
-        }
+        });
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_PHONE_STATE_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                retrieveSimNumber();
-            }
-            // Silently ignore if permission is denied
-        }
-    }
-
-    private String normalizePhoneNumber(String input) {
-        String normalized = input.replaceAll("[^0-9+]", ""); // Remove non-numeric chars except +
-        String countryCode = ccp.getSelectedCountryCodeWithPlus();
-
-        if (normalized.startsWith("+")) {
-            return normalized; // Already in E.164 format, e.g., +8801775267893, +60123456789, +6581234567
-        } else if (normalized.startsWith("880")) {
-            return "+" + normalized; // BD: 8801775267893 → +8801775267893
-        } else if (normalized.startsWith("60")) {
-            return "+" + normalized; // MY: 60123456789 → +60123456789
-        } else if (normalized.startsWith("65")) {
-            return "+" + normalized; // SG: 6581234567 → +6581234567
-        } else if (normalized.startsWith("0")) {
-            // Local formats: 01775267893 (BD), 0123456789 (MY)
-            if (normalized.matches("^01[3-9]\\d{8}$")) {
-                return "+880" + normalized.substring(1); // BD: 01775267893 → +8801775267893
-            } else if (normalized.matches("^01[0-9]\\d{7,8}$")) {
-                return "+60" + normalized.substring(1); // MY: 0123456789 → +60123456789
-            }
-            return countryCode + normalized.substring(1); // Fallback to CCP
-        } else if (normalized.matches("^[1][3-9]\\d{8}$")) {
-            return "+880" + normalized; // BD: 1775267893 → +8801775267893
-        } else if (normalized.matches("^[89]\\d{6}$")) {
-            return "+65" + normalized; // SG: 81234567 → +6581234567
-        } else {
-            // Fallback: prepend country code from CCP (e.g., 123456789 → +60123456789 if MY selected)
-            return countryCode + normalized;
-        }
-    }
-
-    private void updateCountryFlag(String phoneNumber) {
-        String normalized = phoneNumber.replaceAll("[^0-9+]", "");
-        if (normalized.startsWith("+880") || normalized.startsWith("880") || normalized.matches("^01[3-9]\\d{8}$") || normalized.matches("^1[3-9]\\d{8}$")) {
-            ccp.setCountryForNameCode("BD");
-        } else if (normalized.startsWith("+60") || normalized.startsWith("60") || normalized.matches("^01[0-9]\\d{7,8}$")) {
-            ccp.setCountryForNameCode("MY");
-        } else if (normalized.startsWith("+65") || normalized.startsWith("65") || normalized.matches("^[89]\\d{6}$")) {
-            ccp.setCountryForNameCode("SG");
-        }
-    }
-
-    private void checkUserExists(String input, boolean isPhone) {
+    private void checkUserExists(String emailToCheck, String originalInput, boolean isPhone) {
         loadingSpinner.setVisibility(View.VISIBLE);
         setUiEnabled(false);
 
-        if (isPhone) {
-            String normalizedPhone = normalizePhoneNumber(input);
-            sendOtpToPhone(normalizedPhone);
-        } else {
-            mAuth.fetchSignInMethodsForEmail(input)
-                    .addOnCompleteListener(task -> {
-                        loadingSpinner.setVisibility(View.GONE);
-                        setUiEnabled(true);
-                        if (task.isSuccessful()) {
-                            if (task.getResult().getSignInMethods() != null && !task.getResult().getSignInMethods().isEmpty()) {
-                                sendEmailResetLink(input);
+        mAuth.fetchSignInMethodsForEmail(emailToCheck)
+                .addOnCompleteListener(task -> {
+                    loadingSpinner.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    if (task.isSuccessful()) {
+                        if (task.getResult().getSignInMethods() != null && !task.getResult().getSignInMethods().isEmpty()) {
+                            if (isPhone) {
+                                sendOtpToPhone(originalInput);
                             } else {
-                                showCustomToast("This email is not registered.", false);
-                                validationMessage.setText("Email not found");
-                                validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
+                                sendEmailResetLink(originalInput);
                             }
                         } else {
-                            String errorMessage = task.getException() != null ? task.getException().getMessage() : "Unknown error";
-                            if (errorMessage.contains("network")) {
-                                showCustomToast("Network error. Please check your internet connection.", false);
-                                validationMessage.setText("Network error");
-                            } else if (errorMessage.contains("badly formatted")) {
-                                showCustomToast("Invalid email format. Please use a valid email (e.g., user@example.com).", false);
-                                validationMessage.setText("Invalid email format");
-                            } else {
-                                showCustomToast("Error checking email: " + errorMessage, false);
-                                validationMessage.setText("Error checking email");
-                            }
+                            showCustomToast(isPhone ? "This phone number is not registered." : "This email is not registered.", false);
+                            setErrorBorder(credInput);
+                            validationMessage.setText(isPhone ? "Phone number not found" : "Email not found");
                             validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
                         }
-                    });
-        }
+                    } else {
+                        String errorMessage = task.getException() != null ? task.getException().getMessage() : "Unknown error";
+                        if (errorMessage.contains("network")) {
+                            showCustomToast("Network error. Please check your internet connection.", false);
+                            setErrorBorder(credInput);
+                            validationMessage.setText("Network error");
+                        } else if (errorMessage.contains("badly formatted")) {
+                            showCustomToast("Invalid format. Please use a valid email or phone number.", false);
+                            setErrorBorder(credInput);
+                            validationMessage.setText("Invalid format");
+                        } else {
+                            showCustomToast("Error checking user: " + errorMessage, false);
+                            setErrorBorder(credInput);
+                            validationMessage.setText("Error checking user");
+                        }
+                        validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
+                    }
+                });
     }
 
     private void sendEmailResetLink(String email) {
@@ -356,6 +255,7 @@ public class ForgotPassActivity extends AppCompatActivity {
                     loadingSpinner.setVisibility(View.GONE);
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
+                        resetInputBorders();
                         showCustomToast("Reset link sent to " + email, true);
                         Intent intent = new Intent(this, OtpVerificationActivity.class);
                         intent.putExtra("credentials", email);
@@ -367,9 +267,11 @@ public class ForgotPassActivity extends AppCompatActivity {
                         String errorMessage = task.getException() != null ? task.getException().getMessage() : "Unknown error";
                         if (errorMessage.contains("network")) {
                             showCustomToast("Network error. Please check your internet connection.", false);
+                            setErrorBorder(credInput);
                             validationMessage.setText("Network error");
                         } else {
                             showCustomToast("Failed to send reset link: " + errorMessage, false);
+                            setErrorBorder(credInput);
                             validationMessage.setText("Failed to send reset link");
                         }
                         validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
@@ -378,6 +280,16 @@ public class ForgotPassActivity extends AppCompatActivity {
     }
 
     private void sendOtpToPhone(String phoneNumber) {
+        if (!phoneNumber.matches("\\+[0-9]{10,13}")) {
+            Log.e(TAG, "Invalid phone format: " + phoneNumber);
+            showCustomToast("Invalid phone number format. Must be in E.164 (e.g., +60123456789).", false);
+            setErrorBorder(credInput);
+            validationMessage.setText("Invalid phone format");
+            validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
+            return;
+        }
+
+        Log.d(TAG, "Sending OTP to: " + phoneNumber);
         PhoneAuthOptions options = PhoneAuthOptions.newBuilder(mAuth)
                 .setPhoneNumber(phoneNumber)
                 .setTimeout(60L, TimeUnit.SECONDS)
@@ -387,6 +299,7 @@ public class ForgotPassActivity extends AppCompatActivity {
                     public void onVerificationCompleted(PhoneAuthCredential credential) {
                         loadingSpinner.setVisibility(View.GONE);
                         setUiEnabled(true);
+                        resetInputBorders();
                         showCustomToast("Phone verified automatically", true);
                         Intent intent = new Intent(ForgotPassActivity.this, ResetPasswordActivity.class);
                         intent.putExtra("credentials", phoneNumber);
@@ -399,35 +312,45 @@ public class ForgotPassActivity extends AppCompatActivity {
                         loadingSpinner.setVisibility(View.GONE);
                         setUiEnabled(true);
                         String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                        Log.e(TAG, "OTP sending failed: " + errorMessage);
                         if (e instanceof FirebaseAuthException) {
                             String errorCode = ((FirebaseAuthException) e).getErrorCode();
                             if (errorCode.equals("ERROR_INVALID_PHONE_NUMBER")) {
                                 showCustomToast("Invalid phone number format. Please check the number.", false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("Invalid phone number format");
                             } else if (errorCode.equals("ERROR_INVALID_CREDENTIALS") || errorCode.equals("ERROR_USER_NOT_FOUND")) {
                                 showCustomToast("This phone number is not registered. Please sign up first.", false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("Phone number not found");
                             } else if (errorCode.equals("ERROR_TOO_MANY_REQUESTS")) {
                                 showCustomToast("Too many requests. Please try again later.", false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("Request limit reached");
                             } else if (errorMessage.contains("not authorized")) {
                                 showCustomToast("App not authorized for Firebase Authentication. Contact support.", false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("App authorization error");
                             } else if (errorMessage.contains("quota")) {
                                 showCustomToast("SMS quota exceeded. Please try again later.", false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("SMS quota exceeded");
                             } else if (errorMessage.contains("blocked")) {
                                 showCustomToast("SMS sending is blocked for this country. Contact support.", false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("SMS blocked for country");
                             } else {
                                 showCustomToast("Failed to send OTP: " + errorMessage, false);
+                                setErrorBorder(credInput);
                                 validationMessage.setText("OTP sending failed");
                             }
                         } else if (errorMessage.contains("network")) {
                             showCustomToast("Network error. Please check your internet connection.", false);
+                            setErrorBorder(credInput);
                             validationMessage.setText("Network error");
                         } else {
                             showCustomToast("Failed to send OTP: " + errorMessage, false);
+                            setErrorBorder(credInput);
                             validationMessage.setText("OTP sending failed");
                         }
                         validationMessage.setTextColor(ContextCompat.getColor(ForgotPassActivity.this, android.R.color.holo_red_dark));
@@ -437,6 +360,7 @@ public class ForgotPassActivity extends AppCompatActivity {
                     public void onCodeSent(String verificationId, PhoneAuthProvider.ForceResendingToken token) {
                         loadingSpinner.setVisibility(View.GONE);
                         setUiEnabled(true);
+                        resetInputBorders();
                         showCustomToast("OTP sent to " + phoneNumber, true);
                         Intent intent = new Intent(ForgotPassActivity.this, OtpVerificationActivity.class);
                         intent.putExtra("credentials", phoneNumber);
@@ -587,5 +511,13 @@ public class ForgotPassActivity extends AppCompatActivity {
         } else {
             callbackManager.onActivityResult(requestCode, resultCode, data);
         }
+    }
+
+    private void setErrorBorder(EditText editText) {
+        editText.setBackgroundResource(R.drawable.edittext_error_bg);
+    }
+
+    private void resetInputBorders() {
+        credInput.setBackgroundResource(R.drawable.edittext_bg);
     }
 }

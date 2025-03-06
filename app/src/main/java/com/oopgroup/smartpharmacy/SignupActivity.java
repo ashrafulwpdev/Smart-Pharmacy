@@ -1,19 +1,29 @@
 package com.oopgroup.smartpharmacy;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import com.airbnb.lottie.LottieAnimationView;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
@@ -29,12 +39,16 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.auth.OAuthProvider;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.hbb20.CountryCodePicker;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,13 +57,18 @@ import java.util.Random;
 public class SignupActivity extends AppCompatActivity {
 
     private static final int RC_GOOGLE_SIGN_IN = 9001;
+    private static final int PHONE_STATE_PERMISSION_REQUEST_CODE = 1001;
     private static final String TAG = "SignupActivity";
     private EditText fullNameInput, credInput, passwordInput;
     private LottieAnimationView loadingSpinner;
     private TextView loginText;
-    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin;
+    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin, emailIcon, phoneIcon;
+    private CountryCodePicker ccp;
     private FirebaseAuth mAuth;
     private DatabaseReference databaseReference;
+    private DatabaseReference emailsReference;
+    private DatabaseReference phoneNumbersReference;
+    private DatabaseReference usernamesReference;
     private boolean isPasswordVisible = false;
     private GoogleSignInClient mGoogleSignInClient;
     private CallbackManager callbackManager;
@@ -61,6 +80,9 @@ public class SignupActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         databaseReference = FirebaseDatabase.getInstance().getReference("users");
+        emailsReference = FirebaseDatabase.getInstance().getReference("emails");
+        phoneNumbersReference = FirebaseDatabase.getInstance().getReference("phoneNumbers");
+        usernamesReference = FirebaseDatabase.getInstance().getReference("usernames");
 
         // Google Sign-In Setup
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -100,85 +122,326 @@ public class SignupActivity extends AppCompatActivity {
         googleLogin = findViewById(R.id.googleLogin);
         facebookLogin = findViewById(R.id.facebookLogin);
         githubLogin = findViewById(R.id.githublogin);
+        emailIcon = findViewById(R.id.emailIcon);
+        phoneIcon = findViewById(R.id.phoneIcon);
+        ccp = findViewById(R.id.ccp);
 
-        // Set Lottie animation programmatically
-        try {
-            loadingSpinner.setAnimation(R.raw.loading_global); // Use your new file
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load Lottie animation: " + e.getMessage(), e);
-            loadingSpinner.setVisibility(View.GONE); // Hide if file is missing
-        }
+        // Set default country for CCP
+        ccp.setCustomMasterCountries("BD,MY,SG");
+        ccp.setCountryForNameCode("BD");
+
+        // Fetch SIM number with permission check
+        requestPhoneStatePermission();
+
+        // Setup dynamic input and adjust padding
+        AuthInputHandler.setupDynamicInput(this, credInput, ccp, emailIcon, phoneIcon, null);
+        adjustCredInputPadding();
+
+        // Add text watchers for real-time validation
+        setupInputValidation();
 
         // Set click listeners
-        signupBtn.setOnClickListener(v -> {
-            String fullName = fullNameInput.getText().toString().trim();
-            String credentials = credInput.getText().toString().trim();
-            String password = passwordInput.getText().toString().trim();
-            handleEmailSignup(fullName, credentials, password);
+        signupBtn.setOnClickListener(v -> handleSignup());
+        loginText.setOnClickListener(v -> {
+            startActivity(new Intent(SignupActivity.this, LoginActivity.class));
+            finish();
         });
-
-        loginText.setOnClickListener(v -> startActivity(new Intent(SignupActivity.this, LoginActivity.class)));
         passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
         googleLogin.setOnClickListener(v -> signInWithGoogle());
         facebookLogin.setOnClickListener(v -> signInWithFacebook());
         githubLogin.setOnClickListener(v -> signInWithGitHub());
     }
 
-    private void handleEmailSignup(String fullName, String credentials, String password) {
-        if (fullName.isEmpty() || credentials.isEmpty() || password.isEmpty()) {
-            showCustomToast(fullName.isEmpty() ? "Please enter your full name" :
-                    credentials.isEmpty() ? "Please enter your email or phone number" :
-                            "Please enter your password", false);
-            applyErrorBorder(fullName.isEmpty() ? fullNameInput : credentials.isEmpty() ? credInput : passwordInput);
+    private void requestPhoneStatePermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_PHONE_STATE)) {
+                showCustomToast("Phone state permission is needed to auto-fill your phone number", false);
+            }
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_PHONE_STATE}, PHONE_STATE_PERMISSION_REQUEST_CODE);
+        } else {
+            AuthInputHandler.fetchSimNumber(this, credInput);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PHONE_STATE_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                AuthInputHandler.fetchSimNumber(this, credInput);
+            } else {
+                Log.d(TAG, "READ_PHONE_STATE permission denied, proceeding with manual entry");
+            }
+        }
+    }
+
+    private void setupInputValidation() {
+        fullNameInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        credInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+                adjustCredInputPadding();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        passwordInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+                if (s.length() < 6 && s.length() > 0) {
+                    passwordInput.setError("Password must be at least 6 characters");
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+    }
+
+    private void adjustCredInputPadding() {
+        ccp.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                ccp.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                if (ccp.getVisibility() == View.VISIBLE) {
+                    int ccpWidth = ccp.getWidth();
+                    int paddingStart = ccpWidth + (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(paddingStart, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
+                } else {
+                    int defaultPadding = (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(defaultPadding, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
+                }
+            }
+        });
+    }
+
+    private void handleSignup() {
+        String fullName = fullNameInput.getText().toString().trim();
+        String credentials = credInput.getText().toString().trim();
+        String password = passwordInput.getText().toString().trim();
+
+        resetInputBorders();
+
+        if (fullName.isEmpty()) {
+            setErrorBorder(fullNameInput);
+            fullNameInput.setError("Full name cannot be empty");
+            showCustomToast("Full name is required", false);
             return;
         }
 
-        String emailOrPhone = credentials.contains("@") ? credentials : "+880" + credentials;
-        String email = credentials.contains("@") ? credentials : emailOrPhone + "@smartpharmacy.com";
-        String username = generateRandomUsername();
+        if (credentials.isEmpty()) {
+            setErrorBorder(credInput);
+            credInput.setError("Enter an email or phone number");
+            showCustomToast("Phone number or email is required", false);
+            return;
+        }
+
+        if (password.isEmpty()) {
+            setErrorBorder(passwordInput);
+            passwordInput.setError("Password cannot be empty");
+            showCustomToast("Password is required", false);
+            return;
+        }
+
+        if (password.length() < 6) {
+            setErrorBorder(passwordInput);
+            passwordInput.setError("Password too short");
+            showCustomToast("Password must be at least 6 characters long", false);
+            return;
+        }
+
+        String emailOrPhone;
+        String signInMethod;
+        if (AuthInputHandler.isValidEmail(credentials)) {
+            emailOrPhone = credentials;
+            signInMethod = "email";
+        } else if (AuthInputHandler.isValidPhoneNumber(credentials)) {
+            emailOrPhone = AuthInputHandler.normalizePhoneNumber(credentials, ccp);
+            if (!emailOrPhone.matches("^\\+\\d{10,14}$")) {
+                setErrorBorder(credInput);
+                credInput.setError("Invalid phone format (e.g., +60123456789)");
+                showCustomToast("Invalid phone number format", false);
+                return;
+            }
+            signInMethod = "phone";
+        } else {
+            setErrorBorder(credInput);
+            credInput.setError("Invalid format");
+            showCustomToast("Enter a valid phone number or email", false);
+            return;
+        }
+
+        final String syntheticEmail = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
+        final String phoneNumber = emailOrPhone.contains("@") ? "" : emailOrPhone;
+        Log.d(TAG, "Synthetic email for signup: " + syntheticEmail);
 
         loadingSpinner.setVisibility(View.VISIBLE);
         setUiEnabled(false);
 
+        checkUniqueness(emailOrPhone, signInMethod, unique -> {
+            if (!unique) {
+                loadingSpinner.setVisibility(View.GONE);
+                setUiEnabled(true);
+                setErrorBorder(credInput);
+                credInput.setError(signInMethod.equals("email") ? "Email already in use" : "Phone number already in use");
+                showCustomToast((signInMethod.equals("email") ? "Email" : "Phone number") + " '" + emailOrPhone + "' is already registered.", false);
+                return;
+            }
+
+            generateUniqueUsername(fullName, uniqueUsername -> {
+                mAuth.fetchSignInMethodsForEmail(syntheticEmail)
+                        .addOnCompleteListener(task -> {
+                            if (task.isSuccessful()) {
+                                if (task.getResult().getSignInMethods() != null && !task.getResult().getSignInMethods().isEmpty()) {
+                                    loadingSpinner.setVisibility(View.GONE);
+                                    setUiEnabled(true);
+                                    setErrorBorder(credInput);
+                                    credInput.setError(signInMethod.equals("email") ? "Email already registered" : "Phone number already registered");
+                                    showCustomToast("This " + (signInMethod.equals("email") ? "email" : "phone number") + " is already registered.", false);
+                                } else {
+                                    createUser(fullName, syntheticEmail, password, emailOrPhone, uniqueUsername, signInMethod);
+                                }
+                            } else {
+                                loadingSpinner.setVisibility(View.GONE);
+                                setUiEnabled(true);
+                                Log.e(TAG, "Error checking email existence: " + task.getException().getMessage());
+                                showCustomToast("Signup failed: Unable to verify " + (signInMethod.equals("email") ? "email" : "phone"), false);
+                            }
+                        });
+            });
+        });
+    }
+
+    private void createUser(String fullName, String email, String password, String emailOrPhone, String username, String signInMethod) {
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
-                    loadingSpinner.setVisibility(View.GONE);
-                    setUiEnabled(true);
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            Map<String, Object> userData = new HashMap<>();
-                            userData.put("fullName", fullName);
-                            userData.put("email", emailOrPhone.contains("@") ? emailOrPhone : "");
-                            userData.put("phoneNumber", emailOrPhone.contains("@") ? "" : emailOrPhone);
-                            userData.put("gender", "Not specified");
-                            userData.put("birthday", "");
-                            userData.put("username", username);
-                            userData.put("imageUrl", "");
-                            userData.put("signInMethod", "email");
-
-                            Log.d(TAG, "Email Signup - Saving data: " + userData.toString());
-                            databaseReference.child(user.getUid()).setValue(userData)
-                                    .addOnFailureListener(e -> Log.e(TAG, "Failed to save email signup data: " + e.getMessage()));
-                        }
-                        showCustomToast("Sign up successful! Please edit your username later.", true);
-                        startActivity(new Intent(SignupActivity.this, MainActivity.class));
-                        finish();
-                    } else {
-                        if (task.getException() instanceof FirebaseAuthUserCollisionException) {
-                            showCustomToast("This email or phone number is already registered.", false);
+                            saveUserData(user, fullName, emailOrPhone.contains("@") ? emailOrPhone : "", emailOrPhone.contains("@") ? "" : emailOrPhone, username, signInMethod);
                         } else {
-                            showCustomToast("Signup failed: " + task.getException().getMessage(), false);
+                            loadingSpinner.setVisibility(View.GONE);
+                            setUiEnabled(true);
+                            showCustomToast("Signup failed: User not created", false);
                         }
-                        applyErrorBorder(credInput);
-                        clearErrorBorders();
+                    } else {
+                        loadingSpinner.setVisibility(View.GONE);
+                        setUiEnabled(true);
+                        String errorMsg = task.getException() != null ? task.getException().getMessage() : "Unknown error";
+                        Log.e(TAG, "Signup failed: " + errorMsg);
+                        if (errorMsg.toLowerCase().contains("password")) {
+                            setErrorBorder(passwordInput);
+                            passwordInput.setError("Invalid password");
+                        } else {
+                            setErrorBorder(credInput);
+                            credInput.setError("Signup error");
+                        }
+                        showCustomToast("Signup failed: " + errorMsg, false);
                     }
                 });
     }
 
-    private String generateRandomUsername() {
-        Random random = new Random();
-        return "@user" + random.nextInt(1000000);
+    private void saveUserData(FirebaseUser user, String fullName, String email, String phoneNumber, String username, String signInMethod) {
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("fullName", fullName != null ? fullName : "User");
+        userData.put("email", email != null ? email : "");
+        userData.put("phoneNumber", phoneNumber != null ? phoneNumber : "");
+        userData.put("gender", "Not specified");
+        userData.put("birthday", "01-01-2000");
+        userData.put("username", username != null ? username : "user" + new Random().nextInt(1000));
+        userData.put("imageUrl", "");
+        userData.put("signInMethod", signInMethod != null ? signInMethod : "unknown");
+
+        databaseReference.child(user.getUid()).setValue(userData)
+                .addOnSuccessListener(aVoid -> {
+                    if (signInMethod.equals("email") && email != null && !email.isEmpty()) {
+                        String emailKey = email.replace(".", "_");
+                        emailsReference.child(emailKey).setValue(user.getUid());
+                    } else if (signInMethod.equals("phone") && phoneNumber != null && !phoneNumber.isEmpty()) {
+                        phoneNumbersReference.child(phoneNumber).setValue(user.getUid());
+                    }
+                    if (username != null && !username.isEmpty()) {
+                        usernamesReference.child(username).setValue(user.getUid());
+                    }
+
+                    loadingSpinner.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    resetInputBorders();
+                    showCustomToast("Sign up successful! Welcome aboard!", true);
+                    startActivity(new Intent(SignupActivity.this, MainActivity.class));
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    loadingSpinner.setVisibility(View.GONE);
+                    setUiEnabled(true);
+                    Log.e(TAG, "Failed to save user data: " + e.getMessage());
+                    showCustomToast("Signup failed: Couldn’t save profile data - " + e.getMessage(), false);
+                    mAuth.signOut();
+                });
+    }
+
+    private void checkUniqueness(String emailOrPhone, String signInMethod, OnUniquenessCheckListener listener) {
+        DatabaseReference ref = signInMethod.equals("email") ? emailsReference : phoneNumbersReference;
+        String key = signInMethod.equals("email") ? emailOrPhone.replace(".", "_") : emailOrPhone;
+        Log.d(TAG, "Checking uniqueness for " + signInMethod + " with key: " + key);
+
+        ref.child(key).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                listener.onCheckComplete(!dataSnapshot.exists());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Log.e(TAG, "Uniqueness check failed: " + databaseError.getMessage());
+                listener.onCheckComplete(false);
+            }
+        });
+    }
+
+    private void generateUniqueUsername(String fullName, OnUsernameGeneratedListener listener) {
+        String baseUsername = fullName != null ? fullName.replaceAll("[^a-zA-Z0-9]", "").toLowerCase() : "user";
+        String initialUsername = baseUsername.isEmpty() ? "user" : baseUsername;
+
+        usernamesReference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                String uniqueUsername = initialUsername;
+                int suffix = 1;
+                while (dataSnapshot.child(uniqueUsername).exists()) {
+                    uniqueUsername = initialUsername + suffix++;
+                }
+                listener.onUsernameGenerated(uniqueUsername);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Log.e(TAG, "Username generation failed: " + databaseError.getMessage());
+                listener.onUsernameGenerated(initialUsername + new Random().nextInt(1000));
+            }
+        });
     }
 
     private void signInWithGoogle() {
@@ -186,58 +449,42 @@ public class SignupActivity extends AppCompatActivity {
         startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == RC_GOOGLE_SIGN_IN) {
-            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            try {
-                GoogleSignInAccount account = task.getResult(ApiException.class);
-                firebaseAuthWithGoogle(account.getIdToken(), account.getDisplayName(), account.getEmail());
-            } catch (ApiException e) {
-                showCustomToast("Google Sign-In failed: " + e.getMessage(), false);
-            }
-        } else {
-            callbackManager.onActivityResult(requestCode, resultCode, data);
-        }
-    }
-
     private void firebaseAuthWithGoogle(String idToken, String displayName, String email) {
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
-        String username = generateRandomUsername();
-
         loadingSpinner.setVisibility(View.VISIBLE);
         setUiEnabled(false);
 
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
-                    loadingSpinner.setVisibility(View.GONE);
-                    setUiEnabled(true);
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            String userEmail = user.getEmail() != null ? user.getEmail() : (email != null ? email : "");
-                            String userDisplayName = user.getDisplayName() != null ? user.getDisplayName() : (displayName != null ? displayName : "User");
+                            String userEmail = email != null ? email : (user.getEmail() != null ? user.getEmail() : "");
+                            String userDisplayName = displayName != null ? displayName : (user.getDisplayName() != null ? user.getDisplayName() : "User");
                             String userPhone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
 
-                            Map<String, Object> userData = new HashMap<>();
-                            userData.put("fullName", userDisplayName);
-                            userData.put("email", userEmail);
-                            userData.put("phoneNumber", userPhone);
-                            userData.put("gender", "Not specified");
-                            userData.put("birthday", "");
-                            userData.put("username", username);
-                            userData.put("imageUrl", "");
-                            userData.put("signInMethod", "google");
+                            checkUniqueness(userEmail, "email", unique -> {
+                                if (!unique) {
+                                    loadingSpinner.setVisibility(View.GONE);
+                                    setUiEnabled(true);
+                                    showCustomToast("Email '" + userEmail + "' is already in use.", false);
+                                    mAuth.signOut();
+                                    return;
+                                }
 
-                            Log.d(TAG, "Google Signup - Saving data: " + userData.toString());
-                            databaseReference.child(user.getUid()).setValue(userData)
-                                    .addOnFailureListener(e -> Log.e(TAG, "Failed to save Google data: " + e.getMessage()));
+                                generateUniqueUsername(userDisplayName, uniqueUsername -> {
+                                    saveUserData(user, userDisplayName, userEmail, userPhone, uniqueUsername, "google");
+                                });
+                            });
+                        } else {
+                            loadingSpinner.setVisibility(View.GONE);
+                            setUiEnabled(true);
+                            showCustomToast("Google signup failed: User not found", false);
                         }
-                        showCustomToast("Google signup successful! Please edit your username later.", true);
-                        startActivity(new Intent(SignupActivity.this, MainActivity.class));
-                        finish();
                     } else {
+                        loadingSpinner.setVisibility(View.GONE);
+                        setUiEnabled(true);
+                        Log.e(TAG, "Google signup failed: " + task.getException().getMessage());
                         showCustomToast("Google signup failed: " + task.getException().getMessage(), false);
                     }
                 });
@@ -254,8 +501,6 @@ public class SignupActivity extends AppCompatActivity {
 
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
-                    loadingSpinner.setVisibility(View.GONE);
-                    setUiEnabled(true);
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
@@ -263,24 +508,28 @@ public class SignupActivity extends AppCompatActivity {
                             String userDisplayName = user.getDisplayName() != null ? user.getDisplayName() : "User";
                             String userPhone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
 
-                            Map<String, Object> userData = new HashMap<>();
-                            userData.put("fullName", userDisplayName);
-                            userData.put("email", userEmail);
-                            userData.put("phoneNumber", userPhone);
-                            userData.put("gender", "Not specified");
-                            userData.put("birthday", "");
-                            userData.put("username", generateRandomUsername());
-                            userData.put("imageUrl", "");
-                            userData.put("signInMethod", "facebook");
+                            checkUniqueness(userEmail, "email", unique -> {
+                                if (!unique) {
+                                    loadingSpinner.setVisibility(View.GONE);
+                                    setUiEnabled(true);
+                                    showCustomToast("Email '" + userEmail + "' is already in use.", false);
+                                    mAuth.signOut();
+                                    return;
+                                }
 
-                            Log.d(TAG, "Facebook Signup - Saving data: " + userData.toString());
-                            databaseReference.child(user.getUid()).setValue(userData)
-                                    .addOnFailureListener(e -> Log.e(TAG, "Failed to save Facebook data: " + e.getMessage()));
-                            showCustomToast("Facebook signup successful! Please edit your username later.", true);
-                            startActivity(new Intent(SignupActivity.this, MainActivity.class));
-                            finish();
+                                generateUniqueUsername(userDisplayName, uniqueUsername -> {
+                                    saveUserData(user, userDisplayName, userEmail, userPhone, uniqueUsername, "facebook");
+                                });
+                            });
+                        } else {
+                            loadingSpinner.setVisibility(View.GONE);
+                            setUiEnabled(true);
+                            showCustomToast("Facebook signup failed: User not found", false);
                         }
                     } else {
+                        loadingSpinner.setVisibility(View.GONE);
+                        setUiEnabled(true);
+                        Log.e(TAG, "Facebook signup failed: " + task.getException().getMessage());
                         showCustomToast("Facebook signup failed: " + task.getException().getMessage(), false);
                     }
                 });
@@ -288,36 +537,37 @@ public class SignupActivity extends AppCompatActivity {
 
     private void signInWithGitHub() {
         OAuthProvider.Builder provider = OAuthProvider.newBuilder("github.com");
-        provider.addCustomParameter("client_id", "YOUR_GITHUB_CLIENT_ID"); // Replace with your GitHub Client ID
-        provider.setScopes(Arrays.asList("user:email")); // Request email scope
+        provider.addCustomParameter("client_id", "YOUR_GITHUB_CLIENT_ID"); // Replace with your GitHub client ID
+        provider.setScopes(Arrays.asList("user:email"));
 
         loadingSpinner.setVisibility(View.VISIBLE);
         setUiEnabled(false);
 
         mAuth.startActivityForSignInWithProvider(this, provider.build())
                 .addOnSuccessListener(authResult -> {
-                    FirebaseUser user = mAuth.getCurrentUser();
+                    FirebaseUser user = authResult.getUser();
                     if (user != null) {
                         String userEmail = user.getEmail() != null ? user.getEmail() : "";
                         String userDisplayName = user.getDisplayName() != null ? user.getDisplayName() : "User";
                         String userPhone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
 
-                        Map<String, Object> userData = new HashMap<>();
-                        userData.put("fullName", userDisplayName);
-                        userData.put("email", userEmail);
-                        userData.put("phoneNumber", userPhone);
-                        userData.put("gender", "Not specified");
-                        userData.put("birthday", "");
-                        userData.put("username", generateRandomUsername());
-                        userData.put("imageUrl", "");
-                        userData.put("signInMethod", "github");
+                        checkUniqueness(userEmail, "email", unique -> {
+                            if (!unique) {
+                                loadingSpinner.setVisibility(View.GONE);
+                                setUiEnabled(true);
+                                showCustomToast("Email '" + userEmail + "' is already in use.", false);
+                                mAuth.signOut();
+                                return;
+                            }
 
-                        Log.d(TAG, "GitHub Signup - Saving data: " + userData.toString());
-                        databaseReference.child(user.getUid()).setValue(userData)
-                                .addOnFailureListener(e -> Log.e(TAG, "Failed to save GitHub data: " + e.getMessage()));
-                        showCustomToast("GitHub signup successful! Please edit your username later.", true);
-                        startActivity(new Intent(SignupActivity.this, MainActivity.class));
-                        finish();
+                            generateUniqueUsername(userDisplayName, uniqueUsername -> {
+                                saveUserData(user, userDisplayName, userEmail, userPhone, uniqueUsername, "github");
+                            });
+                        });
+                    } else {
+                        loadingSpinner.setVisibility(View.GONE);
+                        setUiEnabled(true);
+                        showCustomToast("GitHub signup failed: User not found", false);
                     }
                 })
                 .addOnFailureListener(e -> {
@@ -326,6 +576,24 @@ public class SignupActivity extends AppCompatActivity {
                     Log.e(TAG, "GitHub signup failed: " + e.getMessage());
                     showCustomToast("GitHub signup failed: " + e.getMessage(), false);
                 });
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_GOOGLE_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                firebaseAuthWithGoogle(account.getIdToken(), account.getDisplayName(), account.getEmail());
+            } catch (ApiException e) {
+                loadingSpinner.setVisibility(View.GONE);
+                setUiEnabled(true);
+                showCustomToast("Google Sign-In failed: " + e.getMessage(), false);
+            }
+        } else {
+            callbackManager.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     private void togglePasswordVisibility() {
@@ -352,16 +620,6 @@ public class SignupActivity extends AppCompatActivity {
         githubLogin.setEnabled(enabled);
     }
 
-    private void applyErrorBorder(EditText editText) {
-        editText.setBackgroundResource(R.drawable.edittext_error_bg);
-    }
-
-    private void clearErrorBorders() {
-        fullNameInput.setBackgroundResource(R.drawable.edittext_bg);
-        credInput.setBackgroundResource(R.drawable.edittext_bg);
-        passwordInput.setBackgroundResource(R.drawable.edittext_bg);
-    }
-
     private void showCustomToast(String message, boolean isSuccess) {
         Toast toast = new Toast(this);
         toast.setDuration(Toast.LENGTH_LONG);
@@ -375,11 +633,28 @@ public class SignupActivity extends AppCompatActivity {
         toast.show();
     }
 
-    // Navigate to LoginActivity on back press
     @Override
     public void onBackPressed() {
         super.onBackPressed();
         startActivity(new Intent(SignupActivity.this, LoginActivity.class));
         finish();
+    }
+
+    private interface OnUniquenessCheckListener {
+        void onCheckComplete(boolean isUnique);
+    }
+
+    private interface OnUsernameGeneratedListener {
+        void onUsernameGenerated(String username);
+    }
+
+    private void setErrorBorder(EditText editText) {
+        editText.setBackgroundResource(R.drawable.edittext_error_bg);
+    }
+
+    private void resetInputBorders() {
+        fullNameInput.setBackgroundResource(R.drawable.edittext_bg);
+        credInput.setBackgroundResource(R.drawable.edittext_bg);
+        passwordInput.setBackgroundResource(R.drawable.edittext_bg);
     }
 }

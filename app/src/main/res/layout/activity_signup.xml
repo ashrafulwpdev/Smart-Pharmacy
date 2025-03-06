@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Background Color (Full-screen, Base Layer) -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#FFFFFF" />
 
-    <!-- Blurred Background Image (Full-screen, On Top of Background Color) -->
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -19,208 +16,235 @@
         android:scaleType="centerCrop"
         android:src="@drawable/bg_blur_img" />
 
-    <!-- White Card with Rounded Corners and Elevation -->
-    <RelativeLayout
-        android:id="@+id/signup_frame"
-        android:layout_width="342dp"
-        android:layout_height="570dp"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="130dp"
-        android:background="@drawable/login_bgframe"
-        android:elevation="5dp">
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:overScrollMode="never">
 
-        <!-- Logo -->
-        <ImageView
-            android:id="@+id/logo"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="50dp"
-            android:src="@drawable/pharmacyicon"
-            android:contentDescription="App logo" />
-
-        <!-- Sign Up Title -->
-        <TextView
-            android:id="@+id/signupTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/logo"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="20dp"
-            android:text="Create Account"
-            android:textColor="#083EC9"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <!-- Subtitle -->
-        <TextView
-            android:id="@+id/subtitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/signupTitle"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="10dp"
-            android:text="Please Enter Your Details to Sign Up"
-            android:textAlignment="center"
-            android:textColor="#1F1F1F"
-            android:textSize="14sp" />
-
-        <!-- Full Name Input Field -->
-        <EditText
-            android:id="@+id/fullNameInput"
-            android:layout_width="280dp"
-            android:layout_height="50dp"
-            android:layout_below="@id/subtitle"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="20dp"
-            android:autofillHints="name"
-            android:background="@drawable/edittext_bg"
-            android:hint="Enter Full Name"
-            android:inputType="textPersonName"
-            android:padding="10dp"
-            android:textColor="#1F1F1F"
-            android:textColorHint="#757575"
-            android:textSize="16sp" />
-
-        <!-- Email/Mobile Number Input Field -->
-        <EditText
-            android:id="@+id/credInput"
-            android:layout_width="280dp"
-            android:layout_height="50dp"
-            android:layout_below="@id/fullNameInput"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="15dp"
-            android:autofillHints="email|username|phone"
-            android:background="@drawable/edittext_bg"
-            android:hint="Enter Email or Mobile Number"
-            android:inputType="text"
-            android:padding="10dp"
-            android:textColor="#1F1F1F"
-            android:textColorHint="#757575"
-            android:textSize="16sp" />
-
-        <!-- Password Input Field with Eye Icon -->
         <RelativeLayout
-            android:id="@+id/passwordContainer"
-            android:layout_width="280dp"
-            android:layout_height="50dp"
-            android:layout_below="@id/credInput"
+            android:id="@+id/signup_frame"
+            android:layout_width="342dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="130dp"
+            android:layout_marginBottom="20dp"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="15dp">
+            android:background="@drawable/login_bgframe"
+            android:elevation="5dp"
+            android:padding="16dp">
+
+            <ImageView
+                android:id="@+id/logo"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="50dp"
+                android:src="@drawable/pharmacyicon" />
+
+            <TextView
+                android:id="@+id/signupTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/logo"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="20dp"
+                android:text="Create Account"
+                android:textColor="#083EC9"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/signupTitle"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="10dp"
+                android:text="Please Enter Your Details to Sign Up"
+                android:textAlignment="center"
+                android:textColor="#1F1F1F"
+                android:textSize="14sp" />
 
             <EditText
-                android:id="@+id/passwordInput"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:autofillHints="password"
+                android:id="@+id/fullNameInput"
+                android:layout_width="280dp"
+                android:layout_height="50dp"
+                android:layout_below="@id/subtitle"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="20dp"
                 android:background="@drawable/edittext_bg"
-                android:hint="Enter Password"
-                android:inputType="textPassword"
-                android:padding="10dp"
+                android:hint="Enter Full Name"
+                android:inputType="textPersonName"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
                 android:textColor="#1F1F1F"
                 android:textColorHint="#757575"
                 android:textSize="16sp" />
 
-            <ImageView
-                android:id="@+id/passwordToggle"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:layout_marginEnd="10dp"
-                android:contentDescription="Toggle password visibility"
-                android:src="@drawable/ic_eye_off" />
+            <RelativeLayout
+                android:id="@+id/credContainer"
+                android:layout_width="280dp"
+                android:layout_height="50dp"
+                android:layout_below="@id/fullNameInput"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="15dp"
+                android:padding="0dp">
+
+                <EditText
+                    android:id="@+id/credInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/edittext_bg"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="40dp"
+                    android:hint="Enter Email or Mobile Number"
+                    android:inputType="text"
+                    android:textColor="#1F1F1F"
+                    android:textColorHint="#757575"
+                    android:textSize="16sp" />
+
+                <com.hbb20.CountryCodePicker
+                    android:id="@+id/ccp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="10dp"
+                    android:visibility="gone"
+                    app:ccp_defaultNameCode="BD"
+                    app:ccp_textSize="16sp"
+                    app:ccp_showFlag="true"
+                    app:ccp_showNameCode="false"
+                    app:ccp_showPhoneCode="true"
+                    app:ccp_contentColor="#1F1F1F" />
+
+                <ImageView
+                    android:id="@+id/emailIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/email_ic"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:id="@+id/phoneIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/otp_phone_icon"
+                    android:visibility="gone" />
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/passwordContainer"
+                android:layout_width="280dp"
+                android:layout_height="50dp"
+                android:layout_below="@id/credContainer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="15dp"
+                android:padding="0dp">
+
+                <EditText
+                    android:id="@+id/passwordInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/edittext_bg"
+                    android:hint="Enter Password"
+                    android:inputType="textPassword"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="40dp"
+                    android:textColor="#1F1F1F"
+                    android:textColorHint="#757575"
+                    android:textSize="16sp" />
+
+                <ImageView
+                    android:id="@+id/passwordToggle"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/ic_eye_off" />
+            </RelativeLayout>
+
+            <Button
+                android:id="@+id/signupBtn"
+                android:layout_width="280dp"
+                android:layout_height="50dp"
+                android:layout_below="@id/passwordContainer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/login_btn_bg"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:text="Sign Up"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/loginText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/signupBtn"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="10dp"
+                android:clickable="true"
+                android:text="Already have an account? Login"
+                android:textColor="#1F1F1F"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:id="@+id/socialOpts"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/loginText"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="20dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/githublogin"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/github_ic" />
+
+                <ImageView
+                    android:id="@+id/googleLogin"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/google_ic" />
+
+                <ImageView
+                    android:id="@+id/facebookLogin"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/fb_ic" />
+            </LinearLayout>
+
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/loadingSpinner"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_centerInParent="true"
+                android:visibility="gone"
+                app:lottie_rawRes="@raw/loading_spinner"
+                app:lottie_autoPlay="true"
+                app:lottie_loop="true" />
         </RelativeLayout>
-
-        <!-- Interactive Sign Up Button -->
-        <Button
-            android:id="@+id/signupBtn"
-            android:layout_width="280dp"
-            android:layout_height="50dp"
-            android:layout_below="@id/passwordContainer"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="20dp"
-            android:background="@drawable/login_btn_bg"
-            android:foreground="?android:attr/selectableItemBackground"
-            android:stateListAnimator="@animator/button_elevation_anim"
-            android:text="Sign Up"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <!-- Progress Bar -->
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:visibility="gone" />
-
-        <!-- Login Option -->
-        <TextView
-            android:id="@+id/loginText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/signupBtn"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="10dp"
-            android:clickable="true"
-            android:onClick="onLoginClick"
-            android:text="Already have an account? Login"
-            android:textColor="#1F1F1F"
-            android:textSize="14sp" />
-
-        <!-- Social Login Options -->
-        <LinearLayout
-            android:id="@+id/socialOpts"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/loginText"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="20dp"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:id="@+id/githublogin"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="12dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="GitHub login"
-                android:scaleType="fitCenter"
-                android:src="@drawable/github_ic" />
-
-            <ImageView
-                android:id="@+id/googleLogin"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="12dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Google login"
-                android:scaleType="fitCenter"
-                android:src="@drawable/google_ic" />
-
-            <ImageView
-                android:id="@+id/facebookLogin"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Facebook login"
-                android:scaleType="fitCenter"
-                android:src="@drawable/fb_ic" />
-        </LinearLayout>
-
-        <!-- Lottie Animation -->
-        <com.airbnb.lottie.LottieAnimationView
-            android:id="@+id/loadingSpinner"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_centerInParent="true"
-            android:visibility="gone"
-            android:elevation="4dp"
-            app:lottie_rawRes="@raw/loading_spinner"
-            app:lottie_autoPlay="true"
-            app:lottie_loop="true" />
-    </RelativeLayout>
+    </ScrollView>
 </RelativeLayout>

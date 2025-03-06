@@ -3,11 +3,14 @@ package com.oopgroup.smartpharmacy;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -31,8 +34,16 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.auth.OAuthProvider;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.hbb20.CountryCodePicker;
+
 import java.util.Arrays;
 
 public class LoginActivity extends AppCompatActivity {
@@ -43,9 +54,11 @@ public class LoginActivity extends AppCompatActivity {
     private LottieAnimationView loadingSpinner;
     private TextView forgotText, signupText;
     private Button loginBtn;
-    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin;
+    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin, emailIcon, phoneIcon;
     private CheckBox rememberMeCheckbox;
+    private CountryCodePicker ccp;
     private FirebaseAuth mAuth;
+    private DatabaseReference databaseReference;
     private SharedPreferences prefs;
     private boolean isPasswordVisible = false;
     private GoogleSignInClient mGoogleSignInClient;
@@ -57,6 +70,7 @@ public class LoginActivity extends AppCompatActivity {
         setContentView(R.layout.activity_login);
 
         mAuth = FirebaseAuth.getInstance();
+        databaseReference = FirebaseDatabase.getInstance().getReference("users");
         prefs = getSharedPreferences("SmartPharmacyPrefs", MODE_PRIVATE);
 
         // Google Sign-In Setup
@@ -98,14 +112,20 @@ public class LoginActivity extends AppCompatActivity {
         googleLogin = findViewById(R.id.googleLogin);
         facebookLogin = findViewById(R.id.facebookLogin);
         githubLogin = findViewById(R.id.githublogin);
+        emailIcon = findViewById(R.id.emailIcon);
+        phoneIcon = findViewById(R.id.phoneIcon);
+        ccp = findViewById(R.id.ccp);
 
-        // Set Lottie animation programmatically
-        try {
-            loadingSpinner.setAnimation(R.raw.loading_global); // Use your new file
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load Lottie animation: " + e.getMessage(), e);
-            loadingSpinner.setVisibility(View.GONE); // Hide if file is missing
-        }
+        // Set default country for CCP
+        ccp.setCustomMasterCountries("BD,MY,SG");
+        ccp.setCountryForNameCode("BD");
+
+        // Fetch SIM number
+        AuthInputHandler.fetchSimNumber(this, credInput);
+
+        // Setup dynamic input and adjust padding
+        AuthInputHandler.setupDynamicInput(this, credInput, ccp, emailIcon, phoneIcon, null);
+        adjustCredInputPadding();
 
         // Check if user is remembered
         if (prefs.getBoolean("rememberMe", false) && mAuth.getCurrentUser() != null) {
@@ -113,6 +133,39 @@ public class LoginActivity extends AppCompatActivity {
             finish();
             return;
         }
+
+        // Add text watcher to adjust padding when input changes and synchronize CCP
+        credInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+                adjustCredInputPadding();
+                String input = s.toString().trim();
+                if (!AuthInputHandler.isValidEmail(input) && AuthInputHandler.isValidPhoneNumber(input)) {
+                    String cleanedInput = input.replaceAll("[^0-9+]", "");
+                    AuthInputHandler.updateCountryFlag(cleanedInput, ccp);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        passwordInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
 
         // Set click listeners
         loginBtn.setOnClickListener(v -> {
@@ -129,28 +182,60 @@ public class LoginActivity extends AppCompatActivity {
         githubLogin.setOnClickListener(v -> signInWithGitHub());
     }
 
-    // Email/Password Login
-    private void handleEmailLogin(String credentials, String password) {
-        boolean credEmpty = credentials.isEmpty();
-        boolean passEmpty = password.isEmpty();
-
-        if (credEmpty || passEmpty) {
-            clearErrorBorders();
-            if (credEmpty && passEmpty) {
-                showCustomToast("Please fill all fields", false);
-                applyErrorBorder(credInput);
-                applyErrorBorder(passwordInput);
-            } else if (credEmpty) {
-                showCustomToast("Please enter your email or phone number", false);
-                applyErrorBorder(credInput);
-            } else {
-                showCustomToast("Please enter your password", false);
-                applyErrorBorder(passwordInput);
+    private void adjustCredInputPadding() {
+        ccp.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                ccp.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                if (ccp.getVisibility() == View.VISIBLE) {
+                    int ccpWidth = ccp.getWidth();
+                    int paddingStart = ccpWidth + (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(paddingStart, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
+                } else {
+                    int defaultPadding = (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(defaultPadding, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
+                }
             }
+        });
+    }
+
+    private void handleEmailLogin(String credentials, String password) {
+        resetInputBorders();
+
+        if (credentials.isEmpty() && password.isEmpty()) {
+            showCustomToast("Please fill all fields", false);
+            setErrorBorder(credInput);
+            setErrorBorder(passwordInput);
             return;
         }
 
-        String email = credentials.contains("@") ? credentials : "+880" + credentials + "@smartpharmacy.com";
+        if (credentials.isEmpty()) {
+            showCustomToast("Please enter your email or phone number", false);
+            setErrorBorder(credInput);
+            return;
+        }
+
+        if (password.isEmpty()) {
+            showCustomToast("Please enter your password", false);
+            setErrorBorder(passwordInput);
+            return;
+        }
+
+        String emailOrPhone;
+        if (AuthInputHandler.isValidEmail(credentials)) {
+            emailOrPhone = credentials;
+            Log.d(TAG, "Logging in with email: " + emailOrPhone);
+        } else if (AuthInputHandler.isValidPhoneNumber(credentials)) {
+            emailOrPhone = AuthInputHandler.normalizePhoneNumber(credentials, ccp);
+            Log.d(TAG, "Normalized phone number: " + credentials + " -> " + emailOrPhone);
+        } else {
+            showCustomToast("Invalid email or phone number format", false);
+            setErrorBorder(credInput);
+            return;
+        }
+
+        String email = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
+        Log.d(TAG, "Final email used for login: " + email);
 
         setUiEnabled(false);
         loadingSpinner.setVisibility(View.VISIBLE);
@@ -165,19 +250,19 @@ public class LoginActivity extends AppCompatActivity {
                             editor.putBoolean("rememberMe", true);
                             editor.apply();
                         }
+                        resetInputBorders();
                         showCustomToast("Login successful!", true);
                         startActivity(new Intent(LoginActivity.this, MainActivity.class));
                         finish();
                     } else {
                         showCustomToast("Invalid email/phone number or password", false);
-                        applyErrorBorder(credInput);
-                        applyErrorBorder(passwordInput);
-                        clearErrorBorders();
+                        setErrorBorder(credInput);
+                        setErrorBorder(passwordInput);
+                        Log.e(TAG, "Login failed: " + task.getException().getMessage());
                     }
                 });
     }
 
-    // Google Sign-In
     private void signInWithGoogle() {
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
@@ -207,7 +292,6 @@ public class LoginActivity extends AppCompatActivity {
                 });
     }
 
-    // Facebook Sign-In
     private void signInWithFacebook() {
         LoginManager.getInstance().logInWithReadPermissions(this, Arrays.asList("email", "public_profile"));
     }
@@ -236,10 +320,9 @@ public class LoginActivity extends AppCompatActivity {
                 });
     }
 
-    // GitHub Sign-In
     private void signInWithGitHub() {
         OAuthProvider.Builder provider = OAuthProvider.newBuilder("github.com");
-        provider.addCustomParameter("client_id", "YOUR_GITHUB_CLIENT_ID"); // Replace with your GitHub Client ID
+        provider.addCustomParameter("client_id", "YOUR_GITHUB_CLIENT_ID");
         provider.setScopes(Arrays.asList("user:email"));
 
         setUiEnabled(false);
@@ -294,15 +377,6 @@ public class LoginActivity extends AppCompatActivity {
         passwordInput.setSelection(passwordInput.getText().length());
     }
 
-    private void applyErrorBorder(EditText editText) {
-        editText.setBackgroundResource(R.drawable.edittext_error_bg);
-    }
-
-    private void clearErrorBorders() {
-        credInput.setBackgroundResource(R.drawable.edittext_bg);
-        passwordInput.setBackgroundResource(R.drawable.edittext_bg);
-    }
-
     private void setUiEnabled(boolean enabled) {
         credInput.setEnabled(enabled);
         passwordInput.setEnabled(enabled);
@@ -327,5 +401,15 @@ public class LoginActivity extends AppCompatActivity {
         toastView.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
         toast.setView(toastView);
         toast.show();
+    }
+
+    // Helper methods for border handling
+    private void setErrorBorder(EditText editText) {
+        editText.setBackgroundResource(R.drawable.edittext_error_bg);
+    }
+
+    private void resetInputBorders() {
+        credInput.setBackgroundResource(R.drawable.edittext_bg);
+        passwordInput.setBackgroundResource(R.drawable.edittext_bg);
     }
 }

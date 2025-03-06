@@ -61,8 +61,8 @@
                     android:padding="3dp"
                     android:scaleType="fitCenter"
                     android:clipToOutline="true"
-                    android:elevation="4dp" />
-
+                    android:elevation="4dp"
+                    android:src="@drawable/default_profile" /> <!-- Pre-set default image -->
 
                 <!-- User Name -->
                 <TextView
@@ -484,5 +484,14 @@
                 </LinearLayout>
             </LinearLayout>
         </RelativeLayout>
+
+        <!-- Loading Progress (Centered over profileImage during refresh) -->
+        <ProgressBar
+            android:id="@+id/loadingProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_centerInParent="true" />
+
     </RelativeLayout>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

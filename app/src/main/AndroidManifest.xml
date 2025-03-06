@@ -1,11 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.oopgroup.smartpharmacy">
 
-    <!-- Permissions for internet and storage (for image uploads) -->
+    <!-- Permissions -->
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Storage Permissions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" /> <!-- For Android 13+ -->
+    <!-- SMS Permission -->
+    <uses-permission android:name="android.permission.READ_SMS" />
 
     <application
         android:allowBackup="true"
@@ -15,7 +21,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- Splash Activity (Set as Launcher) -->
+        <!-- Splash Activity (Launcher) -->
         <activity
             android:name=".SplashActivity"
             android:exported="true">
@@ -79,6 +85,11 @@
         <!-- EditProfile Activity -->
         <activity
             android:name=".EditProfileActivity"
+            android:exported="true" />
+
+        <!-- ChangePassword Activity -->
+        <activity
+            android:name=".ChangePasswordActivity"
             android:exported="true" />
 
         <!-- Facebook SDK Configuration -->

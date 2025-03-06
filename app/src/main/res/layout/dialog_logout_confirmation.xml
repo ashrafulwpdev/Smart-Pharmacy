@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="298dp"
+    android:layout_height="260dp"
+    android:background="@drawable/dialog_background"
+    android:layout_gravity="center"
+    android:clipToPadding="false">
+
+    <!-- Close Button -->
+    <ImageView
+        android:id="@+id/dialog_close_button"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="12dp"
+        android:src="@drawable/ic_dialog_close"
+        android:contentDescription="Close dialog"/>
+
+    <!-- Content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="16dp">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/dialog_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Are you sure you want to logout?"
+            android:textSize="18sp"
+            android:textColor="#171725"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:layout_marginTop="36dp"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Cancel Button -->
+        <Button
+            android:id="@+id/dialog_cancel_button"
+            android:layout_width="170dp"
+            android:layout_height="48dp"
+            android:text="Cancel"
+            android:textSize="20sp"
+            android:textColor="@android:color/white"
+            android:background="@drawable/button_blue_rounded"
+            android:fontFamily="sans-serif"
+            android:paddingHorizontal="24dp"
+            android:layout_marginHorizontal="24dp"
+            android:layout_marginBottom="12dp"
+            android:elevation="2dp"
+            android:translationZ="2dp"/>
+
+        <!-- Log Out Button -->
+        <TextView
+            android:id="@+id/dialog_logout_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Log Out"
+            android:textSize="20sp"
+            android:textColor="#FF0000"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:padding="8dp"
+            android:layout_marginBottom="12dp"/>
+
+    </LinearLayout>
+</RelativeLayout>
