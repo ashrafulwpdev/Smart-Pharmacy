@@ -12,23 +12,28 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import com.hbb20.CountryCodePicker;
+
 import java.util.regex.Pattern;
 
 public class AuthInputHandler {
     private static final String TAG = "AuthInputHandler";
     private static final int REQUEST_PHONE_STATE_PERMISSION = 1001;
 
-    // Regex for phone and email validation
-    // Supports BD (+880, 10 digits), MY (+60, 9-10 digits), SG (+65, 8 digits)
-    private static final String PHONE_REGEX = "^(\\+?(880|60|65))?([0-9]{8,10})$";
+    private static final String PHONE_REGEX_BD = "^(\\+880|880)[0-9]{10}$"; // +8801712345678
+    private static final String PHONE_REGEX_MY = "^(\\+60|60)[0-9]{9,10}$"; // +60123456789
+    private static final String PHONE_REGEX_SG = "^(\\+65|65)[0-9]{8}$"; // +6581234567
     private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@(.+)$";
 
     public static boolean isValidPhoneNumber(String phone) {
         String cleanedPhone = phone.replaceAll("[^0-9+]", "");
-        boolean isValid = Pattern.matches(PHONE_REGEX, cleanedPhone);
+        boolean isValid = Pattern.matches(PHONE_REGEX_BD, cleanedPhone) ||
+                Pattern.matches(PHONE_REGEX_MY, cleanedPhone) ||
+                Pattern.matches(PHONE_REGEX_SG, cleanedPhone);
         Log.d(TAG, "Validating phone: " + cleanedPhone + ", isValid: " + isValid);
         return isValid;
     }
@@ -38,25 +43,44 @@ public class AuthInputHandler {
     }
 
     public static String normalizePhoneNumber(String input, CountryCodePicker ccp) {
+        if (ccp == null) {
+            Log.w(TAG, "CCP is null, returning input as-is: " + input);
+            return input;
+        }
+
         String normalized = input.replaceAll("[^0-9+]", "");
         String countryCode = ccp.getSelectedCountryCodeWithPlus();
 
         Log.d(TAG, "Normalizing: " + input + ", CCP: " + countryCode);
 
-        // Already in E.164 format
         if (normalized.startsWith("+")) {
-            return normalized; // e.g., +60123456789
+            if (isValidPhoneNumber(normalized)) {
+                return normalized;
+            }
         }
 
-        // Use CCP country code as the primary guide
         if (normalized.startsWith("0")) {
-            normalized = normalized.substring(1); // Remove leading 0
-            return countryCode + normalized; // e.g., 0123456789 → +60123456789 if CCP is MY
+            normalized = normalized.substring(1);
+            updateCountryFlag("0" + normalized, ccp);
+            countryCode = ccp.getSelectedCountryCodeWithPlus();
+            String result = countryCode + normalized;
+            if (isValidPhoneNumber(result)) {
+                return result;
+            }
         } else if (normalized.startsWith(countryCode.replace("+", ""))) {
-            return "+" + normalized; // e.g., 60123456789 → +60123456789
-        } else {
-            return countryCode + normalized; // Fallback: prepend CCP code
+            String result = "+" + normalized;
+            if (isValidPhoneNumber(result)) {
+                return result;
+            }
         }
+
+        String result = countryCode + normalized;
+        if (isValidPhoneNumber(result)) {
+            return result;
+        }
+
+        Log.w(TAG, "Normalization failed for: " + input + ", returning original");
+        return input;
     }
 
     public static void fetchSimNumber(Activity activity, EditText credInput) {
@@ -89,6 +113,14 @@ public class AuthInputHandler {
     }
 
     public static void setupDynamicInput(Activity activity, EditText credInput, CountryCodePicker ccp, ImageView emailIcon, ImageView phoneIcon, TextView validationMessage) {
+        if (ccp != null) {
+            // Explicitly register the EditText with the CCP to avoid "EditText not registered" warning
+            ccp.registerCarrierNumberEditText(credInput);
+            Log.d(TAG, "Registered EditText " + credInput.getId() + " with CCP");
+        } else {
+            Log.w(TAG, "CCP is null, skipping registration for EditText " + credInput.getId());
+        }
+
         credInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -99,9 +131,9 @@ public class AuthInputHandler {
                 credInput.setError(null);
 
                 if (isValidEmail(input)) {
-                    emailIcon.setVisibility(View.VISIBLE);
-                    phoneIcon.setVisibility(View.GONE);
-                    ccp.setVisibility(View.GONE);
+                    if (emailIcon != null) emailIcon.setVisibility(View.VISIBLE);
+                    if (phoneIcon != null) phoneIcon.setVisibility(View.GONE);
+                    if (ccp != null) ccp.setVisibility(View.GONE);
                     if (validationMessage != null) {
                         validationMessage.setText("Valid email");
                         validationMessage.setTextColor(ContextCompat.getColor(activity, android.R.color.holo_green_dark));
@@ -109,22 +141,24 @@ public class AuthInputHandler {
                 } else {
                     String cleanedInput = input.replaceAll("[^0-9+]", "");
                     if (!input.contains("@") && cleanedInput.length() >= 8 && isValidPhoneNumber(cleanedInput)) {
-                        emailIcon.setVisibility(View.GONE);
-                        phoneIcon.setVisibility(View.VISIBLE);
-                        ccp.setVisibility(View.VISIBLE);
-                        updateCountryFlag(cleanedInput, ccp);
-                        Log.d(TAG, "Updated CCP to: " + ccp.getSelectedCountryCodeWithPlus());
+                        if (emailIcon != null) emailIcon.setVisibility(View.GONE);
+                        if (phoneIcon != null) phoneIcon.setVisibility(View.VISIBLE);
+                        if (ccp != null) {
+                            ccp.setVisibility(View.VISIBLE);
+                            updateCountryFlag(cleanedInput, ccp);
+                            Log.d(TAG, "Updated CCP to: " + ccp.getSelectedCountryCodeWithPlus());
+                        }
                         if (validationMessage != null) {
                             validationMessage.setText("Valid phone number");
                             validationMessage.setTextColor(ContextCompat.getColor(activity, android.R.color.holo_green_dark));
                         }
                     } else {
-                        emailIcon.setVisibility(View.GONE);
-                        phoneIcon.setVisibility(View.GONE);
-                        ccp.setVisibility(View.GONE);
+                        if (emailIcon != null) emailIcon.setVisibility(View.GONE);
+                        if (phoneIcon != null) phoneIcon.setVisibility(View.GONE);
+                        if (ccp != null) ccp.setVisibility(View.GONE);
                         if (validationMessage != null) {
                             if (!input.isEmpty()) {
-                                validationMessage.setText("Invalid format (e.g., +60123456789, 0123456789, +6581234567, or email@example.com)");
+                                validationMessage.setText("Invalid format (e.g., +8801712345678, +60123456789, +6581234567)");
                                 validationMessage.setTextColor(ContextCompat.getColor(activity, android.R.color.holo_red_dark));
                             } else {
                                 validationMessage.setText("");
@@ -139,14 +173,25 @@ public class AuthInputHandler {
         });
     }
 
-    public static void updateCountryFlag(String phoneNumber, CountryCodePicker ccp) {
+    public static boolean updateCountryFlag(String phoneNumber, CountryCodePicker ccp) {
+        if (ccp == null) {
+            Log.w(TAG, "CCP is null, cannot update country flag for: " + phoneNumber);
+            return false;
+        }
+
         String normalized = phoneNumber.replaceAll("[^0-9+]", "");
-        if (normalized.startsWith("+880") || normalized.startsWith("880") || normalized.matches("^01[3-9][0-9]{8}$")) {
+        if (Pattern.matches("^(\\+880|880)[0-9]{10}$", normalized) || Pattern.matches("^01[3-9][0-9]{8}$", normalized) || Pattern.matches("^1[3-9][0-9]{8}$", normalized)) {
             ccp.setCountryForNameCode("BD");
-        } else if (normalized.startsWith("+60") || normalized.startsWith("60") || normalized.matches("^01[0-9][0-9]{7,8}$")) {
+            return true;
+        } else if (Pattern.matches("^(\\+60|60)[0-9]{9,10}$", normalized) || Pattern.matches("^01[0-9][0-9]{7,8}$", normalized)) {
             ccp.setCountryForNameCode("MY");
-        } else if (normalized.startsWith("+65") || normalized.startsWith("65") || normalized.matches("^[89][0-9]{6}$")) {
+            return true;
+        } else if (Pattern.matches("^(\\+65|65)[0-9]{8}$", normalized) || Pattern.matches("^[89][0-9]{7}$", normalized)) {
             ccp.setCountryForNameCode("SG");
+            return true;
+        } else {
+            Log.d(TAG, "No country match for: " + normalized + ", keeping CCP as: " + ccp.getSelectedCountryCodeWithPlus());
+            return false;
         }
     }
 }

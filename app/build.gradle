@@ -38,7 +38,7 @@ dependencies {
     // Firebase BoM (Bill of Materials)
     implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
 
-    // Firebase services (no need to specify versions, managed by BoM)
+    // Firebase services (managed by BoM)
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
@@ -47,10 +47,10 @@ dependencies {
 
     // Other dependencies
     implementation 'com.hbb20:ccp:2.5.2'
-
     implementation 'com.google.android.gms:play-services-auth:20.7.0' // Google Sign-In
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'com.facebook.android:facebook-login:17.0.1'
     implementation 'com.airbnb.android:lottie:6.4.0'
+    implementation("com.google.firebase:firebase-appcheck-debug")
 }

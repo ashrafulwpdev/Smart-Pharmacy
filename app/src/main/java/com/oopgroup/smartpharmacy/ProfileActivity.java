@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
@@ -54,7 +53,7 @@ public class ProfileActivity extends AppCompatActivity {
     private ImageView selectedIcon;
 
     private ImageView profileImage;
-    private TextView userName, userPhone;
+    private TextView userName, userPhone, verificationStatus;
     private RelativeLayout editProfileLayout, changePasswordLayout;
     private Button logoutBtn;
     private SwipeRefreshLayout swipeRefreshLayout;
@@ -64,8 +63,9 @@ public class ProfileActivity extends AppCompatActivity {
     private DatabaseReference databaseReference;
     private FirebaseUser currentUser;
 
-    private String cachedFullName, cachedPhoneNumber, cachedEmail, cachedImageUrl;
+    private String cachedFullName, cachedPhoneNumber, cachedEmail, cachedImageUrl, cachedUsername;
     private String signInMethod;
+    private String pendingEmail;
 
     private SharedPreferences sharedPreferences;
 
@@ -74,7 +74,6 @@ public class ProfileActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile);
 
-        // Initialize SharedPreferences
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Preload cached data
@@ -82,7 +81,9 @@ public class ProfileActivity extends AppCompatActivity {
         cachedPhoneNumber = sharedPreferences.getString("phoneNumber", "");
         cachedEmail = sharedPreferences.getString("email", "");
         cachedImageUrl = sharedPreferences.getString("imageUrl", "");
+        cachedUsername = sharedPreferences.getString("username", "");
         signInMethod = sharedPreferences.getString("signInMethod", "email");
+        pendingEmail = sharedPreferences.getString("pendingEmail", ""); // Load pendingEmail from SharedPreferences
 
         initializeFirebase();
 
@@ -97,17 +98,9 @@ public class ProfileActivity extends AppCompatActivity {
         setupLogoutListener();
         swipeRefreshLayout.setOnRefreshListener(this::onRefresh);
 
-        // Display cached data immediately
-        Log.d(TAG, "Displaying cached data with image URL: " + cachedImageUrl);
-        displayCachedProfileData();
-
-        // Fetch fresh data in the background if needed
-        if (!sharedPreferences.getBoolean(KEY_DATA_FRESH, false) || !sharedPreferences.getBoolean(KEY_LAST_FETCH_SUCCESS, false)) {
-            loadingProgress.setVisibility(View.VISIBLE);
-            loadProfileDataFromFirebase();
-        } else {
-            loadingProgress.setVisibility(View.GONE);
-        }
+        // Fetch fresh data immediately, UI will update after fetch
+        loadingProgress.setVisibility(View.VISIBLE);
+        loadProfileDataFromFirebase();
     }
 
     @Override
@@ -117,7 +110,7 @@ public class ProfileActivity extends AppCompatActivity {
             logoutAndRedirectToLogin();
         } else {
             currentUser = mAuth.getCurrentUser();
-            displayCachedProfileData();
+            loadProfileDataFromFirebase(); // Refresh data on resume
         }
     }
 
@@ -133,32 +126,23 @@ public class ProfileActivity extends AppCompatActivity {
             String newUsername = data.getStringExtra("username");
 
             SharedPreferences.Editor editor = sharedPreferences.edit();
-            if (newImageUrl != null) {
-                cachedImageUrl = newImageUrl;
-                editor.putString("imageUrl", cachedImageUrl);
-            }
-            if (newFullName != null) {
-                cachedFullName = newFullName;
-                editor.putString("fullName", cachedFullName);
-            }
-            if (newPhoneNumber != null) {
-                cachedPhoneNumber = newPhoneNumber;
-                editor.putString("phoneNumber", cachedPhoneNumber);
-            }
-            if (newEmail != null) {
-                cachedEmail = newEmail;
-                editor.putString("email", cachedEmail);
-            }
-            if (newUsername != null) {
-                editor.putString("username", newUsername);
-            }
+            if (newImageUrl != null) cachedImageUrl = newImageUrl;
+            if (newFullName != null) cachedFullName = newFullName;
+            if (newPhoneNumber != null) cachedPhoneNumber = newPhoneNumber;
+            if (newEmail != null) cachedEmail = newEmail;
+            if (newUsername != null) cachedUsername = newUsername;
+            editor.putString("fullName", cachedFullName);
+            editor.putString("phoneNumber", cachedPhoneNumber);
+            editor.putString("email", cachedEmail);
+            editor.putString("username", cachedUsername);
+            editor.putString("imageUrl", cachedImageUrl);
             editor.putBoolean(KEY_DATA_FRESH, true);
             editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
             editor.apply();
 
             displayCachedProfileData();
             loadingProgress.setVisibility(View.VISIBLE);
-            loadProfileDataFromFirebase();
+            loadProfileDataFromFirebase(); // Re-sync with database
         }
     }
 
@@ -194,9 +178,10 @@ public class ProfileActivity extends AppCompatActivity {
         profileImage = findViewById(R.id.profileImage);
         userName = findViewById(R.id.userName);
         userPhone = findViewById(R.id.userPhone);
+        verificationStatus = findViewById(R.id.verificationStatus);
         LinearLayout menuItems = findViewById(R.id.menuItems);
-        editProfileLayout = (RelativeLayout) menuItems.getChildAt(0); // Edit Profile
-        changePasswordLayout = (RelativeLayout) menuItems.getChildAt(1); // Change Password
+        editProfileLayout = (RelativeLayout) menuItems.getChildAt(0);
+        changePasswordLayout = (RelativeLayout) menuItems.getChildAt(1);
         logoutBtn = findViewById(R.id.logoutBtn);
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
         loadingProgress = findViewById(R.id.loadingProgress);
@@ -210,7 +195,6 @@ public class ProfileActivity extends AppCompatActivity {
             startActivity(new Intent(ProfileActivity.this, MainActivity.class));
             finish();
         });
-
         navCategories.setOnClickListener(v -> setSelectedNavItem(navCategories, icCategories, categoriesIndicator));
         navScanner.setOnClickListener(v -> setSelectedNavItem(navScanner, icScanner, scannerIndicator));
         navProfile.setOnClickListener(v -> setSelectedNavItem(navProfile, icProfile, profileIndicator));
@@ -284,7 +268,7 @@ public class ProfileActivity extends AppCompatActivity {
         if (selectedNavItem != navScanner) {
             selectedIcon.setColorFilter(ContextCompat.getColor(this, R.color.nav_active));
             if (selectedNavItem.getChildCount() > 2) {
-                TextView textView = (TextView) selectedNavItem.getChildAt(2); // Fixed typo
+                TextView textView = (TextView) selectedNavItem.getChildAt(2);
                 textView.setTextColor(ContextCompat.getColor(this, R.color.nav_active));
             }
         }
@@ -299,9 +283,27 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private void displayCachedProfileData() {
-        userName.setText(cachedFullName != null ? cachedFullName : "User");
+        Log.d(TAG, "Displaying cached data - signInMethod: " + signInMethod + ", pendingEmail: " + pendingEmail + ", emailVerified: " + (currentUser != null ? currentUser.isEmailVerified() : "null"));
+        // Show fullName instead of username
+        userName.setText(cachedFullName != null && !cachedFullName.isEmpty() ? cachedFullName : "User");
         String contactInfo = getPrimaryContactInfo();
         userPhone.setText(contactInfo != null ? contactInfo : "Not provided");
+
+        // Improved verification status logic
+        verificationStatus.setVisibility(View.GONE); // Default to hidden
+        if (currentUser != null) {
+            if ("email".equals(signInMethod) && !currentUser.isEmailVerified() && pendingEmail != null && !pendingEmail.isEmpty()) {
+                verificationStatus.setVisibility(View.VISIBLE);
+                verificationStatus.setText("Verification pending for: " + pendingEmail);
+                verificationStatus.setTextColor(ContextCompat.getColor(this, R.color.orange));
+                Log.d(TAG, "Showing pending email verification: " + pendingEmail);
+            } else if ("phone".equals(signInMethod) && cachedPhoneNumber != null && !cachedPhoneNumber.equals(currentUser.getPhoneNumber())) {
+                verificationStatus.setVisibility(View.VISIBLE);
+                verificationStatus.setText("Phone verification pending: " + cachedPhoneNumber);
+                verificationStatus.setTextColor(ContextCompat.getColor(this, R.color.orange));
+                Log.d(TAG, "Showing pending phone verification: " + cachedPhoneNumber);
+            }
+        }
 
         profileImage.setImageDrawable(null);
 
@@ -352,46 +354,59 @@ public class ProfileActivity extends AppCompatActivity {
             databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
-                    boolean dataUpdated = false;
                     if (dataSnapshot.exists()) {
                         Map<String, Object> userData = (Map<String, Object>) dataSnapshot.getValue();
                         String newFullName = (String) userData.get("fullName");
                         String newPhoneNumber = (String) userData.get("phoneNumber");
                         String newEmail = (String) userData.get("email");
+                        String newUsername = (String) userData.get("username");
                         String newImageUrl = (String) userData.get("imageUrl");
                         String newSignInMethod = (String) userData.get("signInMethod");
+                        pendingEmail = (String) userData.get("pendingEmail");
 
+                        // Sync with Firebase Auth for verified credentials
+                        if ("email".equals(newSignInMethod)) {
+                            newEmail = currentUser.isEmailVerified() ? currentUser.getEmail() : (pendingEmail != null ? pendingEmail : newEmail);
+                        } else if ("phone".equals(newSignInMethod)) {
+                            newPhoneNumber = currentUser.getPhoneNumber() != null ? currentUser.getPhoneNumber() : newPhoneNumber;
+                        }
+
+                        // Update cached values only if they differ
                         if (!newFullName.equals(cachedFullName) || !newPhoneNumber.equals(cachedPhoneNumber) ||
                                 !newEmail.equals(cachedEmail) || !newImageUrl.equals(cachedImageUrl) ||
-                                !newSignInMethod.equals(signInMethod)) {
+                                !newUsername.equals(cachedUsername) || !newSignInMethod.equals(signInMethod)) {
                             cachedFullName = newFullName;
                             cachedPhoneNumber = newPhoneNumber;
                             cachedEmail = newEmail;
+                            cachedUsername = newUsername;
                             cachedImageUrl = newImageUrl;
                             signInMethod = newSignInMethod;
-                            dataUpdated = true;
 
                             SharedPreferences.Editor editor = sharedPreferences.edit();
                             editor.putString("fullName", cachedFullName);
                             editor.putString("phoneNumber", cachedPhoneNumber);
                             editor.putString("email", cachedEmail);
+                            editor.putString("username", cachedUsername);
                             editor.putString("imageUrl", cachedImageUrl);
                             editor.putString("signInMethod", signInMethod);
+                            editor.putString("pendingEmail", pendingEmail != null ? pendingEmail : ""); // Save pendingEmail
                             editor.putBoolean(KEY_DATA_FRESH, true);
                             editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
                             editor.apply();
-
-                            displayCachedProfileData();
                         }
+
+                        // Always update UI after fetch
+                        displayCachedProfileData();
                     } else {
                         Toast.makeText(ProfileActivity.this, "No profile data found.", Toast.LENGTH_SHORT).show();
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.putBoolean(KEY_LAST_FETCH_SUCCESS, false);
                         editor.apply();
+                        displayCachedProfileData(); // Show cached data even if fetch fails
                     }
                     loadingProgress.setVisibility(View.GONE);
                     swipeRefreshLayout.setRefreshing(false);
-                    Log.d(TAG, "Fetch completed, dataUpdated: " + dataUpdated);
+                    Log.d(TAG, "Fetch completed, pendingEmail: " + pendingEmail);
                 }
 
                 @Override
@@ -431,12 +446,13 @@ public class ProfileActivity extends AppCompatActivity {
         }
         Toast.makeText(ProfileActivity.this, errorMessage, Toast.LENGTH_LONG).show();
         Log.e(TAG, "Database error: " + databaseError.getDetails());
+        displayCachedProfileData(); // Show cached data on error
     }
 
     private String getPrimaryContactInfo() {
         if ("phone".equals(signInMethod) && cachedPhoneNumber != null && !cachedPhoneNumber.isEmpty()) {
             return cachedPhoneNumber;
-        } else if (cachedEmail != null && !cachedEmail.isEmpty()) {
+        } else if ("email".equals(signInMethod) && cachedEmail != null && !cachedEmail.isEmpty()) {
             return cachedEmail;
         } else if (currentUser != null) {
             if (currentUser.getPhoneNumber() != null && !currentUser.getPhoneNumber().isEmpty()) {

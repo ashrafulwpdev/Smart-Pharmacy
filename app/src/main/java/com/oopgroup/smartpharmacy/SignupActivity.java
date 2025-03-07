@@ -425,21 +425,26 @@ public class SignupActivity extends AppCompatActivity {
         String baseUsername = fullName != null ? fullName.replaceAll("[^a-zA-Z0-9]", "").toLowerCase() : "user";
         String initialUsername = baseUsername.isEmpty() ? "user" : baseUsername;
 
-        usernamesReference.addListenerForSingleValueEvent(new ValueEventListener() {
+        checkUsernameAvailability(initialUsername, 1, username -> listener.onUsernameGenerated(username));
+    }
+
+    private void checkUsernameAvailability(String baseUsername, int suffix, OnUsernameGeneratedListener listener) {
+        String candidateUsername = suffix == 1 ? baseUsername : baseUsername + (suffix - 1);
+        usernamesReference.child(candidateUsername).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                String uniqueUsername = initialUsername;
-                int suffix = 1;
-                while (dataSnapshot.child(uniqueUsername).exists()) {
-                    uniqueUsername = initialUsername + suffix++;
+                if (!dataSnapshot.exists()) {
+                    listener.onUsernameGenerated(candidateUsername); // Username is available
+                } else {
+                    checkUsernameAvailability(baseUsername, suffix + 1, listener); // Try next suffix
                 }
-                listener.onUsernameGenerated(uniqueUsername);
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                Log.e(TAG, "Username generation failed: " + databaseError.getMessage());
-                listener.onUsernameGenerated(initialUsername + new Random().nextInt(1000));
+                Log.e(TAG, "Username check failed: " + databaseError.getMessage());
+                // Fallback to random suffix on error
+                listener.onUsernameGenerated(baseUsername + new Random().nextInt(1000));
             }
         });
     }

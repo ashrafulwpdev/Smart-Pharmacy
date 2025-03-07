@@ -9,4 +9,5 @@
     <color name="primary_blue">#1976D2</color>
     <color name="nav_inactive">#D2D6DB</color>
     <color name="nav_active">#FFFFFF</color>
+    <color name="orange">#FFA500</color>
 </resources>

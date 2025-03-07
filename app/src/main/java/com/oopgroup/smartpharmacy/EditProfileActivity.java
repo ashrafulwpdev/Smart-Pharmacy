@@ -6,35 +6,28 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.animation.AnimationUtils;
+import android.view.ViewTreeObserver;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.airbnb.lottie.LottieAnimationView;
-import com.google.firebase.auth.AuthCredential;
-import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.auth.PhoneAuthCredential;
-import com.google.firebase.auth.PhoneAuthProvider;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -43,14 +36,14 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
-import com.bumptech.glide.Glide;
 import com.hbb20.CountryCodePicker;
+import com.bumptech.glide.Glide;
+
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
-public class EditProfileActivity extends AppCompatActivity {
+public class EditProfileActivity extends AppCompatActivity implements ProfileAuthHelper.OnAuthCompleteListener {
 
     private static final int IMAGE_SIZE = 102;
     private static final int INNER_SIZE = IMAGE_SIZE - 4;
@@ -79,30 +72,29 @@ public class EditProfileActivity extends AppCompatActivity {
 
     private SharedPreferences sharedPreferences;
 
-    private Uri selectedImageUri; // Holds the newly selected image
+    private Uri selectedImageUri;
     private String currentImageUrl, currentEmail, currentPhoneNumber;
     private String previousEmail, previousPhoneNumber;
     private String signInMethod;
 
-    private ActivityResultLauncher<String> pickImage; // Declare here
+    private ActivityResultLauncher<String> pickImage;
+    private ProfileAuthHelper authHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_profile);
 
-        // Initialize the ActivityResultLauncher
         pickImage = registerForActivityResult(
                 new ActivityResultContracts.GetContent(),
                 result -> {
                     if (result != null) {
                         selectedImageUri = result;
-                        loadProfileImage(selectedImageUri); // Instantly reflect the new image
+                        loadProfileImage(selectedImageUri);
                     }
                 }
         );
 
-        // Restore state if available
         if (savedInstanceState != null) {
             selectedImageUri = savedInstanceState.getParcelable("selectedImageUri");
             if (selectedImageUri != null) {
@@ -112,10 +104,25 @@ public class EditProfileActivity extends AppCompatActivity {
 
         initializeFirebase();
         initializeUI();
+        authHelper = new ProfileAuthHelper(this, this);
         setupListeners();
         setupDynamicInput();
         loadCachedProfileData();
         loadProfileDataFromFirebase();
+
+        auth.addAuthStateListener(firebaseAuth -> {
+            FirebaseUser user = firebaseAuth.getCurrentUser();
+            if (user != null && "email".equals(signInMethod) && user.isEmailVerified()) {
+                databaseReference.child("pendingEmail").get().addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult().exists()) {
+                        String pendingEmail = task.getResult().getValue(String.class);
+                        if (pendingEmail != null && !pendingEmail.equals(currentEmail)) {
+                            updateVerifiedEmail(pendingEmail);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     @Override
@@ -171,7 +178,7 @@ public class EditProfileActivity extends AppCompatActivity {
             loadingSpinner.setVisibility(View.GONE);
         }
 
-        ccp.setCustomMasterCountries("BD,MY,IN,SG");
+        ccp.setCustomMasterCountries("BD,MY,SG");
         ccp.setDefaultCountryUsingNameCode("BD");
         ccp.resetToDefaultCountry();
 
@@ -185,36 +192,20 @@ public class EditProfileActivity extends AppCompatActivity {
 
     private void setupListeners() {
         backButton.setOnClickListener(v -> {
-            // Revert to previous image if not saved
             if (selectedImageUri != null) {
                 loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
                 selectedImageUri = null;
             }
             navigateToProfileActivity();
         });
-        cameraIcon.setOnClickListener(v -> pickImage.launch("image/*")); // Use the initialized launcher
+        cameraIcon.setOnClickListener(v -> pickImage.launch("image/*"));
         birthdayEditText.setOnClickListener(v -> showDatePickerDialog());
         saveButton.setOnClickListener(v -> saveProfileData());
         swipeRefreshLayout.setOnRefreshListener(this::loadProfileDataFromFirebase);
-
-        TextWatcher borderResetWatcher = new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                clearErrorBorders();
-            }
-        };
-        fullNameEditText.addTextChangedListener(borderResetWatcher);
-        phoneNumberInput.addTextChangedListener(borderResetWatcher);
-        emailInput.addTextChangedListener(borderResetWatcher);
-        usernameEditText.addTextChangedListener(borderResetWatcher);
     }
 
     private void setupDynamicInput() {
-        phoneNumberInput.addTextChangedListener(new TextWatcher() {
+        phoneNumberInput.addTextChangedListener(new android.text.TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
@@ -228,9 +219,18 @@ public class EditProfileActivity extends AppCompatActivity {
                     adjustPhoneInputPadding(null);
                 } else {
                     String cleanedInput = input.replaceAll("[^0-9+]", "");
-                    if (!input.contains("@") && cleanedInput.length() >= 8 && AuthInputHandler.isValidPhoneNumber(cleanedInput)) {
-                        ccp.setVisibility(View.VISIBLE);
+                    if (!input.contains("@") && cleanedInput.length() >= 8) {
                         AuthInputHandler.updateCountryFlag(cleanedInput, ccp);
+                        String normalized = AuthInputHandler.normalizePhoneNumber(input, ccp);
+                        if (AuthInputHandler.isValidPhoneNumber(normalized)) {
+                            ccp.setVisibility(View.VISIBLE);
+                            if (!phoneNumberInput.getText().toString().equals(normalized)) {
+                                phoneNumberInput.setText(normalized);
+                                phoneNumberInput.setSelection(normalized.length());
+                            }
+                        } else {
+                            ccp.setVisibility(View.GONE);
+                        }
                     } else {
                         ccp.setVisibility(View.GONE);
                     }
@@ -239,22 +239,21 @@ public class EditProfileActivity extends AppCompatActivity {
             }
 
             @Override
-            public void afterTextChanged(Editable s) {}
+            public void afterTextChanged(android.text.Editable s) {}
         });
 
-        emailInput.addTextChangedListener(new TextWatcher() {
+        emailInput.addTextChangedListener(new android.text.TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String input = s.toString().trim();
                 clearErrorBorders();
                 adjustEmailInputPadding(null);
             }
 
             @Override
-            public void afterTextChanged(Editable s) {}
+            public void afterTextChanged(android.text.Editable s) {}
         });
 
         adjustPhoneInputPadding(null);
@@ -267,14 +266,18 @@ public class EditProfileActivity extends AppCompatActivity {
         if ("google".equals(signInMethod) || "facebook".equals(signInMethod) || "github".equals(signInMethod)) {
             emailInput.setEnabled(false);
             emailInput.setText(currentEmail != null ? currentEmail : "");
-        } else {
+            phoneNumberInput.setEnabled(true);
+        } else if ("email".equals(signInMethod)) {
+            emailInput.setEnabled(true);
+            phoneNumberInput.setEnabled(true);
+        } else if ("phone".equals(signInMethod)) {
             emailInput.setEnabled(true);
             phoneNumberInput.setEnabled(true);
         }
     }
 
     private void adjustPhoneInputPadding(View unused) {
-        ccp.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+        ViewTreeObserver.OnGlobalLayoutListener listener = new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
             public void onGlobalLayout() {
                 ccp.getViewTreeObserver().removeOnGlobalLayoutListener(this);
@@ -290,7 +293,8 @@ public class EditProfileActivity extends AppCompatActivity {
 
                 phoneNumberInput.setPadding(paddingStart, phoneNumberInput.getPaddingTop(), phoneNumberInput.getPaddingEnd(), phoneNumberInput.getPaddingBottom());
             }
-        });
+        };
+        ccp.getViewTreeObserver().addOnGlobalLayoutListener(listener);
     }
 
     private void adjustEmailInputPadding(View unused) {
@@ -337,6 +341,8 @@ public class EditProfileActivity extends AppCompatActivity {
             if (task.isSuccessful()) {
                 currentEmail = currentUser.getEmail();
                 currentPhoneNumber = currentUser.getPhoneNumber();
+            } else {
+                Log.e(TAG, "Failed to reload user: " + task.getException().getMessage());
             }
 
             databaseReference.get().addOnCompleteListener(dbTask -> {
@@ -348,6 +354,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     String phoneNumber = (String) userData.get("phoneNumber");
                     String email = (String) userData.get("email");
                     String username = (String) userData.get("username");
+                    String pendingEmail = (String) userData.get("pendingEmail");
                     currentImageUrl = (String) userData.get("imageUrl");
                     signInMethod = (String) userData.get("signInMethod");
 
@@ -355,7 +362,13 @@ public class EditProfileActivity extends AppCompatActivity {
                     genderSpinner.setSelection(((ArrayAdapter<String>) genderSpinner.getAdapter()).getPosition(gender != null ? gender : DEFAULT_GENDER));
                     birthdayEditText.setText(birthday != null ? birthday : DEFAULT_BIRTHDAY);
                     phoneNumberInput.setText(phoneNumber);
-                    emailInput.setText(email);
+                    if (pendingEmail != null && !currentUser.isEmailVerified() && "email".equals(signInMethod)) {
+                        emailInput.setText(pendingEmail);
+                        emailInput.setEnabled(false);
+                        showCustomToast("Pending email: " + pendingEmail + " awaits verification.", false);
+                    } else {
+                        emailInput.setText(email);
+                    }
                     usernameEditText.setText(username);
                     displayFullNameTextView.setText(fullName);
 
@@ -368,6 +381,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     editor.putString("username", username);
                     editor.putString("imageUrl", currentImageUrl != null ? currentImageUrl : "");
                     editor.putString("signInMethod", signInMethod != null ? signInMethod : "email");
+                    if (pendingEmail != null) editor.putString("pendingEmail", pendingEmail);
                     editor.apply();
 
                     currentPhoneNumber = phoneNumber;
@@ -375,7 +389,6 @@ public class EditProfileActivity extends AppCompatActivity {
                     previousEmail = email;
                     previousPhoneNumber = phoneNumber;
 
-                    // Only load image if it hasn't been overridden by a new selection
                     if (selectedImageUri == null) {
                         loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
                     }
@@ -395,7 +408,6 @@ public class EditProfileActivity extends AppCompatActivity {
     }
 
     private void loadProfileImage(Uri imageUri) {
-        // Avoid resetting to default if a new image is selected
         if (imageUri != null) {
             Glide.with(this)
                     .load(imageUri)
@@ -464,25 +476,29 @@ public class EditProfileActivity extends AppCompatActivity {
         String phoneNumber;
         if (!phoneNumberInputText.isEmpty()) {
             phoneNumber = AuthInputHandler.normalizePhoneNumber(phoneNumberInputText, ccp);
-            if (!AuthInputHandler.isValidPhoneNumber(phoneNumberInputText) || !phoneNumber.startsWith("+")) {
+            if (!AuthInputHandler.isValidPhoneNumber(phoneNumber)) {
                 applyErrorBorder(phoneNumberInput);
-                showCustomToast("Invalid phone number format. Please include the country code (e.g., +880123456789).", false);
+                showCustomToast("Invalid phone number format. Examples: +8801712345678 (BD), +60123456789 (MY), +6581234567 (SG)", false);
                 hasError = true;
             }
         } else {
             phoneNumber = "";
         }
 
-        if (!"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod) && "email".equals(signInMethod)) {
-            if (email.isEmpty()) {
-                applyErrorBorder(emailInput);
-                showCustomToast("Email is required for email sign-in accounts.", false);
-                hasError = true;
-            } else if (!AuthInputHandler.isValidEmail(email)) {
-                applyErrorBorder(emailInput);
-                showCustomToast("Please enter a valid email address.", false);
-                hasError = true;
-            }
+        if ("email".equals(signInMethod) && email.isEmpty()) {
+            applyErrorBorder(emailInput);
+            showCustomToast("Email is required for email sign-in accounts.", false);
+            hasError = true;
+        } else if (!email.isEmpty() && !AuthInputHandler.isValidEmail(email)) {
+            applyErrorBorder(emailInput);
+            showCustomToast("Please enter a valid email address.", false);
+            hasError = true;
+        }
+
+        if ("phone".equals(signInMethod) && phoneNumber.isEmpty()) {
+            applyErrorBorder(phoneNumberInput);
+            showCustomToast("Phone number is required for phone sign-in accounts.", false);
+            hasError = true;
         }
 
         if (hasError) {
@@ -495,39 +511,30 @@ public class EditProfileActivity extends AppCompatActivity {
         String originalUsername = sharedPreferences.getString("username", "");
         String originalEmail = sharedPreferences.getString("email", "");
         String originalPhoneNumber = sharedPreferences.getString("phoneNumber", "");
+        boolean usernameChanged = !username.equals(originalUsername);
 
         String finalEmail = email;
         String finalPhoneNumber = phoneNumber;
 
-        if (emailChanged && !("google".equals(signInMethod) || "facebook".equals(signInMethod) || "github".equals(signInMethod))) {
-            checkEmailUnique(email, isEmailUnique -> {
+        if (!emailChanged && !phoneChanged && !usernameChanged) {
+            saveProfileDataToFirebase(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, null, originalEmail, originalPhoneNumber, originalUsername);
+            return;
+        }
+
+        if (emailChanged || phoneChanged || usernameChanged) {
+            checkEmailUnique(finalEmail, isEmailUnique -> {
                 if (!isEmailUnique) {
                     applyErrorBorder(emailInput);
-                    showCustomToast("Email '" + email + "' is already in use by another account.", false);
+                    showCustomToast("Email '" + finalEmail + "' is already in use by another account.", false);
                     return;
                 }
-                if (phoneChanged) {
-                    checkPhoneNumberUnique(phoneNumber, isPhoneUnique -> {
-                        if (!isPhoneUnique) {
-                            applyErrorBorder(phoneNumberInput);
-                            showCustomToast("Phone number '" + phoneNumber + "' is already in use by another account.", false);
-                            return;
-                        }
-                        if (!username.equals(originalUsername)) {
-                            checkUsernameUnique(username, isUsernameUnique -> {
-                                if (!isUsernameUnique) {
-                                    applyErrorBorder(usernameEditText);
-                                    showCustomToast("Username '" + username + "' is already taken", false);
-                                    return;
-                                }
-                                proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
-                            });
-                        } else {
-                            proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
-                        }
-                    });
-                } else {
-                    if (!username.equals(originalUsername)) {
+                checkPhoneNumberUnique(finalPhoneNumber, isPhoneUnique -> {
+                    if (!isPhoneUnique) {
+                        applyErrorBorder(phoneNumberInput);
+                        showCustomToast("Phone number '" + finalPhoneNumber + "' is already in use by another account.", false);
+                        return;
+                    }
+                    if (usernameChanged) {
                         checkUsernameUnique(username, isUsernameUnique -> {
                             if (!isUsernameUnique) {
                                 applyErrorBorder(usernameEditText);
@@ -539,61 +546,23 @@ public class EditProfileActivity extends AppCompatActivity {
                     } else {
                         proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
                     }
-                }
-            });
-        } else if (phoneChanged) {
-            checkPhoneNumberUnique(phoneNumber, isPhoneUnique -> {
-                if (!isPhoneUnique) {
-                    applyErrorBorder(phoneNumberInput);
-                    showCustomToast("Phone number '" + phoneNumber + "' is already in use by another account.", false);
-                    return;
-                }
-                if (!username.equals(originalUsername)) {
-                    checkUsernameUnique(username, isUsernameUnique -> {
-                        if (!isUsernameUnique) {
-                            applyErrorBorder(usernameEditText);
-                            showCustomToast("Username '" + username + "' is already taken", false);
-                            return;
-                        }
-                        proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
-                    });
-                } else {
-                    proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
-                }
-            });
-        } else {
-            if (!username.equals(originalUsername)) {
-                checkUsernameUnique(username, isUsernameUnique -> {
-                    if (!isUsernameUnique) {
-                        applyErrorBorder(usernameEditText);
-                        showCustomToast("Username '" + username + "' is already taken", false);
-                        return;
-                    }
-                    proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
                 });
-            } else {
-                proceedWithSave(fullName, gender, birthday, finalPhoneNumber, finalEmail, username, emailChanged, phoneChanged, originalEmail, originalPhoneNumber, originalUsername);
-            }
+            });
         }
     }
 
     private void checkEmailUnique(String email, OnEmailCheckListener listener) {
+        if (email.isEmpty()) {
+            listener.onResult(true);
+            return;
+        }
         loadingSpinner.setVisibility(View.VISIBLE);
         String emailKey = email.replace(".", "_");
         emailsReference.child(emailKey).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 loadingSpinner.setVisibility(View.GONE);
-                boolean isUnique = true;
-                if (dataSnapshot.exists()) {
-                    String existingUid = dataSnapshot.getValue(String.class);
-                    Log.d(TAG, "Found email '" + email + "' for UID: " + existingUid + ", current user UID: " + currentUser.getUid());
-                    if (existingUid != null && !currentUser.getUid().equals(existingUid)) {
-                        isUnique = false;
-                    }
-                } else {
-                    Log.d(TAG, "Email '" + email + "' not found in emails node.");
-                }
+                boolean isUnique = !dataSnapshot.exists() || dataSnapshot.getValue(String.class).equals(currentUser.getUid());
                 Log.d(TAG, "Email " + email + " is unique: " + isUnique);
                 listener.onResult(isUnique);
             }
@@ -601,7 +570,7 @@ public class EditProfileActivity extends AppCompatActivity {
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 loadingSpinner.setVisibility(View.GONE);
-                Log.e(TAG, "Email check failed: " + databaseError.getMessage() + ", Code: " + databaseError.getCode());
+                Log.e(TAG, "Email check failed: " + databaseError.getMessage());
                 showCustomToast("Failed to check email: " + databaseError.getMessage(), false);
                 listener.onResult(false);
             }
@@ -618,16 +587,7 @@ public class EditProfileActivity extends AppCompatActivity {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 loadingSpinner.setVisibility(View.GONE);
-                boolean isUnique = true;
-                if (dataSnapshot.exists()) {
-                    String existingUid = dataSnapshot.getValue(String.class);
-                    Log.d(TAG, "Found phone number '" + phoneNumber + "' for UID: " + existingUid + ", current user UID: " + currentUser.getUid());
-                    if (existingUid != null && !currentUser.getUid().equals(existingUid)) {
-                        isUnique = false;
-                    }
-                } else {
-                    Log.d(TAG, "Phone number '" + phoneNumber + "' not found in phoneNumbers node.");
-                }
+                boolean isUnique = !dataSnapshot.exists() || dataSnapshot.getValue(String.class).equals(currentUser.getUid());
                 Log.d(TAG, "Phone number " + phoneNumber + " is unique: " + isUnique);
                 listener.onResult(isUnique);
             }
@@ -635,7 +595,7 @@ public class EditProfileActivity extends AppCompatActivity {
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 loadingSpinner.setVisibility(View.GONE);
-                Log.e(TAG, "Phone number check failed: " + databaseError.getMessage() + ", Code: " + databaseError.getCode());
+                Log.e(TAG, "Phone number check failed: " + databaseError.getMessage());
                 showCustomToast("Failed to check phone number: " + databaseError.getMessage(), false);
                 listener.onResult(false);
             }
@@ -643,8 +603,8 @@ public class EditProfileActivity extends AppCompatActivity {
     }
 
     private void checkUsernameUnique(String username, OnUsernameCheckListener listener) {
-        if (currentUser == null || auth.getCurrentUser() == null) {
-            Log.e(TAG, "Cannot check username: User is not authenticated. CurrentUser: " + (currentUser != null ? currentUser.getUid() : "null") + ", Auth CurrentUser: " + (auth.getCurrentUser() != null ? auth.getCurrentUser().getUid() : "null"));
+        if (currentUser == null) {
+            Log.e(TAG, "Cannot check username: User is not authenticated.");
             showCustomToast("User not authenticated. Please log in.", false);
             listener.onResult(false);
             return;
@@ -655,17 +615,7 @@ public class EditProfileActivity extends AppCompatActivity {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 loadingSpinner.setVisibility(View.GONE);
-                boolean isUnique = true;
-                if (dataSnapshot.exists()) {
-                    String existingUid = dataSnapshot.getValue(String.class);
-                    Log.d(TAG, "Found username '" + username + "' for UID: " + existingUid + ", current user UID: " + currentUser.getUid());
-                    if (existingUid != null && !currentUser.getUid().equals(existingUid)) {
-                        isUnique = false;
-                        Log.d(TAG, "Username '" + username + "' is taken by UID: " + existingUid);
-                    }
-                } else {
-                    Log.d(TAG, "Username '" + username + "' not found in usernames node.");
-                }
+                boolean isUnique = !dataSnapshot.exists() || dataSnapshot.getValue(String.class).equals(currentUser.getUid());
                 Log.d(TAG, "Username " + username + " is unique: " + isUnique);
                 listener.onResult(isUnique);
             }
@@ -673,8 +623,7 @@ public class EditProfileActivity extends AppCompatActivity {
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 loadingSpinner.setVisibility(View.GONE);
-                Log.e(TAG, "Username check failed: " + databaseError.getMessage() + ", Code: " + databaseError.getCode());
-                Log.e(TAG, "Database error details: " + databaseError.getDetails());
+                Log.e(TAG, "Username check failed: " + databaseError.getMessage());
                 showCustomToast("Failed to check username: " + databaseError.getMessage(), false);
                 listener.onResult(false);
             }
@@ -696,13 +645,15 @@ public class EditProfileActivity extends AppCompatActivity {
     private void proceedWithSave(String fullName, String gender, String birthday, String phoneNumber,
                                  String email, String username, boolean emailChanged, boolean phoneChanged,
                                  String originalEmail, String originalPhoneNumber, String originalUsername) {
-        if (emailChanged && !("google".equals(signInMethod) || "facebook".equals(signInMethod) || "github".equals(signInMethod))) {
-            showCustomPasswordDialog(fullName, gender, birthday, phoneNumber, email, username, true, originalEmail, originalPhoneNumber, originalUsername);
-        } else if (phoneChanged) {
-            verifyPhoneNumber(fullName, gender, birthday, phoneNumber, email, username, originalEmail, originalPhoneNumber, originalUsername);
+        if (emailChanged && "email".equals(signInMethod)) {
+            authHelper.showPasswordDialog(fullName, gender, birthday, phoneNumber, email, username, true,
+                    originalEmail, originalPhoneNumber, originalUsername);
+        } else if (phoneChanged && "phone".equals(signInMethod)) {
+            authHelper.verifyPhoneNumber(fullName, gender, birthday, phoneNumber, email, username,
+                    originalEmail, originalPhoneNumber, originalUsername);
         } else {
-            saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username,
-                    null, originalEmail, originalPhoneNumber, originalUsername); // Pass null for imageUrl, handle upload inside
+            saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, null,
+                    originalEmail, originalPhoneNumber, originalUsername);
         }
     }
 
@@ -717,244 +668,9 @@ public class EditProfileActivity extends AppCompatActivity {
         usernameEditText.setBackgroundResource(R.drawable.edittext_bg);
     }
 
-    private void showCustomPasswordDialog(String fullName, String gender, String birthday, String phoneNumber, String email, String username, boolean isEmailReauth, String originalEmail, String originalPhoneNumber, String originalUsername) {
-        View dialogView = LayoutInflater.from(this).inflate(android.R.layout.simple_list_item_1, null);
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(50, 50, 50, 50);
-        layout.setBackgroundResource(android.R.drawable.dialog_holo_light_frame);
-        layout.setGravity(Gravity.CENTER);
-        layout.setAnimation(AnimationUtils.loadAnimation(this, android.R.anim.fade_in));
-
-        TextView title = new TextView(this);
-        title.setText("Authenticate to Proceed");
-        title.setTextSize(22);
-        title.setTextColor(Color.BLACK);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, 20);
-        layout.addView(title);
-
-        EditText passwordInput = new EditText(this);
-        passwordInput.setHint("Enter your password");
-        passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        passwordInput.setPadding(20, 15, 20, 15);
-        passwordInput.setBackgroundResource(android.R.drawable.edit_text);
-        passwordInput.setTextColor(Color.BLACK);
-        passwordInput.setHintTextColor(Color.GRAY);
-        layout.addView(passwordInput);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setView(layout)
-                .setPositiveButton("Verify", null)
-                .setNegativeButton("Cancel", (d, which) -> d.dismiss())
-                .setCancelable(false)
-                .create();
-
-        dialog.setOnShowListener(d -> {
-            Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            positiveButton.setTextColor(Color.parseColor("#083EC9"));
-            positiveButton.setBackgroundResource(android.R.drawable.btn_default_small);
-            positiveButton.setPadding(20, 10, 20, 10);
-            positiveButton.setOnClickListener(v -> {
-                String currentPassword = passwordInput.getText().toString().trim();
-                if (currentPassword.isEmpty()) {
-                    showCustomToast("Please enter your password.", false);
-                } else {
-                    AuthCredential credential = EmailAuthProvider.getCredential(previousEmail, currentPassword);
-                    reauthenticateAndVerifyEmail(fullName, gender, birthday, phoneNumber, email, username, credential, originalEmail, originalPhoneNumber, originalUsername);
-                    dialog.dismiss();
-                }
-            });
-
-            Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-            negativeButton.setTextColor(Color.GRAY);
-            negativeButton.setBackgroundResource(android.R.drawable.btn_default_small);
-            negativeButton.setPadding(20, 10, 20, 10);
-        });
-
-        dialog.show();
-    }
-
-    private void verifyPhoneNumber(String fullName, String gender, String birthday, String phoneNumber, String email, String username, String originalEmail, String originalPhoneNumber, String originalUsername) {
-        PhoneAuthProvider.getInstance().verifyPhoneNumber(
-                phoneNumber,
-                60,
-                TimeUnit.SECONDS,
-                this,
-                new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                    @Override
-                    public void onCodeSent(String verificationId, PhoneAuthProvider.ForceResendingToken forceResendingToken) {
-                        showCustomOTPDialog(fullName, gender, birthday, phoneNumber, email, username, verificationId, originalEmail, originalPhoneNumber, originalUsername);
-                    }
-
-                    @Override
-                    public void onVerificationCompleted(PhoneAuthCredential credential) {
-                        reauthenticateAndSave(fullName, gender, birthday, phoneNumber, email, username, credential, originalEmail, originalPhoneNumber, originalUsername);
-                    }
-
-                    @Override
-                    public void onVerificationFailed(com.google.firebase.FirebaseException e) {
-                        showCustomToast("Phone verification failed: " + e.getMessage(), false);
-                        revertToPreviousCredentials();
-                    }
-                }
-        );
-    }
-
-    private void showCustomOTPDialog(String fullName, String gender, String birthday, String phoneNumber, String email, String username, String verificationId, String originalEmail, String originalPhoneNumber, String originalUsername) {
-        View dialogView = LayoutInflater.from(this).inflate(android.R.layout.simple_list_item_1, null);
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(50, 50, 50, 50);
-        layout.setBackgroundResource(android.R.drawable.dialog_holo_light_frame);
-        layout.setGravity(Gravity.CENTER);
-        layout.setAnimation(AnimationUtils.loadAnimation(this, android.R.anim.fade_in));
-
-        TextView title = new TextView(this);
-        title.setText("Verify Your Phone");
-        title.setTextSize(22);
-        title.setTextColor(Color.BLACK);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, 20);
-        layout.addView(title);
-
-        EditText otpInput = new EditText(this);
-        otpInput.setHint("Enter OTP");
-        otpInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        otpInput.setPadding(20, 15, 20, 15);
-        otpInput.setBackgroundResource(android.R.drawable.edit_text);
-        otpInput.setTextColor(Color.BLACK);
-        otpInput.setHintTextColor(Color.GRAY);
-        layout.addView(otpInput);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setView(layout)
-                .setPositiveButton("Confirm", null)
-                .setNegativeButton("Cancel", (d, which) -> {
-                    revertToPreviousCredentials();
-                    d.dismiss();
-                })
-                .setCancelable(false)
-                .create();
-
-        dialog.setOnShowListener(d -> {
-            Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            positiveButton.setTextColor(Color.parseColor("#083EC9"));
-            positiveButton.setBackgroundResource(android.R.drawable.btn_default_small);
-            positiveButton.setPadding(20, 10, 20, 10);
-            positiveButton.setOnClickListener(v -> {
-                String otp = otpInput.getText().toString().trim();
-                if (otp.isEmpty()) {
-                    showCustomToast("Please enter the OTP.", false);
-                } else {
-                    PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationId, otp);
-                    reauthenticateAndSave(fullName, gender, birthday, phoneNumber, email, username, credential, originalEmail, originalPhoneNumber, originalUsername);
-                    dialog.dismiss();
-                }
-            });
-
-            Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-            negativeButton.setTextColor(Color.GRAY);
-            negativeButton.setBackgroundResource(android.R.drawable.btn_default_small);
-            negativeButton.setPadding(20, 10, 20, 10);
-        });
-
-        dialog.show();
-    }
-
-    private void reauthenticateAndVerifyEmail(String fullName, String gender, String birthday, String phoneNumber, String email, String username, AuthCredential credential, String originalEmail, String originalPhoneNumber, String originalUsername) {
-        if (currentUser == null) {
-            showCustomToast("User session expired. Please log in again.", false);
-            startActivity(new Intent(this, LoginActivity.class));
-            finish();
-            return;
-        }
-
-        loadingSpinner.setVisibility(View.VISIBLE);
-        loadingSpinner.playAnimation();
-        saveButton.setEnabled(false);
-
-        currentUser.reauthenticate(credential)
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        if (!email.equalsIgnoreCase(currentEmail)) {
-                            auth.fetchSignInMethodsForEmail(email).addOnCompleteListener(fetchTask -> {
-                                if (fetchTask.isSuccessful() && !fetchTask.getResult().getSignInMethods().isEmpty()) {
-                                    loadingSpinner.setVisibility(View.GONE);
-                                    saveButton.setEnabled(true);
-                                    showCustomToast("This email is already in use by another account (Firebase Auth).", false);
-                                    revertToPreviousCredentials();
-                                } else {
-                                    currentUser.verifyBeforeUpdateEmail(email)
-                                            .addOnSuccessListener(aVoid -> {
-                                                loadingSpinner.setVisibility(View.GONE);
-                                                saveButton.setEnabled(true);
-                                                showCustomToast("Verification email sent to " + email + ". Please verify to update.", true);
-                                                saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, null, originalEmail, originalPhoneNumber, originalUsername);
-                                            })
-                                            .addOnFailureListener(e -> {
-                                                loadingSpinner.setVisibility(View.GONE);
-                                                saveButton.setEnabled(true);
-                                                showCustomToast("Failed to send verification email: " + e.getMessage(), false);
-                                                revertToPreviousCredentials();
-                                            });
-                                }
-                            });
-                        } else {
-                            loadingSpinner.setVisibility(View.GONE);
-                            saveButton.setEnabled(true);
-                            saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, null, originalEmail, originalPhoneNumber, originalUsername);
-                        }
-                    } else {
-                        loadingSpinner.setVisibility(View.GONE);
-                        saveButton.setEnabled(true);
-                        showCustomToast("Re-authentication failed: Incorrect credentials or network issue.", false);
-                        revertToPreviousCredentials();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    loadingSpinner.setVisibility(View.GONE);
-                    saveButton.setEnabled(true);
-                    showCustomToast("Authentication error: " + e.getMessage(), false);
-                    revertToPreviousCredentials();
-                });
-    }
-
-    private void reauthenticateAndSave(String fullName, String gender, String birthday, String phoneNumber, String email, String username, AuthCredential credential, String originalEmail, String originalPhoneNumber, String originalUsername) {
-        if (currentUser == null) {
-            showCustomToast("User session expired. Please log in again.", false);
-            startActivity(new Intent(this, LoginActivity.class));
-            finish();
-            return;
-        }
-
-        loadingSpinner.setVisibility(View.VISIBLE);
-        loadingSpinner.playAnimation();
-        saveButton.setEnabled(false);
-
-        currentUser.reauthenticate(credential)
-                .addOnCompleteListener(task -> {
-                    loadingSpinner.setVisibility(View.GONE);
-                    saveButton.setEnabled(true);
-                    if (task.isSuccessful()) {
-                        currentPhoneNumber = phoneNumber;
-                        saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, null, originalEmail, originalPhoneNumber, originalUsername);
-                    } else {
-                        showCustomToast("Re-authentication failed: Incorrect credentials or network issue.", false);
-                        revertToPreviousCredentials();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    loadingSpinner.setVisibility(View.GONE);
-                    saveButton.setEnabled(true);
-                    showCustomToast("Authentication error: " + e.getMessage(), false);
-                    revertToPreviousCredentials();
-                });
-    }
-
-    private void saveProfileDataToFirebase(String fullName, String gender, String birthday, String phoneNumber, String email, String username, String imageUrl, String originalEmail, String originalPhoneNumber, String originalUsername) {
+    private void saveProfileDataToFirebase(String fullName, String gender, String birthday, String phoneNumber,
+                                           String email, String username, String imageUrl, String originalEmail,
+                                           String originalPhoneNumber, String originalUsername) {
         loadingSpinner.setVisibility(View.VISIBLE);
         loadingSpinner.playAnimation();
         saveButton.setEnabled(false);
@@ -973,7 +689,7 @@ public class EditProfileActivity extends AppCompatActivity {
                 uploadTask.addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
                     String downloadedImageUrl = uri.toString();
                     saveUserDataToDatabase(fullName, gender, birthday, phoneNumber, email, username, downloadedImageUrl);
-                    selectedImageUri = null; // Clear after successful upload
+                    selectedImageUri = null;
                 })).addOnFailureListener(e -> {
                     loadingSpinner.setVisibility(View.GONE);
                     saveButton.setEnabled(true);
@@ -982,7 +698,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     revertToPreviousCredentials();
                 });
             } else {
-                saveUserDataToDatabase(fullName, gender, birthday, phoneNumber, email, username, currentImageUrl); // Use currentImageUrl if no new image
+                saveUserDataToDatabase(fullName, gender, birthday, phoneNumber, email, username, currentImageUrl);
             }
         });
     }
@@ -1018,7 +734,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     });
         }
 
-        if (!newEmail.isEmpty() && !"phone".equals(signInMethod)) {
+        if (!newEmail.isEmpty() && !"email".equals(signInMethod)) {
             String emailKey = newEmail.replace(".", "_");
             emailsReference.child(emailKey).setValue(currentUser.getUid())
                     .addOnFailureListener(e -> {
@@ -1028,7 +744,7 @@ public class EditProfileActivity extends AppCompatActivity {
                     });
         }
 
-        if (!newPhoneNumber.isEmpty() && !"email".equals(signInMethod) && !"google".equals(signInMethod) && !"facebook".equals(signInMethod) && !"github".equals(signInMethod)) {
+        if (!newPhoneNumber.isEmpty() && !"phone".equals(signInMethod)) {
             phoneNumbersReference.child(newPhoneNumber).setValue(currentUser.getUid())
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to add new phone number: " + e.getMessage());
@@ -1056,7 +772,8 @@ public class EditProfileActivity extends AppCompatActivity {
         void onComplete(boolean success);
     }
 
-    private void saveUserDataToDatabase(String fullName, String gender, String birthday, String phoneNumber, String email, String username, String imageUrl) {
+    private void saveUserDataToDatabase(String fullName, String gender, String birthday, String phoneNumber,
+                                        String email, String username, String imageUrl) {
         Map<String, Object> user = new HashMap<>();
         user.put("fullName", fullName);
         user.put("gender", gender);
@@ -1066,11 +783,14 @@ public class EditProfileActivity extends AppCompatActivity {
         user.put("username", username);
         user.put("imageUrl", imageUrl != null ? imageUrl : "");
         user.put("signInMethod", signInMethod);
+        String pendingEmail = sharedPreferences.getString("pendingEmail", null);
+        if (pendingEmail != null) {
+            user.put("pendingEmail", pendingEmail);
+        }
 
         Log.d(TAG, "Writing to database path: users/" + currentUser.getUid());
         databaseReference.setValue(user)
                 .addOnSuccessListener(aVoid -> {
-                    // Update SharedPreferences only after Firebase save succeeds
                     SharedPreferences.Editor editor = sharedPreferences.edit();
                     editor.putString("fullName", fullName);
                     editor.putString("gender", gender);
@@ -1080,11 +800,12 @@ public class EditProfileActivity extends AppCompatActivity {
                     editor.putString("username", username);
                     editor.putString("imageUrl", imageUrl != null ? imageUrl : "");
                     editor.putString("signInMethod", signInMethod);
+                    if (pendingEmail != null) editor.putString("pendingEmail", pendingEmail);
                     editor.apply();
 
-                    currentPhoneNumber = phoneNumber;
-                    currentEmail = email;
                     currentImageUrl = imageUrl != null ? imageUrl : "";
+                    if (!"email".equals(signInMethod)) currentEmail = email;
+                    if (!"phone".equals(signInMethod)) currentPhoneNumber = phoneNumber;
                     previousEmail = email;
                     previousPhoneNumber = phoneNumber;
 
@@ -1095,7 +816,6 @@ public class EditProfileActivity extends AppCompatActivity {
                     saveButton.setEnabled(true);
                     showCustomToast("Profile saved successfully", true);
 
-                    // Return updated data to ProfileActivity
                     Intent resultIntent = new Intent();
                     resultIntent.putExtra("imageUrl", imageUrl != null ? imageUrl : "");
                     resultIntent.putExtra("fullName", fullName);
@@ -1115,11 +835,35 @@ public class EditProfileActivity extends AppCompatActivity {
                 });
     }
 
+    private void updateVerifiedEmail(String verifiedEmail) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("email", verifiedEmail);
+        updates.put("pendingEmail", null);
+        databaseReference.updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    String emailKey = verifiedEmail.replace(".", "_");
+                    emailsReference.child(emailKey).setValue(currentUser.getUid());
+                    currentEmail = verifiedEmail;
+                    previousEmail = verifiedEmail;
+                    SharedPreferences.Editor editor = sharedPreferences.edit();
+                    editor.putString("email", verifiedEmail);
+                    editor.remove("pendingEmail");
+                    editor.apply();
+                    emailInput.setText(verifiedEmail);
+                    emailInput.setEnabled(true);
+                    showCustomToast("Email verified and updated.", true);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to update verified email: " + e.getMessage());
+                    showCustomToast("Failed to update email after verification: " + e.getMessage(), false);
+                });
+    }
+
     private void revertToPreviousCredentials() {
         phoneNumberInput.setText(previousPhoneNumber);
         emailInput.setText(previousEmail);
         loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
-        selectedImageUri = null; // Clear the selected image on revert
+        selectedImageUri = null;
     }
 
     private void showCustomToast(String message, boolean isSuccess) {
@@ -1132,5 +876,48 @@ public class EditProfileActivity extends AppCompatActivity {
         toastView.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
         toast.setView(toastView);
         toast.show();
+    }
+
+    @Override
+    public void onAuthStart() {
+        loadingSpinner.setVisibility(View.VISIBLE);
+        loadingSpinner.playAnimation();
+        saveButton.setEnabled(false);
+    }
+
+    @Override
+    public void onAuthSuccess(String fullName, String gender, String birthday, String phoneNumber,
+                              String email, String username, String originalEmail,
+                              String originalPhoneNumber, String originalUsername) {
+        loadingSpinner.setVisibility(View.GONE);
+        saveButton.setEnabled(true);
+        currentPhoneNumber = phoneNumber;
+        saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, email, username, null,
+                originalEmail, originalPhoneNumber, originalUsername);
+    }
+
+    @Override
+    public void onEmailVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
+                                        String currentEmail, String username, String pendingEmail,
+                                        String originalEmail, String originalPhoneNumber, String originalUsername) {
+        loadingSpinner.setVisibility(View.GONE);
+        saveButton.setEnabled(true);
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("pendingEmail", pendingEmail);
+        databaseReference.updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    SharedPreferences.Editor editor = sharedPreferences.edit();
+                    editor.putString("pendingEmail", pendingEmail);
+                    editor.apply();
+                });
+        saveProfileDataToFirebase(fullName, gender, birthday, phoneNumber, currentEmail, username, null,
+                originalEmail, originalPhoneNumber, originalUsername);
+    }
+
+    @Override
+    public void onAuthFailed() {
+        loadingSpinner.setVisibility(View.GONE);
+        saveButton.setEnabled(true);
+        revertToPreviousCredentials();
     }
 }

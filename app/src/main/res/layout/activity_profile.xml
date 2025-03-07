@@ -85,11 +85,20 @@
                     android:layout_below="@id/userName"
                     android:layout_centerHorizontal="true"
                     android:layout_marginTop="8dp"
-                    android:text="+91 (852) 65 52 435"
+                    android:text="None"
                     android:textColor="#808080"
                     android:textSize="18sp"
                     android:textStyle="normal"
                     android:gravity="center" />
+
+                <TextView
+                    android:id="@+id/verificationStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/userPhone"
+                    android:layout_centerHorizontal="true"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
 
                 <!-- Menu Items -->
                 <LinearLayout
