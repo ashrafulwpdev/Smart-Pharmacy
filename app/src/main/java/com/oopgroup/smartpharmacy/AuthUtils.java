@@ -45,6 +45,7 @@ public class AuthUtils {
     private static final int REQUEST_PHONE_STATE_PERMISSION = 1001;
     private static final long DEBOUNCE_DELAY = 300;
     private static final long TOAST_DELAY = 2000;
+    private static final int CCP_WIDTH_DP = 48; // Approximate width of CCP in dp
 
     // International format regex
     private static final String PHONE_REGEX_BD = "^\\+8801[3-9][0-9]{8}$"; // 13 digits
@@ -68,8 +69,20 @@ public class AuthUtils {
     private static String lockedCountryCode = null;
     private static boolean isProcessingInput = false;
 
+    // Caching for optimization
+    private static String lastValidatedPhone = "";
+    private static boolean lastValidationResult = false;
+    private static String lastNormalizedInput = "";
+    private static String lastNormalizedResult = "";
+
     public static boolean isValidPhoneNumber(String phone) {
         if (phone == null) return false;
+        // Check cache
+        if (phone.equals(lastValidatedPhone)) {
+            Log.d(TAG, "Using cached validation result for: " + phone + " -> " + lastValidationResult);
+            return lastValidationResult;
+        }
+
         String cleanedPhone = phone.replaceAll("[^0-9+]", "");
         if (!cleanedPhone.startsWith("+")) {
             cleanedPhone = "+" + cleanedPhone;
@@ -78,6 +91,11 @@ public class AuthUtils {
         boolean matchesMY = Pattern.matches(PHONE_REGEX_MY, cleanedPhone);
         boolean matchesSG = Pattern.matches(PHONE_REGEX_SG, cleanedPhone);
         boolean isValid = matchesBD || matchesMY || matchesSG;
+
+        // Update cache
+        lastValidatedPhone = phone;
+        lastValidationResult = isValid;
+
         Log.d(TAG, "Validating phone: " + cleanedPhone + " -> BD: " + matchesBD + ", MY: " + matchesMY + ", SG: " + matchesSG + ", Valid: " + isValid);
         return isValid;
     }
@@ -102,6 +120,12 @@ public class AuthUtils {
             return input != null ? input : "";
         }
 
+        // Check cache
+        if (input.equals(lastNormalizedInput)) {
+            Log.d(TAG, "Using cached normalization result for: " + input + " -> " + lastNormalizedResult);
+            return lastNormalizedResult;
+        }
+
         String normalized = input.replaceAll("[^0-9+]", "");
         Log.d(TAG, "Normalizing input: " + input + ", cleaned: " + normalized);
 
@@ -111,10 +135,16 @@ public class AuthUtils {
                 lockedCountryCode = getCountryCodeFromNumber(normalized);
                 updateCountryFlag(normalized, ccp);
                 Log.d(TAG, "Valid input with country code: " + normalized + ", Locked: " + lockedCountryCode);
+
+                lastNormalizedInput = input;
+                lastNormalizedResult = normalized;
                 return normalized;
             }
             lockedCountryCode = null;
             Log.w(TAG, "Input starts with +, but invalid: " + normalized);
+
+            lastNormalizedInput = input;
+            lastNormalizedResult = normalized;
             return normalized;
         }
 
@@ -124,6 +154,9 @@ public class AuthUtils {
             if (isValidPhoneNumber(potentialNumber)) {
                 updateCountryFlag(potentialNumber, ccp);
                 Log.d(TAG, "Using locked country code: " + potentialNumber);
+
+                lastNormalizedInput = input;
+                lastNormalizedResult = potentialNumber;
                 return potentialNumber;
             }
             lockedCountryCode = null;
@@ -141,6 +174,9 @@ public class AuthUtils {
                 lockedCountryCode = "+880";
                 updateCountryFlag(result, ccp);
                 Log.d(TAG, "Normalized BD local format: " + result);
+
+                lastNormalizedInput = input;
+                lastNormalizedResult = result;
                 return result;
             }
         } else if (Pattern.matches(LOCAL_REGEX_MY, normalized) && detectedCountry.equals("MY")) {
@@ -149,6 +185,9 @@ public class AuthUtils {
                 lockedCountryCode = "+60";
                 updateCountryFlag(result, ccp);
                 Log.d(TAG, "Normalized MY local format: " + result);
+
+                lastNormalizedInput = input;
+                lastNormalizedResult = result;
                 return result;
             }
         } else if (Pattern.matches(LOCAL_REGEX_SG, normalized) && detectedCountry.equals("SG")) {
@@ -157,6 +196,9 @@ public class AuthUtils {
                 lockedCountryCode = "+65";
                 updateCountryFlag(result, ccp);
                 Log.d(TAG, "Normalized SG local format: " + result);
+
+                lastNormalizedInput = input;
+                lastNormalizedResult = result;
                 return result;
             }
         }
@@ -169,11 +211,16 @@ public class AuthUtils {
                 lockedCountryCode = detectedCode;
                 updateCountryFlag(potentialNumber, ccp);
                 Log.d(TAG, "Prepended detected country code: " + potentialNumber);
+
+                lastNormalizedInput = input;
+                lastNormalizedResult = potentialNumber;
                 return potentialNumber;
             }
         }
 
         Log.d(TAG, "No valid format detected, returning raw input: " + normalized);
+        lastNormalizedInput = input;
+        lastNormalizedResult = normalized;
         return normalized;
     }
 
@@ -194,7 +241,7 @@ public class AuthUtils {
         }
     }
 
-    private static String detectCountry(String input) {
+    static String detectCountry(String input) {
         if (input == null || input.length() < 1) return "Unknown";
         String prefix1 = input.length() >= 1 ? input.substring(0, 1) : "";
         String prefix2 = input.length() >= 2 ? input.substring(0, 2) : "";
@@ -383,16 +430,16 @@ public class AuthUtils {
 
         if (input.isEmpty()) {
             lockedCountryCode = null;
-            resetUI(emailIcon, phoneIcon, ccp, validationMessage);
+            resetUI(emailIcon, phoneIcon, ccp, validationMessage, credInput);
             return;
         }
 
         if (looksLikeEmail(input)) {
             if (isValidEmail(input)) {
-                updateUI(emailIcon, phoneIcon, ccp, validationMessage, true,
+                updateUI(emailIcon, phoneIcon, ccp, validationMessage, credInput, true,
                         "Valid email", android.R.color.holo_green_dark, activity);
             } else {
-                updateUI(emailIcon, phoneIcon, ccp, validationMessage, true,
+                updateUI(emailIcon, phoneIcon, ccp, validationMessage, credInput, true,
                         "Typing email...", android.R.color.black, activity);
             }
             return;
@@ -400,7 +447,7 @@ public class AuthUtils {
 
         String backendNumber = normalizePhoneNumberForBackend(input, ccp, simCountry);
         if (isValidPhoneNumber(backendNumber)) {
-            updateUI(emailIcon, phoneIcon, ccp, validationMessage, false,
+            updateUI(emailIcon, phoneIcon, ccp, validationMessage, credInput, false,
                     "Valid phone number", android.R.color.holo_green_dark, activity);
             return;
         }
@@ -429,19 +476,34 @@ public class AuthUtils {
                     android.R.color.holo_red_dark, activity);
             if (ccp != null) {
                 ccp.setCountryForNameCode(null);
-                ccp.setVisibility(View.VISIBLE);
+                ccp.setVisibility(View.GONE);
+                // Reset padding when CCP is hidden
+                credInput.setPadding(
+                        (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                        credInput.getPaddingTop(),
+                        credInput.getPaddingEnd(),
+                        credInput.getPaddingBottom()
+                );
             }
         } else {
-            updateUI(emailIcon, phoneIcon, ccp, validationMessage, false,
+            updateUI(emailIcon, phoneIcon, ccp, validationMessage, credInput, false,
                     "Typing phone number...", android.R.color.black, activity);
             if (ccp != null && detectedCountry.equals("Unknown")) {
                 ccp.setCountryForNameCode(null);
+                ccp.setVisibility(View.GONE);
+                // Reset padding when CCP is hidden
+                credInput.setPadding(
+                        (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                        credInput.getPaddingTop(),
+                        credInput.getPaddingEnd(),
+                        credInput.getPaddingBottom()
+                );
             }
         }
     }
 
     private static void updateUI(ImageView emailIcon, ImageView phoneIcon, CountryCodePicker ccp,
-                                 TextView validationMessage, boolean isEmail, String message,
+                                 TextView validationMessage, EditText credInput, boolean isEmail, String message,
                                  int color, Activity activity) {
         if (emailIcon != null) {
             emailIcon.setVisibility(isEmail ? View.VISIBLE : View.GONE);
@@ -456,8 +518,40 @@ public class AuthUtils {
             Log.w(TAG, "Phone icon is null");
         }
         if (ccp != null) {
-            ccp.setVisibility(isEmail ? View.GONE : View.VISIBLE);
-            Log.d(TAG, "CCP visibility: " + (isEmail ? "GONE" : "VISIBLE"));
+            if (isEmail) {
+                ccp.setVisibility(View.GONE);
+                // Reset padding when CCP is hidden
+                credInput.setPadding(
+                        (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                        credInput.getPaddingTop(),
+                        credInput.getPaddingEnd(),
+                        credInput.getPaddingBottom()
+                );
+            } else {
+                // Show CCP only if the phone number is valid
+                String normalizedNumber = normalizePhoneNumberForBackend(credInput.getText().toString(), ccp, getSimCountry(activity));
+                if (isValidPhoneNumber(normalizedNumber)) {
+                    ccp.setVisibility(View.VISIBLE);
+                    updateCountryFlag(normalizedNumber, ccp);
+                    // Adjust padding to accommodate CCP
+                    credInput.setPadding(
+                            (int) (CCP_WIDTH_DP * activity.getResources().getDisplayMetrics().density), // paddingStart
+                            credInput.getPaddingTop(),
+                            credInput.getPaddingEnd(),
+                            credInput.getPaddingBottom()
+                    );
+                } else {
+                    ccp.setVisibility(View.GONE);
+                    // Reset padding when CCP is hidden
+                    credInput.setPadding(
+                            (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                            credInput.getPaddingTop(),
+                            credInput.getPaddingEnd(),
+                            credInput.getPaddingBottom()
+                    );
+                }
+            }
+            Log.d(TAG, "CCP visibility: " + (ccp.getVisibility() == View.VISIBLE ? "VISIBLE" : "GONE"));
         } else {
             Log.w(TAG, "CCP is null");
         }
@@ -482,7 +576,7 @@ public class AuthUtils {
     }
 
     private static void resetUI(ImageView emailIcon, ImageView phoneIcon, CountryCodePicker ccp,
-                                TextView validationMessage) {
+                                TextView validationMessage, EditText credInput) {
         if (emailIcon != null) {
             emailIcon.setVisibility(View.GONE);
             Log.d(TAG, "Reset email icon visibility: GONE");
@@ -494,6 +588,13 @@ public class AuthUtils {
         if (ccp != null) {
             ccp.setCountryForNameCode(null);
             ccp.setVisibility(View.GONE);
+            // Reset padding when CCP is hidden
+            credInput.setPadding(
+                    (int) (12 * credInput.getContext().getResources().getDisplayMetrics().density), // paddingStart
+                    credInput.getPaddingTop(),
+                    credInput.getPaddingEnd(),
+                    credInput.getPaddingBottom()
+            );
             Log.d(TAG, "Reset CCP visibility: GONE");
         }
         if (validationMessage != null) {
