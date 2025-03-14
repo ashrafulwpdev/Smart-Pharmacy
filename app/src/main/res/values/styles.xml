@@ -1,0 +1,7 @@
+<!-- res/values/styles.xml -->
+<resources>
+    <!-- Define the CustomDialogTheme -->
+    <style name="CustomDialogTheme" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <!-- No attributes needed for now -->
+    </style>
+</resources>

@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Background Color -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#A2A7A6" />
+
+    <!-- Blurred Background Image -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_blur_img" />
+
+    <!-- White Card -->
+    <RelativeLayout
+        android:id="@+id/forgot_frame"
+        android:layout_width="342dp"
+        android:layout_height="570dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="150dp"
+        android:background="@drawable/login_bgframe"
+        android:elevation="6dp"
+        android:padding="16dp">
+
+        <!-- Logo -->
+        <ImageView
+            android:id="@+id/logo"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="50dp"
+            android:src="@drawable/pharmacyicon" />
+
+        <!-- Forgot Password Title -->
+        <TextView
+            android:id="@+id/forgotTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/logo"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:text="Forgot Password"
+            android:textColor="#083EC9"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <!-- Subtitle -->
+        <TextView
+            android:id="@+id/subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/forgotTitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="Please Enter Your Email or Mobile Number to Reset"
+            android:textAlignment="center"
+            android:textColor="#1F1F1F"
+            android:textSize="14sp" />
+
+        <!-- Input Field with Country Code Picker and Icons -->
+        <RelativeLayout
+            android:id="@+id/inputContainer"
+            android:layout_width="280dp"
+            android:layout_height="50dp"
+            android:layout_below="@id/subtitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:padding="0dp">
+
+            <EditText
+                android:id="@+id/credInput"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/edittext_bg"
+                android:paddingStart="10dp"
+                android:paddingEnd="40dp"
+                android:hint="Enter your email or phone number"
+                android:textColor="#1F1F1F"
+                android:textColorHint="#757575"
+                android:textSize="16sp"
+                android:autofillHints="email|phone"
+                android:inputType="text" />
+
+            <com.hbb20.CountryCodePicker
+                android:id="@+id/ccp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="10dp"
+                android:visibility="gone"
+                app:ccp_defaultNameCode="BD"
+                app:ccp_textSize="16sp"
+                app:ccp_showFlag="true"
+                app:ccp_showNameCode="false"
+                app:ccp_showPhoneCode="true"
+                app:ccp_contentColor="#1F1F1F"
+                app:ccp_arrowSize="10dp"
+                app:ccpDialog_showFlag="false" />
+
+            <ImageView
+                android:id="@+id/emailIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/email_ic"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/phoneIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/otp_phone_icon"
+                android:visibility="gone" />
+        </RelativeLayout>
+
+        <!-- Validation Message -->
+        <TextView
+            android:id="@+id/validationMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/inputContainer"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="5dp"
+            android:textSize="12sp"
+            android:textColor="#FF0000" />
+
+        <!-- Interactive Reset Button -->
+        <Button
+            android:id="@+id/resetBtn"
+            android:layout_width="280dp"
+            android:layout_height="50dp"
+            android:layout_below="@id/validationMessage"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/login_btn_interactive_bg"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:stateListAnimator="@animator/button_elevation_anim"
+            android:text="Send Reset Link"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- Back to Login -->
+        <TextView
+            android:id="@+id/backToLoginText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/resetBtn"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="Back to Login"
+            android:textColor="#083EC9"
+            android:textSize="14sp"
+            android:clickable="true" />
+
+
+        <!-- Lottie Animation -->
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/loadingSpinner"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_centerInParent="true"
+            android:visibility="gone"
+            android:elevation="4dp"
+            app:lottie_rawRes="@raw/loading_spinner"
+            app:lottie_autoPlay="true"
+            app:lottie_loop="true" />
+    </RelativeLayout>
+</RelativeLayout>

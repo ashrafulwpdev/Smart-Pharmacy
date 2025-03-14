@@ -1,0 +1,119 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.oopgroup.smartpharmacy">
+
+    <!-- Permissions -->
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Storage Permissions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" /> <!-- For Android 13+ -->
+    <!-- SMS Permission -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Smart Pharmacy"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+
+    <!-- Splash Activity (Launcher) -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- OnBoarding Activity -->
+        <activity
+            android:name=".OnBoardingActivity"
+            android:exported="true" />
+
+        <!-- Login Activity -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true" />
+
+        <!-- Signup Activity -->
+        <activity
+            android:name=".SignupActivity"
+            android:exported="true" />
+
+        <!-- Forgot Password Activity -->
+        <activity
+            android:name=".ForgotPassActivity"
+            android:exported="true" />
+
+        <!-- OTP Verification Activity -->
+        <activity
+            android:name=".OtpVerificationActivity"
+            android:exported="true" />
+
+        <!-- Reset Password Activity -->
+        <activity
+            android:name=".ResetPasswordActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="smartpharmacyuni.page.link"
+                    android:pathPrefix="/resetpass" />
+            </intent-filter>
+        </activity>
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true" />
+
+        <!-- Profile Activity -->
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="true" />
+
+        <!-- EditProfile Activity -->
+        <activity
+            android:name=".EditProfileActivity"
+            android:exported="true" />
+
+        <!-- ChangePassword Activity -->
+        <activity
+            android:name=".ChangePasswordActivity"
+            android:exported="true" />
+
+        <!-- Facebook SDK Configuration -->
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id" />
+        <meta-data
+            android:name="com.facebook.sdk.ClientToken"
+            android:value="@string/facebook_client_token" />
+        <activity
+            android:name="com.facebook.FacebookActivity"
+            android:configChanges="keyboard|keyboardHidden|screenLayout|screenSize|orientation"
+            android:label="@string/app_name" />
+        <activity
+            android:name="com.facebook.CustomTabActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="@string/fb_login_protocol_scheme" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

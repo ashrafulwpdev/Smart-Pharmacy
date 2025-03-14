@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/swipeRefreshLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:fitsSystemWindows="true">
+
+        <!-- Fixed Back Arrow -->
+        <RelativeLayout
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/arrow_bg_circle">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_centerInParent="true"
+                android:src="@drawable/back_arrow_ic" />
+        </RelativeLayout>
+
+        <!-- Scrollable Content -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@id/bottomNav"
+            android:layout_below="@id/backButton">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- Profile Title -->
+                <TextView
+                    android:id="@+id/profileTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerHorizontal="true"
+                    android:layout_marginTop="10dp"
+                    android:text="Profile"
+                    android:textColor="#000000"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/profileImage"
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:layout_below="@id/profileTitle"
+                    android:layout_centerHorizontal="true"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/circ_border_profile"
+                    android:padding="3dp"
+                    android:scaleType="fitCenter"
+                    android:clipToOutline="true"
+                    android:elevation="4dp"
+                    android:src="@drawable/default_profile" />
+
+                <!-- User Name -->
+                <TextView
+                    android:id="@+id/userName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/profileImage"
+                    android:layout_centerHorizontal="true"
+                    android:layout_marginTop="16dp"
+                    android:text="David Jon"
+                    android:textColor="#808080"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <!-- User Phone/Email -->
+                <TextView
+                    android:id="@+id/userPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/userName"
+                    android:layout_centerHorizontal="true"
+                    android:layout_marginTop="8dp"
+                    android:text="None"
+                    android:textColor="#808080"
+                    android:textSize="18sp"
+                    android:textStyle="normal"
+                    android:gravity="center" />
+
+                <!-- Verification Status -->
+                <LinearLayout
+                    android:id="@+id/verificationStatusContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/userPhone"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginEnd="24dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/verification_status_bg"
+                    android:padding="8dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/verificationStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Verification pending"
+                        android:textColor="#FF5722"
+                        android:textSize="14sp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:id="@+id/verificationTimer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="Auto-cancel in 10m 0s"
+                        android:textColor="#FF5722"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginTop="8dp">
+
+                        <Button
+                            android:id="@+id/resendVerificationButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Resend"
+                            android:textColor="#FFFFFF"
+                            android:background="@drawable/button_primary"
+                            android:padding="6dp"
+                            android:textSize="12sp"
+                            android:visibility="gone" />
+
+                        <Button
+                            android:id="@+id/cancelVerificationButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Cancel"
+                            android:textColor="#FFFFFF"
+                            android:background="@drawable/button_secondary"
+                            android:padding="6dp"
+                            android:textSize="12sp"
+                            android:layout_marginStart="8dp"
+                            android:visibility="gone" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Menu Items -->
+                <LinearLayout
+                    android:id="@+id/menuItems"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/verificationStatusContainer"
+                    android:layout_marginTop="40dp"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginEnd="24dp"
+                    android:background="@drawable/menu_card_background"
+                    android:orientation="vertical"
+                    android:padding="8dp"
+                    android:elevation="4dp">
+
+                    <!-- Edit Profile -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="@drawable/menu_item_ripple">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/cir_edit_ic" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="56dp"
+                            android:text="Edit Profile"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:layout_marginEnd="16dp"
+                            android:src="@drawable/arrow_right" />
+                    </RelativeLayout>
+
+                    <!-- Change Password -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="@drawable/menu_item_ripple">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/changepass_ic" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="56dp"
+                            android:text="Change Password"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:layout_marginEnd="16dp"
+                            android:src="@drawable/arrow_right" />
+                    </RelativeLayout>
+
+                    <!-- All Orders & Schedule -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="@drawable/menu_item_ripple">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/allorders_ic" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="56dp"
+                            android:text="All Orders  Schedule"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:layout_marginEnd="16dp"
+                            android:src="@drawable/arrow_right" />
+                    </RelativeLayout>
+
+                    <!-- Payments -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="@drawable/menu_item_ripple">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/payment_ic" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="56dp"
+                            android:text="Payments"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:layout_marginEnd="16dp"
+                            android:src="@drawable/arrow_right" />
+                    </RelativeLayout>
+
+                    <!-- Notification -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="@drawable/menu_item_ripple">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/notification" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="56dp"
+                            android:text="Notification"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:layout_marginEnd="16dp"
+                            android:src="@drawable/arrow_right" />
+                    </RelativeLayout>
+
+                    <!-- Terms & Conditions -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="@drawable/menu_item_ripple">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/termandcondition_ic" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_marginStart="56dp"
+                            android:text="Terms  Conditions"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:layout_marginEnd="16dp"
+                            android:src="@drawable/arrow_right" />
+                    </RelativeLayout>
+                </LinearLayout>
+
+                <!-- Logout Section -->
+                <Button
+                    android:id="@+id/logoutBtn"
+                    android:layout_width="360dp"
+                    android:layout_height="60dp"
+                    android:layout_below="@id/menuItems"
+                    android:layout_centerHorizontal="true"
+                    android:layout_marginTop="50dp"
+                    android:layout_marginBottom="20dp"
+                    android:background="@drawable/logout_ic"
+                    android:foreground="?android:attr/selectableItemBackground"
+                    android:paddingHorizontal="32dp"
+                    android:paddingVertical="12dp"
+                    android:elevation="8dp"
+                    android:stateListAnimator="@anim/lift_on_touch" />
+            </RelativeLayout>
+        </ScrollView>
+
+        <!-- Bottom Navigation Bar -->
+        <RelativeLayout
+            android:id="@+id/bottomNav"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_alignParentBottom="true"
+            android:background="@drawable/navbg"
+            android:elevation="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <!-- Home -->
+                <LinearLayout
+                    android:id="@+id/navHome"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:elevation="2dp">
+                    <View
+                        android:id="@+id/homeIndicator"
+                        android:layout_width="25dp"
+                        android:layout_height="2dp"
+                        android:background="@android:color/transparent" />
+                    <ImageView
+                        android:id="@+id/ic_home"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="4dp"
+                        android:src="@drawable/home" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Home"
+                        android:textColor="@color/nav_inactive"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Categories -->
+                <LinearLayout
+                    android:id="@+id/navCategories"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:elevation="2dp">
+                    <View
+                        android:id="@+id/categoriesIndicator"
+                        android:layout_width="25dp"
+                        android:layout_height="2dp"
+                        android:background="@android:color/transparent" />
+                    <ImageView
+                        android:id="@+id/ic_categories"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="4dp"
+                        android:src="@drawable/category" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Categories"
+                        android:textColor="@color/nav_inactive"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Scanner -->
+                <LinearLayout
+                    android:id="@+id/navScanner"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:elevation="2dp">
+                    <View
+                        android:id="@+id/scannerIndicator"
+                        android:layout_width="25dp"
+                        android:layout_height="2dp"
+                        android:background="@android:color/transparent" />
+                    <LinearLayout
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:background="@drawable/scan_bg"
+                        android:gravity="center">
+                        <ImageView
+                            android:id="@+id/ic_scanner"
+                            android:layout_width="25dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/scanning_ic" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Lab Test -->
+                <LinearLayout
+                    android:id="@+id/navLabTest"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:elevation="2dp">
+                    <View
+                        android:id="@+id/labTestIndicator"
+                        android:layout_width="25dp"
+                        android:layout_height="2dp"
+                        android:background="@android:color/transparent" />
+                    <ImageView
+                        android:id="@+id/ic_lab_test"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="4dp"
+                        android:src="@drawable/labtest" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Lab Test"
+                        android:textColor="@color/nav_inactive"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Profile -->
+                <LinearLayout
+                    android:id="@+id/navProfile"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:elevation="2dp">
+                    <View
+                        android:id="@+id/profileIndicator"
+                        android:layout_width="25dp"
+                        android:layout_height="2dp"
+                        android:background="@android:color/transparent" />
+                    <ImageView
+                        android:id="@+id/ic_profile"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="4dp"
+                        android:src="@drawable/profile" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Profile"
+                        android:textColor="@color/nav_inactive"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </RelativeLayout>
+
+        <!-- Loading Progress -->
+        <ProgressBar
+            android:id="@+id/loadingProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_centerInParent="true" />
+    </RelativeLayout>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
