@@ -167,20 +167,20 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         previousEmail = currentEmail != null ? currentEmail : "";
         previousPhoneNumber = currentPhoneNumber != null ? currentPhoneNumber : "";
 
+        Intent intent = getIntent();
+        currentImageUrl = intent.getStringExtra("currentImageUrl");
+        signInMethod = intent.getStringExtra("signInMethod");
+        pendingEmail = intent.getStringExtra("pendingEmail");
+        pendingPhoneNumber = intent.getStringExtra("pendingPhoneNumber");
+
         if (!currentUser.getProviderData().isEmpty()) {
             for (com.google.firebase.auth.UserInfo provider : currentUser.getProviderData()) {
                 String providerId = provider.getProviderId();
-                if ("phone".equals(providerId)) {
-                    signInMethod = "phone";
-                } else if ("password".equals(providerId)) {
-                    signInMethod = "email";
-                } else if ("google.com".equals(providerId)) {
-                    signInMethod = "google";
-                } else if ("facebook.com".equals(providerId)) {
-                    signInMethod = "facebook";
-                } else if ("github.com".equals(providerId)) {
-                    signInMethod = "github";
-                }
+                if ("phone".equals(providerId)) signInMethod = "phone";
+                else if ("password".equals(providerId)) signInMethod = "email";
+                else if ("google.com".equals(providerId)) signInMethod = "google";
+                else if ("facebook.com".equals(providerId)) signInMethod = "facebook";
+                else if ("github.com".equals(providerId)) signInMethod = "github";
             }
             SharedPreferences.Editor editor = sharedPreferences.edit();
             editor.putString("signInMethod", signInMethod);
@@ -242,7 +242,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     }
 
     private void setupListeners() {
-        backButton.setOnClickListener(v -> navigateToProfileActivity());
+        backButton.setOnClickListener(v -> finish()); // Simply finish to return to ProfileFragment
         cameraIcon.setOnClickListener(v -> pickImage.launch("image/*"));
         birthdayEditText.setOnClickListener(v -> showDatePickerDialog());
         saveButton.setOnClickListener(v -> saveProfileData());
@@ -261,14 +261,10 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (isTextChanging || isProgrammaticChange) {
-                    return;
-                }
+                if (isTextChanging || isProgrammaticChange) return;
                 String input = s.toString().trim();
 
-                if (input.equals(lastProcessedPhoneInput)) {
-                    return;
-                }
+                if (input.equals(lastProcessedPhoneInput)) return;
 
                 isTextChanging = true;
                 resetInputBorders();
@@ -405,23 +401,15 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         }
     }
 
-    private void navigateToProfileActivity() {
-        Intent intent = new Intent(this, ProfileActivity.class);
-        startActivity(intent);
-        finish();
-    }
-
     private void loadCachedProfileData() {
-        String cachedFullName = sharedPreferences.getString("fullName", "User");
+        Intent intent = getIntent();
+        String cachedFullName = intent.getStringExtra("fullName") != null ? intent.getStringExtra("fullName") : sharedPreferences.getString("fullName", "User");
         String cachedGender = sharedPreferences.getString("gender", DEFAULT_GENDER);
         String cachedBirthday = sharedPreferences.getString("birthday", DEFAULT_BIRTHDAY);
-        String cachedPhoneNumber = sharedPreferences.getString("phoneNumber", "");
-        String cachedEmail = sharedPreferences.getString("email", "");
-        originalUsername = sharedPreferences.getString("username", "");
-        String cachedImageUrl = sharedPreferences.getString("imageUrl", "");
-        signInMethod = sharedPreferences.getString("signInMethod", "email");
-        pendingEmail = sharedPreferences.getString("pendingEmail", "");
-        pendingPhoneNumber = sharedPreferences.getString("pendingPhoneNumber", "");
+        String cachedPhoneNumber = intent.getStringExtra("phoneNumber") != null ? intent.getStringExtra("phoneNumber") : sharedPreferences.getString("phoneNumber", "");
+        String cachedEmail = intent.getStringExtra("email") != null ? intent.getStringExtra("email") : sharedPreferences.getString("email", "");
+        originalUsername = intent.getStringExtra("username") != null ? intent.getStringExtra("username") : sharedPreferences.getString("username", "");
+        String cachedImageUrl = intent.getStringExtra("currentImageUrl") != null ? intent.getStringExtra("currentImageUrl") : sharedPreferences.getString("imageUrl", "");
 
         fullNameEditText.setText(cachedFullName);
         genderSpinner.setSelection(((ArrayAdapter<String>) genderSpinner.getAdapter()).getPosition(cachedGender));
@@ -688,9 +676,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                         pendingEmail = "";
                         emailInput.setText(currentEmail);
                         emailInput.setEnabled(true);
-                        if (countdownTimer != null) {
-                            countdownTimer.cancel();
-                        }
+                        if (countdownTimer != null) countdownTimer.cancel();
                         updateVerificationUI();
                         showCustomToast("Email verification cancelled.", true);
                     })
@@ -705,9 +691,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                         pendingPhoneNumber = "";
                         phoneNumberInput.setText(currentPhoneNumber);
                         phoneNumberInput.setEnabled(true);
-                        if (countdownTimer != null) {
-                            countdownTimer.cancel();
-                        }
+                        if (countdownTimer != null) countdownTimer.cancel();
                         updateVerificationUI();
                         showCustomToast("Phone verification cancelled.", true);
                     })
@@ -733,16 +717,12 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
             emailInput.setEnabled(true);
             phoneNumberInput.setEnabled(true);
             verificationTimer.setVisibility(View.GONE);
-            if (countdownTimer != null) {
-                countdownTimer.cancel();
-            }
+            if (countdownTimer != null) countdownTimer.cancel();
         }
     }
 
     private void startVerificationTimer() {
-        if (countdownTimer != null) {
-            countdownTimer.cancel();
-        }
+        if (countdownTimer != null) countdownTimer.cancel();
         long lastVerificationTime = sharedPreferences.getLong("lastVerificationTime", 0);
         long elapsedTime = System.currentTimeMillis() - lastVerificationTime;
         long remainingTime = VERIFICATION_TIMEOUT - elapsedTime;
@@ -870,7 +850,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         setResult(RESULT_OK, resultIntent);
 
         showCustomToast("Profile saved successfully.", true);
-        navigateToProfileActivity();
+        finish(); // Return to ProfileFragment
     }
 
     @Override
@@ -900,7 +880,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         resultIntent.putExtra("pendingPhoneNumber", pendingPhoneNumber);
         setResult(RESULT_OK, resultIntent);
 
-        navigateToProfileActivity();
+        finish(); // Return to ProfileFragment
     }
 
     @Override
@@ -930,7 +910,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         resultIntent.putExtra("pendingPhoneNumber", pendingPhoneNumber);
         setResult(RESULT_OK, resultIntent);
 
-        navigateToProfileActivity();
+        finish(); // Return to ProfileFragment
     }
 
     @Override
@@ -947,8 +927,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (countdownTimer != null) {
-            countdownTimer.cancel();
-        }
+        if (countdownTimer != null) countdownTimer.cancel();
     }
 }

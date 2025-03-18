@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
@@ -45,20 +46,17 @@ public class AuthUtils {
     private static final int REQUEST_PHONE_STATE_PERMISSION = 1001;
     private static final long DEBOUNCE_DELAY = 300;
     private static final long TOAST_DELAY = 2000;
-    private static final int CCP_WIDTH_DP = 48; // Approximate width of CCP in dp
+    private static final int CCP_WIDTH_DP = 48;
 
-    // International format regex
-    private static final String PHONE_REGEX_BD = "^\\+8801[3-9][0-9]{8}$"; // 13 digits
-    private static final String PHONE_REGEX_MY = "^\\+601[0-9]{8,9}$";   // 11-12 digits
-    private static final String PHONE_REGEX_SG = "^\\+65[89][0-9]{7}$";   // 11 digits
+    private static final String PHONE_REGEX_BD = "^\\+8801[3-9][0-9]{8}$";
+    private static final String PHONE_REGEX_MY = "^\\+601[0-9]{8,9}$";
+    private static final String PHONE_REGEX_SG = "^\\+65[89][0-9]{7}$";
     private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@(.+)$";
 
-    // Local format regex (without country code)
-    private static final String LOCAL_REGEX_BD = "^01[3-9][0-9]{8}$";     // 11 digits
-    private static final String LOCAL_REGEX_MY = "^01[0-9][0-9]{7,8}$";   // 10-11 digits
-    private static final String LOCAL_REGEX_SG = "^[89][0-9]{7}$";        // 8 digits
+    private static final String LOCAL_REGEX_BD = "^01[3-9][0-9]{8}$";
+    private static final String LOCAL_REGEX_MY = "^01[0-9][0-9]{7,8}$";
+    private static final String LOCAL_REGEX_SG = "^[89][0-9]{7}$";
 
-    // Prefixes for early detection
     private static final Set<String> BD_PREFIXES = new HashSet<>(Arrays.asList(
             "013", "014", "015", "016", "017", "018", "019"));
     private static final Set<String> MY_PREFIXES = new HashSet<>(Arrays.asList(
@@ -69,7 +67,6 @@ public class AuthUtils {
     private static String lockedCountryCode = null;
     private static boolean isProcessingInput = false;
 
-    // Caching for optimization
     private static String lastValidatedPhone = "";
     private static boolean lastValidationResult = false;
     private static String lastNormalizedInput = "";
@@ -77,7 +74,6 @@ public class AuthUtils {
 
     public static boolean isValidPhoneNumber(String phone) {
         if (phone == null) return false;
-        // Check cache
         if (phone.equals(lastValidatedPhone)) {
             Log.d(TAG, "Using cached validation result for: " + phone + " -> " + lastValidationResult);
             return lastValidationResult;
@@ -92,7 +88,6 @@ public class AuthUtils {
         boolean matchesSG = Pattern.matches(PHONE_REGEX_SG, cleanedPhone);
         boolean isValid = matchesBD || matchesMY || matchesSG;
 
-        // Update cache
         lastValidatedPhone = phone;
         lastValidationResult = isValid;
 
@@ -120,7 +115,6 @@ public class AuthUtils {
             return input != null ? input : "";
         }
 
-        // Check cache
         if (input.equals(lastNormalizedInput)) {
             Log.d(TAG, "Using cached normalization result for: " + input + " -> " + lastNormalizedResult);
             return lastNormalizedResult;
@@ -129,7 +123,6 @@ public class AuthUtils {
         String normalized = input.replaceAll("[^0-9+]", "");
         Log.d(TAG, "Normalizing input: " + input + ", cleaned: " + normalized);
 
-        // Check if input already has a valid country code
         if (normalized.startsWith("+")) {
             if (isValidPhoneNumber(normalized)) {
                 lockedCountryCode = getCountryCodeFromNumber(normalized);
@@ -148,7 +141,6 @@ public class AuthUtils {
             return normalized;
         }
 
-        // Use locked country code if valid
         if (lockedCountryCode != null) {
             String potentialNumber = lockedCountryCode + normalized;
             if (isValidPhoneNumber(potentialNumber)) {
@@ -163,11 +155,9 @@ public class AuthUtils {
             Log.d(TAG, "Unlocked country code due to invalid result: " + potentialNumber);
         }
 
-        // Determine country code from CCP or SIM only if plausible
         String countryCode = ccp != null ? ccp.getSelectedCountryCodeWithPlus() : (simCountry != null ? getCountryCodeFromSim(simCountry) : "+60");
         String detectedCountry = detectCountry(normalized);
 
-        // Handle local formats with explicit detection
         if (Pattern.matches(LOCAL_REGEX_BD, normalized) && detectedCountry.equals("BD")) {
             String result = "+880" + normalized.substring(1);
             if (isValidPhoneNumber(result)) {
@@ -203,7 +193,6 @@ public class AuthUtils {
             }
         }
 
-        // Try detected country code only if plausible
         String detectedCode = getCountryCode(detectedCountry);
         if (!detectedCountry.equals("Unknown")) {
             String potentialNumber = detectedCode + normalized;
@@ -247,12 +236,10 @@ public class AuthUtils {
         String prefix2 = input.length() >= 2 ? input.substring(0, 2) : "";
         String prefix3 = input.length() >= 3 ? input.substring(0, 3) : "";
 
-        // Singapore: Starts with 8 or 9, max 8 digits
         if (SG_PREFIXES.contains(prefix1) && input.length() <= 8) {
             return "SG";
         }
 
-        // Bangladesh or Malaysia: Check prefix and length
         if (input.length() >= 2 && prefix2.equals("01")) {
             if (input.length() >= 3) {
                 if (BD_PREFIXES.contains(prefix3) && !MY_PREFIXES.contains(prefix3) && input.length() <= 11) {
@@ -263,7 +250,7 @@ public class AuthUtils {
                     return input.length() == 11 ? "BD" : input.length() == 10 ? "MY" : "Unknown";
                 }
             }
-            return "Unknown"; // Too short to decide
+            return "Unknown";
         }
 
         return "Unknown";
@@ -280,19 +267,19 @@ public class AuthUtils {
 
     private static int getExpectedLength(String country) {
         switch (country) {
-            case "BD": return 11; // Local: 11, Full: 13
-            case "MY": return 10; // Local: 10-11, Full: 11-12
-            case "SG": return 8;  // Local: 8, Full: 11
+            case "BD": return 11;
+            case "MY": return 10;
+            case "SG": return 8;
             default: return -1;
         }
     }
 
     private static int getMaxLength(String country) {
         switch (country) {
-            case "BD": return 13; // +880 + 10 digits
-            case "MY": return 12; // +60 + 9 digits
-            case "SG": return 11; // +65 + 8 digits
-            default: return 13;  // Max across all (BD)
+            case "BD": return 13;
+            case "MY": return 12;
+            case "SG": return 11;
+            default: return 13;
         }
     }
 
@@ -407,7 +394,7 @@ public class AuthUtils {
         });
     }
 
-    static String getSimCountry(Activity activity) {
+    public static String getSimCountry(Activity activity) {
         try {
             TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
             if (tm != null && ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
@@ -459,10 +446,9 @@ public class AuthUtils {
         int currentLength = cleanedInput.length();
 
         if (cleanedInput.startsWith("+")) {
-            maxLength = 13; // Max across all countries with country code
+            maxLength = 13;
         }
 
-        // Validate length: too short, too long, or complete but invalid
         if ((expectedLength > 0 && currentLength >= expectedLength && !isValidPhoneNumber(backendNumber)) ||
                 currentLength > maxLength) {
             long currentTime = System.currentTimeMillis();
@@ -477,9 +463,8 @@ public class AuthUtils {
             if (ccp != null) {
                 ccp.setCountryForNameCode(null);
                 ccp.setVisibility(View.GONE);
-                // Reset padding when CCP is hidden
                 credInput.setPadding(
-                        (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                        (int) (12 * activity.getResources().getDisplayMetrics().density),
                         credInput.getPaddingTop(),
                         credInput.getPaddingEnd(),
                         credInput.getPaddingBottom()
@@ -491,9 +476,8 @@ public class AuthUtils {
             if (ccp != null && detectedCountry.equals("Unknown")) {
                 ccp.setCountryForNameCode(null);
                 ccp.setVisibility(View.GONE);
-                // Reset padding when CCP is hidden
                 credInput.setPadding(
-                        (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                        (int) (12 * activity.getResources().getDisplayMetrics().density),
                         credInput.getPaddingTop(),
                         credInput.getPaddingEnd(),
                         credInput.getPaddingBottom()
@@ -508,43 +492,35 @@ public class AuthUtils {
         if (emailIcon != null) {
             emailIcon.setVisibility(isEmail ? View.VISIBLE : View.GONE);
             Log.d(TAG, "Email icon visibility: " + (isEmail ? "VISIBLE" : "GONE"));
-        } else {
-            Log.w(TAG, "Email icon is null");
         }
         if (phoneIcon != null) {
             phoneIcon.setVisibility(isEmail ? View.GONE : View.VISIBLE);
             Log.d(TAG, "Phone icon visibility: " + (isEmail ? "GONE" : "VISIBLE"));
-        } else {
-            Log.w(TAG, "Phone icon is null");
         }
         if (ccp != null) {
             if (isEmail) {
                 ccp.setVisibility(View.GONE);
-                // Reset padding when CCP is hidden
                 credInput.setPadding(
-                        (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                        (int) (12 * activity.getResources().getDisplayMetrics().density),
                         credInput.getPaddingTop(),
                         credInput.getPaddingEnd(),
                         credInput.getPaddingBottom()
                 );
             } else {
-                // Show CCP only if the phone number is valid
                 String normalizedNumber = normalizePhoneNumberForBackend(credInput.getText().toString(), ccp, getSimCountry(activity));
                 if (isValidPhoneNumber(normalizedNumber)) {
                     ccp.setVisibility(View.VISIBLE);
                     updateCountryFlag(normalizedNumber, ccp);
-                    // Adjust padding to accommodate CCP
                     credInput.setPadding(
-                            (int) (CCP_WIDTH_DP * activity.getResources().getDisplayMetrics().density), // paddingStart
+                            (int) (CCP_WIDTH_DP * activity.getResources().getDisplayMetrics().density),
                             credInput.getPaddingTop(),
                             credInput.getPaddingEnd(),
                             credInput.getPaddingBottom()
                     );
                 } else {
                     ccp.setVisibility(View.GONE);
-                    // Reset padding when CCP is hidden
                     credInput.setPadding(
-                            (int) (12 * activity.getResources().getDisplayMetrics().density), // paddingStart
+                            (int) (12 * activity.getResources().getDisplayMetrics().density),
                             credInput.getPaddingTop(),
                             credInput.getPaddingEnd(),
                             credInput.getPaddingBottom()
@@ -552,15 +528,11 @@ public class AuthUtils {
                 }
             }
             Log.d(TAG, "CCP visibility: " + (ccp.getVisibility() == View.VISIBLE ? "VISIBLE" : "GONE"));
-        } else {
-            Log.w(TAG, "CCP is null");
         }
         if (validationMessage != null) {
             validationMessage.setText(message);
             validationMessage.setTextColor(ContextCompat.getColor(activity, color));
             Log.d(TAG, "Validation message: " + message + ", color: " + color);
-        } else {
-            Log.w(TAG, "Validation message is null");
         }
     }
 
@@ -570,8 +542,6 @@ public class AuthUtils {
             validationMessage.setText(message);
             validationMessage.setTextColor(ContextCompat.getColor(activity, color));
             Log.d(TAG, "Validation error message: " + message + ", color: " + color);
-        } else {
-            Log.w(TAG, "Validation message is null");
         }
     }
 
@@ -588,9 +558,8 @@ public class AuthUtils {
         if (ccp != null) {
             ccp.setCountryForNameCode(null);
             ccp.setVisibility(View.GONE);
-            // Reset padding when CCP is hidden
             credInput.setPadding(
-                    (int) (12 * credInput.getContext().getResources().getDisplayMetrics().density), // paddingStart
+                    (int) (12 * credInput.getContext().getResources().getDisplayMetrics().density),
                     credInput.getPaddingTop(),
                     credInput.getPaddingEnd(),
                     credInput.getPaddingBottom()
@@ -614,7 +583,6 @@ public class AuthUtils {
             String normalized = phoneNumber.replaceAll("[^0-9+]", "");
             Log.d(TAG, "Normalized phone for flag update: '" + normalized + "'");
 
-            // Set flag for valid full numbers
             if (isValidPhoneNumber(normalized)) {
                 if (normalized.startsWith("+880")) {
                     ccp.setCountryForNameCode("BD");
@@ -631,7 +599,6 @@ public class AuthUtils {
                 }
             }
 
-            // Allow partial local numbers with strict prefix matching
             String prefix1 = normalized.length() >= 1 ? normalized.substring(0, 1) : "";
             String prefix3 = normalized.length() >= 3 ? normalized.substring(0, 3) : "";
             if (!normalized.startsWith("+")) {
@@ -733,28 +700,55 @@ public class AuthUtils {
         String displayName = user.getDisplayName() != null ? user.getDisplayName() : "User";
         String phone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
 
+        // Check if user is already fully registered in Realtime DB
         databaseReference.child(user.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
+                    // User already exists in DB, no need to re-save
                     callback.onSuccess(user);
                 } else {
-                    checkUniqueness(emailsReference, email.replace(".", "_"), isUnique -> {
-                        if (!isUnique) {
-                            FirebaseAuth.getInstance().signOut();
-                            callback.onFailure("Email '" + email + "' already in use");
-                            return;
-                        }
+                    // For social providers, skip email uniqueness check and proceed with signup
+                    if ("google".equals(provider) || "facebook".equals(provider) || "github".equals(provider)) {
                         generateUniqueUsername(displayName, usernamesReference, username ->
                                 saveUserData(user, databaseReference, emailsReference, phoneNumbersReference,
                                         usernamesReference, displayName, email, phone, username, provider,
                                         new SaveUserDataCallback() {
                                             @Override
-                                            public void onSuccess() { callback.onSuccess(user); }
+                                            public void onSuccess() {
+                                                callback.onSuccess(user);
+                                            }
+
                                             @Override
-                                            public void onFailure(String error) { callback.onFailure(error); }
+                                            public void onFailure(String error) {
+                                                callback.onFailure(error);
+                                            }
                                         }));
-                    });
+                    } else {
+                        // For email/password or phone, check uniqueness
+                        String key = email.replace(".", "_");
+                        checkUniqueness(emailsReference, key, email, isUnique -> {
+                            if (!isUnique) {
+                                FirebaseAuth.getInstance().signOut();
+                                callback.onFailure("Email '" + email + "' is already registered");
+                            } else {
+                                generateUniqueUsername(displayName, usernamesReference, username ->
+                                        saveUserData(user, databaseReference, emailsReference, phoneNumbersReference,
+                                                usernamesReference, displayName, email, phone, username, provider,
+                                                new SaveUserDataCallback() {
+                                                    @Override
+                                                    public void onSuccess() {
+                                                        callback.onSuccess(user);
+                                                    }
+
+                                                    @Override
+                                                    public void onFailure(String error) {
+                                                        callback.onFailure(error);
+                                                    }
+                                                }));
+                            }
+                        });
+                    }
                 }
             }
 
@@ -765,11 +759,41 @@ public class AuthUtils {
         });
     }
 
-    public static void checkUniqueness(DatabaseReference ref, String key, UniquenessCallback callback) {
+    // Add this to AuthUtils.java
+    public static void firebaseLoginWithGoogle(Activity activity, String idToken, AuthCallback callback) {
+        if (activity == null || callback == null) {
+            Log.e(TAG, "Invalid parameters for Google login");
+            if (callback != null) callback.onFailure("Invalid parameters");
+            return;
+        }
+        AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+        FirebaseAuth.getInstance()
+                .signInWithCredential(credential)
+                .addOnCompleteListener(activity, task -> {
+                    if (task.isSuccessful()) {
+                        FirebaseUser user = task.getResult().getUser();
+                        if (user != null) {
+                            Log.d(TAG, "Google login successful, UID: " + user.getUid());
+                            callback.onSuccess(user);
+                        } else {
+                            Log.e(TAG, "Google login succeeded but user is null");
+                            callback.onFailure("User null after login");
+                        }
+                    } else {
+                        Log.e(TAG, "Google login failed: " + task.getException().getMessage(), task.getException());
+                        callback.onFailure("Google login failed: " + task.getException().getMessage());
+                    }
+                });
+    }
+
+    public static void checkUniqueness(DatabaseReference ref, String key, String emailOrSyntheticEmail, UniquenessCallback callback) {
         ref.child(key).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                callback.onCheckComplete(!snapshot.exists());
+                boolean isUniqueInDB = !snapshot.exists();
+                Log.d(TAG, "DB check for " + key + ": " + (isUniqueInDB ? "Unique" : "Not unique"));
+                // Only check Realtime DB, skip Firebase Auth for social signups
+                callback.onCheckComplete(isUniqueInDB);
             }
 
             @Override
@@ -793,6 +817,7 @@ public class AuthUtils {
         userData.put("username", username != null ? username : "user" + new java.util.Random().nextInt(1000));
         userData.put("imageUrl", "");
         userData.put("signInMethod", signInMethod != null ? signInMethod : "unknown");
+        userData.put("role", "user"); // Added to match Realtime DB rules for admin checks
 
         databaseReference.child(user.getUid()).setValue(userData)
                 .addOnSuccessListener(aVoid -> {

@@ -1,3 +1,4 @@
+// App-level build.gradle (app module)
 plugins {
     id 'com.android.application'
     id 'com.google.gms.google-services'
@@ -21,36 +22,56 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
     // Core Android dependencies
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.10.0")
-    implementation("androidx.activity:activity:1.8.1")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation 'com.airbnb.android:lottie:6.4.0'
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.10.0"
+    implementation "androidx.activity:activity:1.8.1"
+    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
+    implementation "androidx.fragment:fragment:1.6.2"
+    implementation "androidx.core:core-splashscreen:1.0.1"
+    testImplementation "junit:junit:4.13.2"
+    androidTestImplementation "androidx.test.ext:junit:1.1.5"
+    androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"
 
     // Firebase BoM (Bill of Materials)
-    implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
+    implementation platform("com.google.firebase:firebase-bom:33.9.0") // Verify this is latest
 
     // Firebase services (managed by BoM)
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-database-ktx")
-    implementation("com.google.firebase:firebase-storage-ktx")
+    implementation "com.google.firebase:firebase-analytics"
+    implementation "com.google.firebase:firebase-auth"
+    implementation "com.google.firebase:firebase-firestore"
+    implementation "com.google.firebase:firebase-database"
+    implementation "com.google.firebase:firebase-storage"
+    implementation "com.google.firebase:firebase-appcheck-debug" // Debug only
+
+    // Google Play Services for Auth (managed by BOM or latest version)
+    implementation "com.google.android.gms:play-services-auth" // Remove explicit version
+
+    // Social Media Login
+    implementation "com.facebook.android:facebook-login:17.0.1"
 
     // Other dependencies
-    implementation 'com.hbb20:ccp:2.7.2'
-    implementation 'com.google.android.gms:play-services-auth:20.7.0' // Google Sign-In
-    implementation 'com.github.bumptech.glide:glide:4.16.0'
-    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
-    implementation 'com.facebook.android:facebook-login:17.0.1'
-    implementation 'com.airbnb.android:lottie:6.4.0'
-    implementation("com.google.firebase:firebase-appcheck-debug")
+    implementation "com.hbb20:ccp:2.7.2"
+    implementation "com.github.bumptech.glide:glide:4.16.0"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+    implementation "com.airbnb.android:lottie:6.4.0"
+
+    // Glide annotation processor
+    annotationProcessor "com.github.bumptech.glide:compiler:4.16.0"
+
+    // Firebase App Check with Play Integrity
+    implementation "com.google.firebase:firebase-appcheck-playintegrity:17.1.2"
+
+    // Material Components
+    implementation "androidx.cardview:cardview:1.0.0"
+
+    // Play Services Base (for availability checks)
+    implementation "com.google.android.gms:play-services-base:18.5.0" // Optional, for explicit checks
 }

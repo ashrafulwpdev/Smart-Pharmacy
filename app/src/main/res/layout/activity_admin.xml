@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/light_gray">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Tab Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+            <Button android:id="@+id/tabBanner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Banner" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
+            <Button android:id="@+id/tabCategories" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Categories" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
+            <Button android:id="@+id/tabLabTests" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Lab Tests" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
+            <Button android:id="@+id/tabProducts" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Products" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
+        </LinearLayout>
+
+        <!-- Banner Section -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/bannerSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <EditText android:id="@+id/bannerTitleInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Banner Title" android:inputType="text"/>
+                <EditText android:id="@+id/bannerDescriptionInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Description" android:inputType="text"/>
+                <EditText android:id="@+id/bannerDiscountInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Discount" android:inputType="text"/>
+                <Button android:id="@+id/uploadBannerImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+                <Button android:id="@+id/addBannerButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Banner" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Categories Section -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/categoriesSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <EditText android:id="@+id/categoryNameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Category Name" android:inputType="text"/>
+                <EditText android:id="@+id/productCountInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Product Count" android:inputType="number"/>
+                <Button android:id="@+id/uploadCategoryImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+                <Button android:id="@+id/addCategoryButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Category" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Lab Tests Section -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/labTestsSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <EditText android:id="@+id/labTestNameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Lab Test Name" android:inputType="text"/>
+                <Button android:id="@+id/uploadLabTestImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+                <Button android:id="@+id/addLabTestButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Lab Test" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Products Section -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/productsSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <EditText android:id="@+id/productNameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Product Name" android:inputType="text"/>
+                <EditText android:id="@+id/productPriceInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Price" android:inputType="numberDecimal"/>
+                <EditText android:id="@+id/productRatingInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Rating (0-5)" android:inputType="number"/>
+                <EditText android:id="@+id/productReviewCountInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Review Count" android:inputType="number"/>
+                <Spinner android:id="@+id/categorySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"/>
+                <Button android:id="@+id/uploadProductImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+                <Button android:id="@+id/addProductButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Product" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/adminRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"/>
+    </LinearLayout>
+</ScrollView>

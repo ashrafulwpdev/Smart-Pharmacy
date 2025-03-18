@@ -1,7 +1,13 @@
-<!-- res/values/styles.xml -->
 <resources>
     <!-- Define the CustomDialogTheme -->
     <style name="CustomDialogTheme" parent="Theme.AppCompat.Light.Dialog.Alert">
-        <!-- No attributes needed for now -->
+        <!-- Customize dialog theme properties here -->
+    </style>
+
+    <!-- Base application theme -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/blue</item>
+        <item name="colorPrimaryDark">@color/dark_blue</item>
+        <item name="colorAccent">@color/orange</item>
     </style>
 </resources>

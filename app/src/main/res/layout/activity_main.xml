@@ -4,38 +4,187 @@
     android:layout_height="match_parent"
     android:background="#FFFFFF">
 
-    <TextView
-        android:id="@+id/welcomeText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="100dp"
-        android:text="Welcome to Smart Pharmacy"
-        android:textColor="#083EC9"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+    <RelativeLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/navbg"
+        android:elevation="10dp">
 
-    <Button
-        android:id="@+id/profileBtn"
-        android:layout_width="280dp"
-        android:layout_height="50dp"
-        android:layout_centerInParent="true"
-        android:background="@drawable/login_btn_interactive_bg"
-        android:text="View Profile"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center">
 
-    <Button
-        android:id="@+id/logoutBtn"
-        android:layout_width="280dp"
-        android:layout_height="50dp"
-        android:layout_below="@id/profileBtn"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="20dp"
-        android:background="@drawable/login_btn_interactive_bg"
-        android:text="Logout"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+            <!-- Home -->
+            <LinearLayout
+                android:id="@+id/navHome"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/homeIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_home"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/home" />
+                <TextView
+                    android:id="@+id/homeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Home"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Categories -->
+            <LinearLayout
+                android:id="@+id/navCategories"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/categoriesIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_categories"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/category" />
+                <TextView
+                    android:id="@+id/categoriesText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Categories"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Scanner -->
+            <LinearLayout
+                android:id="@+id/navScanner"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/scannerIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <LinearLayout
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:background="@drawable/scan_bg"
+                    android:gravity="center">
+                    <ImageView
+                        android:id="@+id/ic_scanner"
+                        android:layout_width="25dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/scanning_ic" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Lab Test -->
+            <LinearLayout
+                android:id="@+id/navLabTest"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/labTestIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_lab_test"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/labtest" />
+                <TextView
+                    android:id="@+id/labTestText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Lab Test"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Profile -->
+            <LinearLayout
+                android:id="@+id/navProfile"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/profileIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_profile"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/profile" />
+                <TextView
+                    android:id="@+id/profileText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Profile"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </RelativeLayout>
+
+    <FrameLayout
+        android:id="@+id/fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@id/bottomNav" />
 </RelativeLayout>
