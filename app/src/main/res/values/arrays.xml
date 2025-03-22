@@ -5,4 +5,9 @@
         <item>Female</item>
         <item>Other</item>
     </string-array>
+    <string-array name="notification_targets">
+        <item>All Users</item>
+        <item>Active Users</item>
+        <item>Inactive Users</item>
+    </string-array>
 </resources>

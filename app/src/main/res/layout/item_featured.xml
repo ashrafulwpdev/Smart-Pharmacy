@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="120dp"
+    android:layout_width="150dp"
     android:layout_height="wrap_content"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_margin="8dp"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="8dp"
     app:cardCornerRadius="12dp"
     app:cardBackgroundColor="@android:color/white"
     app:cardElevation="2dp">
@@ -16,17 +19,17 @@
         android:padding="8dp">
 
         <ImageView
-            android:id="@+id/lab_test_image"
+            android:id="@+id/featured_image"
             android:layout_width="100dp"
             android:layout_height="100dp"
-            android:scaleType="centerCrop"
+            android:scaleType="centerInside"
             android:src="@drawable/default_category_image" />
 
         <TextView
-            android:id="@+id/lab_test_text"
+            android:id="@+id/featured_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Lab Test Name"
+            android:text="Featured Item"
             android:textAlignment="center"
             android:paddingTop="8dp"
             android:textColor="#212121"

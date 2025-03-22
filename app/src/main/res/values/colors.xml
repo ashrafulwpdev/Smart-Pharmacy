@@ -1,17 +1,33 @@
 <resources>
-    <color name="blue">#2196F3</color> <!-- Primary Blue -->
-    <color name="dark_blue">#1976D2</color> <!-- Darker Variant -->
-    <color name="white">#FFFFFF</color> <!-- White Color -->
-    <color name="black">#000000</color> <!-- Black Color -->
-    <color name="red">#D32F2F</color> <!-- Error color for borders and toasts -->
-    <color name="gray">#1F1F1F</color> <!-- Text color for subtitles, hints -->
-    <color name="light_gray">#F5F5F5</color> <!-- Background for cards, inputs -->
-    <color name="primary_blue">#1976D2</color>
-    <color name="nav_inactive">#D2D6DB</color>
-    <color name="nav_active">#FFFFFF</color>
-    <color name="orange">#FFA500</color>
-    <color name="green">#1D7811</color>
+    <!-- Primary Colors -->
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#FF4081</color>
+    <color name="blue">#2196F3</color>
+    <color name="dark_blue">#1976D2</color> <!-- Removed primary_blue as it duplicated this -->
+    <color name="green">#1D7811</color>
+    <color name="orange">#FFA500</color>
+    <color name="red">#D32F2F</color> <!-- Removed error_red as it duplicated this -->
+
+    <!-- Accent Colors -->
+    <color name="accent_blue">#083EC9</color>
+    <color name="accent_blue_dark">#2563EB</color>
+
+    <!-- Neutral Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray">#1F1F1F</color>
+    <color name="light_gray">#F5F5F5</color>
+
+    <!-- Background Colors -->
+    <color name="background_light">#FFFFFF</color> <!-- Same as white, kept for semantic meaning -->
+    <color name="card_background">#F5F5F5</color> <!-- Same as light_gray, kept for semantic meaning -->
+
+    <!-- Text Colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#666666</color>
+    <color name="text_hint">#3B82F6</color>
+
+    <!-- Navigation Colors -->
+    <color name="nav_inactive">#D2D6DB</color>
+    <color name="nav_active">#FFFFFF</color> <!-- Same as white, kept for semantic meaning -->
 </resources>

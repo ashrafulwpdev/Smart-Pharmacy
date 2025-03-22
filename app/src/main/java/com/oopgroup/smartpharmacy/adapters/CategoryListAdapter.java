@@ -17,13 +17,13 @@ import com.oopgroup.smartpharmacy.models.Category;
 
 import java.util.List;
 
-public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapter.CategoryViewHolder> {
+public class CategoryListAdapter extends RecyclerView.Adapter<CategoryListAdapter.CategoryViewHolder> {
 
     private Context context;
     private List<Category> categoryList;
     private OnCategoryClickListener onCategoryClickListener;
 
-    public CategoryGridAdapter(Context context, List<Category> categoryList, OnCategoryClickListener listener) {
+    public CategoryListAdapter(Context context, List<Category> categoryList, OnCategoryClickListener listener) {
         this.context = context;
         this.categoryList = categoryList;
         this.onCategoryClickListener = listener;
@@ -32,7 +32,7 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
     @NonNull
     @Override
     public CategoryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.item_category_grid, parent, false);
+        View view = LayoutInflater.from(context).inflate(R.layout.item_category_list, parent, false);
         return new CategoryViewHolder(view);
     }
 
@@ -40,6 +40,7 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
     public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
         Category category = categoryList.get(position);
         holder.categoryName.setText(category.getName());
+        holder.categoryProductCount.setText(category.getProductCount() + " Products");
         Glide.with(context)
                 .load(category.getImageUrl())
                 .placeholder(R.drawable.default_category_image)
@@ -61,12 +62,13 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
 
     public static class CategoryViewHolder extends RecyclerView.ViewHolder {
         ImageView categoryImage;
-        TextView categoryName;
+        TextView categoryName, categoryProductCount;
 
         public CategoryViewHolder(@NonNull View itemView) {
             super(itemView);
             categoryImage = itemView.findViewById(R.id.category_image);
-            categoryName = itemView.findViewById(R.id.category_text);
+            categoryName = itemView.findViewById(R.id.category_name);
+            categoryProductCount = itemView.findViewById(R.id.category_product_count);
         }
     }
 

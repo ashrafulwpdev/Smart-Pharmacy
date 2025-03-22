@@ -44,7 +44,6 @@ dependencies {
     implementation platform("com.google.firebase:firebase-bom:33.9.0") // Verify this is latest
 
     // Firebase services (managed by BoM)
-    implementation "com.google.firebase:firebase-analytics"
     implementation "com.google.firebase:firebase-auth"
     implementation "com.google.firebase:firebase-firestore"
     implementation "com.google.firebase:firebase-database"
@@ -74,4 +73,10 @@ dependencies {
 
     // Play Services Base (for availability checks)
     implementation "com.google.android.gms:play-services-base:18.5.0" // Optional, for explicit checks
+
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+
+    implementation 'com.google.android.gms:play-services-base:18.5.0'
+
+
 }

@@ -383,7 +383,7 @@
                     android:stateListAnimator="@anim/lift_on_touch" />
 
                 <!-- Logout Section -->
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/logoutButton"
                     android:layout_width="360dp"
                     android:layout_height="60dp"
@@ -392,11 +392,13 @@
                     android:layout_marginTop="20dp"
                     android:layout_marginBottom="20dp"
                     android:background="@drawable/logout_ic"
+                    app:backgroundTint="@null"
                     android:foreground="?android:attr/selectableItemBackground"
                     android:paddingHorizontal="32dp"
                     android:paddingVertical="12dp"
                     android:elevation="8dp"
                     android:stateListAnimator="@anim/lift_on_touch" />
+
             </RelativeLayout>
         </androidx.core.widget.NestedScrollView>
 

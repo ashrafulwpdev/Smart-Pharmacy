@@ -1,116 +1,738 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/light_gray">
+    android:background="@color/background_light">
 
-    <LinearLayout
+    <!-- Main Content -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="match_parent">
 
-        <!-- Tab Buttons -->
-        <LinearLayout
+        <!-- App Bar -->
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBarLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
-            <Button android:id="@+id/tabBanner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Banner" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
-            <Button android:id="@+id/tabCategories" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Categories" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
-            <Button android:id="@+id/tabLabTests" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Lab Tests" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
-            <Button android:id="@+id/tabProducts" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Products" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_margin="4dp"/>
-        </LinearLayout>
+            android:background="@color/background_light"
+            app:elevation="4dp">
 
-        <!-- Banner Section -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/bannerSection"
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                app:title="@string/admin_dashboard_title"
+                app:titleTextColor="@color/text_primary"
+                app:navigationIcon="@drawable/ic_menu"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Main Content -->
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardElevation="4dp"
-            app:cardCornerRadius="8dp">
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior"
+            android:fillViewport="true">
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-                <EditText android:id="@+id/bannerTitleInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Banner Title" android:inputType="text"/>
-                <EditText android:id="@+id/bannerDescriptionInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Description" android:inputType="text"/>
-                <EditText android:id="@+id/bannerDiscountInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Discount" android:inputType="text"/>
-                <Button android:id="@+id/uploadBannerImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-                <Button android:id="@+id/addBannerButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Banner" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <!-- Categories Section -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/categoriesSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardElevation="4dp"
-            app:cardCornerRadius="8dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <EditText android:id="@+id/categoryNameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Category Name" android:inputType="text"/>
-                <EditText android:id="@+id/productCountInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Product Count" android:inputType="number"/>
-                <Button android:id="@+id/uploadCategoryImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-                <Button android:id="@+id/addCategoryButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Category" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+                <!-- Banner Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/bannerSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/manage_banners"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/bannerTitleInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/banner_title_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/bannerDescriptionInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/banner_description_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/bannerDiscountInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/banner_discount_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/uploadBannerImageButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/upload_image"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/addBannerButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/add_update_banner"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
 
-        <!-- Lab Tests Section -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/labTestsSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardElevation="4dp"
-            app:cardCornerRadius="8dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <EditText android:id="@+id/labTestNameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Lab Test Name" android:inputType="text"/>
-                <Button android:id="@+id/uploadLabTestImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-                <Button android:id="@+id/addLabTestButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Lab Test" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+                <!-- Categories Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/categoriesSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/add_edit_category"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/categoryNameInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/category_name_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/uploadCategoryImageButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/upload_image"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/addCategoryButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/add_category"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
 
-        <!-- Products Section -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/productsSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardElevation="4dp"
-            app:cardCornerRadius="8dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <EditText android:id="@+id/productNameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Product Name" android:inputType="text"/>
-                <EditText android:id="@+id/productPriceInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Price" android:inputType="numberDecimal"/>
-                <EditText android:id="@+id/productRatingInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Rating (0-5)" android:inputType="number"/>
-                <EditText android:id="@+id/productReviewCountInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Review Count" android:inputType="number"/>
-                <Spinner android:id="@+id/categorySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"/>
-                <Button android:id="@+id/uploadProductImageButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Upload Image" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-                <Button android:id="@+id/addProductButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Add Product" android:backgroundTint="@color/blue" android:textColor="@color/white" android:layout_marginTop="8dp"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+                <!-- Lab Tests Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/labTestsSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/add_edit_lab_test"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/labTestNameInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/lab_test_name_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/uploadLabTestImageButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/upload_image"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/addLabTestButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/add_lab_test"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
 
-        <!-- RecyclerView -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/adminRecyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"/>
-    </LinearLayout>
-</ScrollView>
+                <!-- Products Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/productsSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/add_edit_product"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/select_category"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <Spinner
+                                android:id="@+id/categorySpinner"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:prompt="@string/select_category" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/productNameInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/product_name_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/productQuantityInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/quantity_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/productPriceInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/original_price_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="numberDecimal" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/productDiscountedPriceInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/discounted_price_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="numberDecimal" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/productRatingInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/rating_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="number" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/productReviewCountInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/review_count_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="number" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/uploadProductImageButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/upload_image"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/addProductButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/add_product"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Users Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/usersSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/manage_users"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/refreshUsersButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/refresh_user_list"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Orders Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/ordersSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/manage_orders"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/refreshOrdersButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/refresh_orders"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Notifications Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/notificationsSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/send_notifications"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/notificationTitleInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/notification_title_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/notificationMessageInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/notification_message_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="textMultiLine"
+                                android:minLines="3"
+                                android:maxLines="5" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/notification_target"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <Spinner
+                                android:id="@+id/notificationTargetSpinner"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:prompt="@string/notification_target" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/sendNotificationButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/send_notification"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Scanner Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/scannerSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/scanner_settings"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/scannerInstructionsInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/scanner_instructions_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="textMultiLine"
+                                android:minLines="3"
+                                android:maxLines="5" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/updateScannerSettingsButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="@string/update_scanner_settings"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Empty State TextView -->
+                <TextView
+                    android:id="@+id/emptyView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/no_items_available"
+                    android:textColor="@color/text_secondary"
+                    android:visibility="gone" />
+
+                <!-- RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/adminRecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:padding="16dp"
+                    android:background="@android:color/transparent" />
+
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Navigation Drawer -->
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navView"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        app:menu="@menu/nav_drawer_menu"
+        app:headerLayout="@layout/nav_header" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

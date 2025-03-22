@@ -65,8 +65,8 @@ public class LabTestGridAdapter extends RecyclerView.Adapter<LabTestGridAdapter.
 
         public LabTestViewHolder(@NonNull View itemView) {
             super(itemView);
-            labTestImage = itemView.findViewById(R.id.labTestImage);
-            labTestName = itemView.findViewById(R.id.labTestName);
+            labTestImage = itemView.findViewById(R.id.lab_test_image);
+            labTestName = itemView.findViewById(R.id.lab_test_text);
         }
     }
 

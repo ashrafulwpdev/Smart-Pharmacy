@@ -6,13 +6,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -22,7 +20,6 @@ import com.google.firebase.database.ValueEventListener;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.BestsellerProductAdapter;
 import com.oopgroup.smartpharmacy.models.Product;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,7 +71,7 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
         // Initialize UI
         productsTitle = view.findViewById(R.id.productsTitle);
         productsRecyclerView = view.findViewById(R.id.productsRecyclerView);
-        productsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        productsRecyclerView.setLayoutManager(new GridLayoutManager(requireContext(), 2));
 
         // Set title
         if (categoryName != null) {
@@ -110,9 +107,12 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
                         String imageUrl = productSnapshot.child("imageUrl").getValue(String.class);
                         Integer rating = productSnapshot.child("rating").getValue(Integer.class);
                         Integer reviewCount = productSnapshot.child("reviewCount").getValue(Integer.class);
+                        String quantity = productSnapshot.child("quantity").getValue(String.class);
+                        Double originalPrice = productSnapshot.child("originalPrice").getValue(Double.class);
+                        Double discountedPrice = productSnapshot.child("discountedPrice").getValue(Double.class);
 
                         if (name != null && price != null && imageUrl != null && rating != null && reviewCount != null) {
-                            Product product = new Product(id, name, price, imageUrl, rating, reviewCount);
+                            Product product = new Product(id, name, price, imageUrl, rating, reviewCount, quantity, originalPrice != null ? originalPrice : price, discountedPrice != null ? discountedPrice : 0.0);
                             productList.add(product);
                         }
                     }
@@ -125,9 +125,12 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
                             String imageUrl = productSnapshot.child("imageUrl").getValue(String.class);
                             Integer rating = productSnapshot.child("rating").getValue(Integer.class);
                             Integer reviewCount = productSnapshot.child("reviewCount").getValue(Integer.class);
+                            String quantity = productSnapshot.child("quantity").getValue(String.class);
+                            Double originalPrice = productSnapshot.child("originalPrice").getValue(Double.class);
+                            Double discountedPrice = productSnapshot.child("discountedPrice").getValue(Double.class);
 
                             if (name != null && price != null && imageUrl != null && rating != null && reviewCount != null) {
-                                Product product = new Product(id, name, price, imageUrl, rating, reviewCount);
+                                Product product = new Product(id, name, price, imageUrl, rating, reviewCount, quantity, originalPrice != null ? originalPrice : price, discountedPrice != null ? discountedPrice : 0.0);
                                 productList.add(product);
                             }
                         }

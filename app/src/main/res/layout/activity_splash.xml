@@ -2,7 +2,8 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#E7EFFF">
+    android:background="@color/background_light"
+    android:fitsSystemWindows="false">
 
     <!-- Elliptical Background Photo (Overlay, Centered) -->
     <ImageView
@@ -17,11 +18,11 @@
     <ImageView
         android:id="@+id/topPills"
         android:layout_width="match_parent"
-        android:layout_height="100dp"
-        android:layout_alignParentTop="true"
-        android:scaleType="fitCenter"
-        android:src="@drawable/pill_top"
-        android:alpha="1.0"/> <!-- Full Opacity -->
+        android:layout_height="120dp"
+    android:layout_alignParentTop="true"
+    android:scaleType="fitXY"
+    android:src="@drawable/pill_top"
+    android:alpha="1.0"/>
 
     <!-- App Logo (Inside Ellipse) -->
     <ImageView
@@ -52,10 +53,10 @@
     <ImageView
         android:id="@+id/bottomPills"
         android:layout_width="match_parent"
-        android:layout_height="100dp"
-        android:layout_alignParentBottom="true"
-        android:scaleType="fitCenter"
-        android:src="@drawable/pill_bottom"
-        android:alpha="1.0"/> <!-- Full Opacity -->
+        android:layout_height="120dp"
+    android:layout_alignParentBottom="true"
+    android:scaleType="fitXY"
+    android:src="@drawable/pill_bottom"
+    android:alpha="1.0"/>
 
 </RelativeLayout>

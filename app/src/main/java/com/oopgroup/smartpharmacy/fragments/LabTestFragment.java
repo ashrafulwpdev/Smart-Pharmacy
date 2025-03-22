@@ -1,6 +1,7 @@
 package com.oopgroup.smartpharmacy.fragments;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -28,12 +29,15 @@ import java.util.List;
 
 public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLabTestClickListener {
 
+    private static final String TAG = "LabTestFragment";
+
     private RecyclerView labTestsRecyclerView;
     private TextView labTestTitle;
     private LabTestGridAdapter labTestAdapter;
     private List<LabTest> labTestList;
     private DatabaseReference labTestsRef;
     private FirebaseAuth mAuth;
+    private ValueEventListener labTestsListener;
 
     public LabTestFragment() {
         // Required empty public constructor
@@ -52,34 +56,44 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
         mAuth = FirebaseAuth.getInstance();
         labTestsRef = FirebaseDatabase.getInstance().getReference("labTests");
 
-        // Check if user is authenticated
-        if (mAuth.getCurrentUser() == null) {
-            Toast.makeText(requireContext(), "Please log in to view lab tests.", Toast.LENGTH_LONG).show();
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, new LoginFragment())
-                    .commit();
-            return;
-        }
-
         // Initialize UI
         labTestTitle = view.findViewById(R.id.labTestTitle);
         labTestsRecyclerView = view.findViewById(R.id.labTestsRecyclerView);
-        labTestsRecyclerView.setLayoutManager(new GridLayoutManager(requireContext(), 3));
+
+        if (labTestsRecyclerView == null) {
+            Log.e(TAG, "labTestsRecyclerView not found in layout");
+            Toast.makeText(requireContext(), "Error: Lab tests view not found", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // Check if user is authenticated
+        if (mAuth.getCurrentUser() == null) {
+            if (isAdded()) {
+                Toast.makeText(requireContext(), "Please log in to view lab tests.", Toast.LENGTH_LONG).show();
+                requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new LoginFragment())
+                        .commit();
+            }
+            return;
+        }
 
         // Initialize list and adapter
         labTestList = new ArrayList<>();
         labTestAdapter = new LabTestGridAdapter(requireContext(), labTestList, this);
+        labTestsRecyclerView.setLayoutManager(new GridLayoutManager(requireContext(), 3));
         labTestsRecyclerView.setAdapter(labTestAdapter);
+        labTestsRecyclerView.setHasFixedSize(true);
 
         // Fetch lab tests
         fetchLabTests();
     }
 
     private void fetchLabTests() {
-        labTestsRef.addValueEventListener(new ValueEventListener() {
+        labTestsListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!isAdded()) return;
                 labTestList.clear();
                 for (DataSnapshot labTestSnapshot : snapshot.getChildren()) {
                     String id = labTestSnapshot.getKey();
@@ -96,13 +110,32 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(requireContext(), "Failed to load lab tests: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Failed to load lab tests: " + error.getMessage());
+                if (isAdded()) {
+                    Toast.makeText(requireContext(), "Failed to load lab tests: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                }
             }
-        });
+        };
+        labTestsRef.addValueEventListener(labTestsListener);
     }
 
     @Override
     public void onLabTestClick(LabTest labTest) {
+        if (!isAdded()) return;
         Toast.makeText(requireContext(), "Lab Test clicked: " + labTest.getName(), Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (labTestsRef != null && labTestsListener != null) {
+            labTestsRef.removeEventListener(labTestsListener);
+        }
+        if (labTestsRecyclerView != null) {
+            labTestsRecyclerView.setAdapter(null);
+        }
+        labTestAdapter = null;
+        labTestsRecyclerView = null;
+        labTestTitle = null;
     }
 }

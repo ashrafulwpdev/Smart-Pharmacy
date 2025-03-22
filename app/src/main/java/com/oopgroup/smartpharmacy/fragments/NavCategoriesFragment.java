@@ -5,13 +5,13 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
@@ -21,30 +21,31 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.oopgroup.smartpharmacy.R;
-import com.oopgroup.smartpharmacy.adapters.CategoryGridAdapter;
+import com.oopgroup.smartpharmacy.adapters.CategoryListAdapter;
 import com.oopgroup.smartpharmacy.models.Category;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CategoryFragment extends Fragment implements CategoryGridAdapter.OnCategoryClickListener {
+public class NavCategoriesFragment extends Fragment implements CategoryListAdapter.OnCategoryClickListener {
+
+    private static final String TAG = "AllCategoriesFragment";
 
     private RecyclerView categoriesRecyclerView;
-    private TextView categoryTitle, viewAllCategories;
-    private CategoryGridAdapter categoryAdapter;
+    private ImageButton cartButton;
+    private CategoryListAdapter categoryAdapter;
     private List<Category> categoryList;
     private DatabaseReference categoriesRef;
     private FirebaseAuth mAuth;
     private ValueEventListener categoriesListener;
-    private static final String TAG = "CategoryFragment";
 
-    public CategoryFragment() {
+    public NavCategoriesFragment() {
         // Required empty public constructor
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_category, container, false);
+        return inflater.inflate(R.layout.fragment_nav_categories, container, false);
     }
 
     @Override
@@ -54,6 +55,16 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         categoriesRef = FirebaseDatabase.getInstance().getReference("categories");
+
+        // Initialize UI
+        categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView);
+        cartButton = view.findViewById(R.id.cartButton);
+
+        if (categoriesRecyclerView == null) {
+            Log.e(TAG, "categoriesRecyclerView not found in layout");
+            Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
+            return;
+        }
 
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
@@ -67,40 +78,18 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
             return;
         }
 
-        // Initialize UI
-        categoryTitle = view.findViewById(R.id.categoryTitle);
-        viewAllCategories = view.findViewById(R.id.viewAllCategories);
-        categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView);
-
-        if (categoriesRecyclerView == null) {
-            Log.e(TAG, "categoriesRecyclerView not found in layout");
-            Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
-            return;
-        }
-
         // Initialize list and adapter
         categoryList = new ArrayList<>();
-        categoryAdapter = new CategoryGridAdapter(requireContext(), categoryList, this);
-
-        // Calculate span count based on screen width
-        int screenWidthDp = getResources().getConfiguration().screenWidthDp;
-        int spanCount = screenWidthDp < 400 ? 2 : 3; // 2 columns for screens < 400dp, 3 for larger
-
-        GridLayoutManager gridLayoutManager = new GridLayoutManager(requireContext(), spanCount);
-        categoriesRecyclerView.setLayoutManager(gridLayoutManager);
+        categoryAdapter = new CategoryListAdapter(requireContext(), categoryList, this);
+        categoriesRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         categoriesRecyclerView.setAdapter(categoryAdapter);
         categoriesRecyclerView.setHasFixedSize(true);
 
-        // Set up "View All" click listener
-        if (viewAllCategories != null) {
-            viewAllCategories.setOnClickListener(v -> {
-                if (isAdded()) {
-                    requireActivity().getSupportFragmentManager()
-                            .beginTransaction()
-                            .replace(R.id.fragment_container, new NavCategoriesFragment())
-                            .addToBackStack(null)
-                            .commit();
-                }
+        // Set up cart button click listener
+        if (cartButton != null) {
+            cartButton.setOnClickListener(v -> {
+                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
+                // Navigate to CartFragment here
             });
         }
 
@@ -114,6 +103,7 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!isAdded()) return;
                 categoryList.clear();
+
                 for (DataSnapshot categorySnapshot : snapshot.getChildren()) {
                     String id = categorySnapshot.getKey();
                     String name = categorySnapshot.child("name").getValue(String.class);
@@ -142,6 +132,7 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
     @Override
     public void onCategoryClick(Category category) {
         if (!isAdded()) return;
+        Toast.makeText(requireContext(), "Category clicked: " + category.getName(), Toast.LENGTH_SHORT).show();
         Bundle args = new Bundle();
         args.putString("categoryId", category.getId());
         args.putString("categoryName", category.getName());
@@ -165,7 +156,6 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         }
         categoryAdapter = null;
         categoriesRecyclerView = null;
-        categoryTitle = null;
-        viewAllCategories = null;
+        cartButton = null;
     }
 }

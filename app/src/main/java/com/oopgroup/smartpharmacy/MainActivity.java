@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import com.oopgroup.smartpharmacy.fragments.CategoryFragment;
+import com.oopgroup.smartpharmacy.fragments.NavCategoriesFragment;
 import com.oopgroup.smartpharmacy.fragments.HomeFragment;
 import com.oopgroup.smartpharmacy.fragments.LabTestFragment;
 import com.oopgroup.smartpharmacy.fragments.ProfileFragment;
@@ -75,7 +75,7 @@ public class MainActivity extends AppCompatActivity {
 
         navCategories.setOnClickListener(v -> {
             setSelectedNavItem(navCategories, icCategories, categoriesIndicator);
-            loadFragment(new CategoryFragment());
+            loadFragment(new NavCategoriesFragment());
             backPressCount = 0; // Reset counter
         });
 
