@@ -1,9 +1,13 @@
 package com.oopgroup.smartpharmacy.fragments;
 
-import android.app.Activity; // Ensure this import is present
+import static com.airbnb.lottie.L.TAG;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.util.Log;
@@ -17,7 +21,6 @@ import android.view.animation.ScaleAnimation;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -41,15 +44,19 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.GenericTypeIndicator;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Source;
 import com.oopgroup.smartpharmacy.AdminActivity;
 import com.oopgroup.smartpharmacy.ChangePasswordActivity;
 import com.oopgroup.smartpharmacy.EditProfileActivity;
 import com.oopgroup.smartpharmacy.LoginActivity;
-import com.oopgroup.smartpharmacy.LogoutConfirmationDialog;
 import com.oopgroup.smartpharmacy.ProfileAuthHelper;
 import com.oopgroup.smartpharmacy.R;
+import com.oopgroup.smartpharmacy.utils.BaseActivity;
+import com.oopgroup.smartpharmacy.utils.LogoutConfirmationDialog;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -72,8 +79,7 @@ public class ProfileFragment extends Fragment {
     private RelativeLayout editProfileLayout, changePasswordLayout, allOrdersLayout, paymentsLayout, notificationsLayout, termsLayout;
     private Button logoutButton, cancelVerificationButton, adminButton;
     private SwipeRefreshLayout swipeRefreshLayout;
-    private ProgressBar loadingProgress;
-    private View rootView; // Store the root view
+    private View rootView;
 
     // Firebase and data
     private FirebaseAuth mAuth;
@@ -146,16 +152,8 @@ public class ProfileFragment extends Fragment {
 
         // Display initial data
         displayCachedProfileData();
-        loadingProgress.setVisibility(View.VISIBLE);
+        showCustomLoader(); // Show loader initially
         loadProfileDataFromFirebase();
-
-        // Auth state listener
-        mAuth.addAuthStateListener(firebaseAuth -> {
-            FirebaseUser user = firebaseAuth.getCurrentUser();
-            if (user != null && "email".equals(signInMethod) && user.isEmailVerified() && !pendingEmail.isEmpty()) {
-                updateEmailAfterVerification(user.getEmail());
-            }
-        });
     }
 
     @Override
@@ -172,7 +170,7 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == EDIT_PROFILE_REQUEST && resultCode == Activity.RESULT_OK && data != null) { // Explicitly using Activity.RESULT_OK
+        if (requestCode == EDIT_PROFILE_REQUEST && resultCode == Activity.RESULT_OK && data != null) {
             String newImageUrl = data.getStringExtra("imageUrl");
             String newFullName = data.getStringExtra("fullName");
             String newPhoneNumber = data.getStringExtra("phoneNumber");
@@ -201,7 +199,7 @@ public class ProfileFragment extends Fragment {
             editor.apply();
 
             displayCachedProfileData();
-            loadingProgress.setVisibility(View.VISIBLE);
+            showCustomLoader(); // Show loader
             loadProfileDataFromFirebase();
         }
     }
@@ -226,20 +224,6 @@ public class ProfileFragment extends Fragment {
         cancelVerificationButton = view.findViewById(R.id.cancelVerificationButton);
         adminButton = view.findViewById(R.id.adminButton);
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
-        loadingProgress = view.findViewById(R.id.loadingProgress);
-
-        // Determine sign-in method
-        for (com.google.firebase.auth.UserInfo provider : currentUser.getProviderData()) {
-            String providerId = provider.getProviderId();
-            if ("phone".equals(providerId)) signInMethod = "phone";
-            else if ("password".equals(providerId)) signInMethod = "email";
-            else if ("google.com".equals(providerId)) signInMethod = "google";
-            else if ("facebook.com".equals(providerId)) signInMethod = "facebook";
-            else if ("github.com".equals(providerId)) signInMethod = "github";
-        }
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString("signInMethod", signInMethod);
-        editor.apply();
     }
 
     private void setupMenuListeners() {
@@ -314,13 +298,14 @@ public class ProfileFragment extends Fragment {
                 return;
             }
 
-            Log.d("ProfileFragment", "Admin button clicked, UID: " + currentUser.getUid());
+            showCustomLoader(); // Show loader before check
             firestore.collection("users").document(currentUser.getUid())
-                    .get()
+                    .get(Source.SERVER)
                     .addOnSuccessListener(documentSnapshot -> {
                         Log.d("ProfileFragment", "Firestore success: " + documentSnapshot.getData());
                         if (!isAdded()) return;
                         String role = documentSnapshot.getString("role");
+                        hideLoader(); // Hide after result
                         if ("admin".equals(role)) {
                             startActivity(new Intent(requireContext(), AdminActivity.class));
                         } else {
@@ -329,6 +314,7 @@ public class ProfileFragment extends Fragment {
                     })
                     .addOnFailureListener(e -> {
                         Log.e("ProfileFragment", "Firestore failed: " + e.getMessage(), e);
+                        hideLoader(); // Hide on failure
                         if (isAdded()) {
                             showCustomToast("Failed to verify role: " + e.getMessage(), false);
                         }
@@ -337,7 +323,7 @@ public class ProfileFragment extends Fragment {
     }
 
     private void displayCachedProfileData() {
-        if (rootView == null || !isAdded()) return; // Prevent crash if view is null or fragment is detached
+        if (rootView == null || !isAdded()) return;
 
         userName.setText(cachedFullName != null && !cachedFullName.isEmpty() ? cachedFullName : "User");
 
@@ -426,7 +412,7 @@ public class ProfileFragment extends Fragment {
             authHelper = new ProfileAuthHelper(requireActivity(), new ProfileAuthHelper.OnAuthCompleteListener() {
                 @Override
                 public void onAuthStart() {
-                    loadingProgress.setVisibility(View.VISIBLE);
+                    showCustomLoader(); // Show loader
                 }
 
                 @Override
@@ -462,7 +448,7 @@ public class ProfileFragment extends Fragment {
 
                 @Override
                 public void onAuthFailed() {
-                    loadingProgress.setVisibility(View.GONE);
+                    hideLoader(); // Updated here
                     showCustomToast("Operation failed. Please try again.", false);
                 }
             });
@@ -530,12 +516,16 @@ public class ProfileFragment extends Fragment {
     }
 
     private void onRefresh() {
-        loadingProgress.setVisibility(View.VISIBLE);
+        showCustomLoader(); // Show loader
         swipeRefreshLayout.setRefreshing(true);
-        loadProfileDataFromFirebase();
+        loadProfileDataFromFirebase(true); // Pass true to force refresh
     }
 
     private void loadProfileDataFromFirebase() {
+        loadProfileDataFromFirebase(false); // Default to non-forced refresh
+    }
+
+    private void loadProfileDataFromFirebase(boolean forceRefresh) {
         if (currentUser == null) {
             logoutAndRedirectToLogin();
             return;
@@ -550,28 +540,36 @@ public class ProfileFragment extends Fragment {
                 } else {
                     showCustomToast("Error refreshing session: " + e.getMessage(), false);
                 }
+                hideLoader(); // Updated here
+                swipeRefreshLayout.setRefreshing(false);
                 return;
             }
 
             currentUser.getIdToken(true).addOnCompleteListener(tokenTask -> {
                 if (tokenTask.isSuccessful()) {
-                    fetchProfileData();
+                    fetchProfileData(forceRefresh);
+                } else {
+                    hideLoader(); // Updated here
+                    swipeRefreshLayout.setRefreshing(false);
                 }
             });
         });
     }
 
-    private void fetchProfileData() {
+    private void fetchProfileData(boolean forceRefresh) {
         databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 if (dataSnapshot.exists()) {
-                    Map<String, Object> userData = (Map<String, Object>) dataSnapshot.getValue();
+                    Map<String, Object> userData = dataSnapshot.getValue(new GenericTypeIndicator<Map<String, Object>>() {});
+                    if (userData == null) {
+                        userData = new HashMap<>();
+                    }
+
                     String newFullName = userData.get("fullName") != null ? (String) userData.get("fullName") : cachedFullName;
                     String newPhoneNumber = userData.get("phoneNumber") != null ? (String) userData.get("phoneNumber") : cachedPhoneNumber;
                     String newEmail = userData.get("email") != null ? (String) userData.get("email") : cachedEmail;
                     String newUsername = userData.get("username") != null ? (String) userData.get("username") : cachedUsername;
-                    String newImageUrl = userData.get("imageUrl") != null ? (String) userData.get("imageUrl") : cachedImageUrl;
                     String newSignInMethod = userData.get("signInMethod") != null ? (String) userData.get("signInMethod") : signInMethod;
                     pendingEmail = userData.get("pendingEmail") != null ? (String) userData.get("pendingEmail") : pendingEmail;
                     pendingPhoneNumber = userData.get("pendingPhoneNumber") != null ? (String) userData.get("pendingPhoneNumber") : pendingPhoneNumber;
@@ -582,44 +580,83 @@ public class ProfileFragment extends Fragment {
                         newPhoneNumber = currentUser.getPhoneNumber() != null ? currentUser.getPhoneNumber() : newPhoneNumber;
                     }
 
-                    if (!Objects.equals(newFullName, cachedFullName) ||
-                            !Objects.equals(newPhoneNumber, cachedPhoneNumber) ||
-                            !Objects.equals(newEmail, cachedEmail) ||
-                            !Objects.equals(newImageUrl, cachedImageUrl) ||
-                            !Objects.equals(newUsername, cachedUsername) ||
-                            !Objects.equals(newSignInMethod, signInMethod) ||
-                            !Objects.equals(pendingEmail, sharedPreferences.getString("pendingEmail", "")) ||
-                            !Objects.equals(pendingPhoneNumber, sharedPreferences.getString("pendingPhoneNumber", ""))) {
-                        cachedFullName = newFullName;
-                        cachedPhoneNumber = newPhoneNumber;
-                        cachedEmail = newEmail;
-                        cachedUsername = newUsername;
-                        cachedImageUrl = newImageUrl;
-                        signInMethod = newSignInMethod;
+                    String finalNewPhoneNumber = newPhoneNumber;
+                    Source source = forceRefresh ? Source.SERVER : Source.DEFAULT;
+                    firestore.collection("users").document(currentUser.getUid())
+                            .get(source)
+                            .addOnSuccessListener(documentSnapshot -> {
+                                String newImageUrl = documentSnapshot.getString("imageUrl") != null ? documentSnapshot.getString("imageUrl") : cachedImageUrl;
 
-                        SharedPreferences.Editor editor = sharedPreferences.edit();
-                        editor.putString("fullName", cachedFullName);
-                        editor.putString("phoneNumber", cachedPhoneNumber);
-                        editor.putString("email", cachedEmail);
-                        editor.putString("username", cachedUsername);
-                        editor.putString("imageUrl", cachedImageUrl);
-                        editor.putString("signInMethod", signInMethod);
-                        editor.putString("pendingEmail", pendingEmail);
-                        editor.putString("pendingPhoneNumber", pendingPhoneNumber);
-                        editor.putBoolean(KEY_DATA_FRESH, true);
-                        editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
-                        editor.apply();
-                    }
+                                if (!Objects.equals(newFullName, cachedFullName) ||
+                                        !Objects.equals(finalNewPhoneNumber, cachedPhoneNumber) ||
+                                        !Objects.equals(newEmail, cachedEmail) ||
+                                        !Objects.equals(newImageUrl, cachedImageUrl) ||
+                                        !Objects.equals(newUsername, cachedUsername) ||
+                                        !Objects.equals(newSignInMethod, signInMethod) ||
+                                        !Objects.equals(pendingEmail, sharedPreferences.getString("pendingEmail", "")) ||
+                                        !Objects.equals(pendingPhoneNumber, sharedPreferences.getString("pendingPhoneNumber", ""))) {
+                                    cachedFullName = newFullName;
+                                    cachedPhoneNumber = finalNewPhoneNumber;
+                                    cachedEmail = newEmail;
+                                    cachedUsername = newUsername;
+                                    cachedImageUrl = newImageUrl;
+                                    signInMethod = newSignInMethod;
 
-                    displayCachedProfileData();
+                                    SharedPreferences.Editor editor = sharedPreferences.edit();
+                                    editor.putString("fullName", cachedFullName);
+                                    editor.putString("phoneNumber", cachedPhoneNumber);
+                                    editor.putString("email", cachedEmail);
+                                    editor.putString("username", cachedUsername);
+                                    editor.putString("imageUrl", cachedImageUrl);
+                                    editor.putString("signInMethod", signInMethod);
+                                    editor.putString("pendingEmail", pendingEmail);
+                                    editor.putString("pendingPhoneNumber", pendingPhoneNumber);
+                                    editor.putBoolean(KEY_DATA_FRESH, true);
+                                    editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
+                                    editor.apply();
+                                }
+
+                                displayCachedProfileData();
+                                hideLoader(); // Updated here
+                                swipeRefreshLayout.setRefreshing(false);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e("ProfileFragment", "Failed to fetch imageUrl from Firestore: " + e.getMessage());
+                                displayCachedProfileData();
+                                hideLoader(); // Updated here
+                                swipeRefreshLayout.setRefreshing(false);
+                                showCustomToast("Failed to load profile image: " + e.getMessage(), false);
+                            });
+                } else {
+                    Source source = forceRefresh ? Source.SERVER : Source.DEFAULT;
+                    firestore.collection("users").document(currentUser.getUid())
+                            .get(source)
+                            .addOnSuccessListener(documentSnapshot -> {
+                                String newImageUrl = documentSnapshot.getString("imageUrl") != null ? documentSnapshot.getString("imageUrl") : cachedImageUrl;
+                                if (!Objects.equals(newImageUrl, cachedImageUrl)) {
+                                    cachedImageUrl = newImageUrl;
+                                    SharedPreferences.Editor editor = sharedPreferences.edit();
+                                    editor.putString("imageUrl", cachedImageUrl);
+                                    editor.putBoolean(KEY_DATA_FRESH, true);
+                                    editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
+                                    editor.apply();
+                                }
+                                displayCachedProfileData();
+                                hideLoader(); // Updated here
+                                swipeRefreshLayout.setRefreshing(false);
+                            })
+                            .addOnFailureListener(e -> {
+                                displayCachedProfileData();
+                                hideLoader(); // Updated here
+                                swipeRefreshLayout.setRefreshing(false);
+                                showCustomToast("Failed to load profile: " + e.getMessage(), false);
+                            });
                 }
-                loadingProgress.setVisibility(View.GONE);
-                swipeRefreshLayout.setRefreshing(false);
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                loadingProgress.setVisibility(View.GONE);
+                hideLoader(); // Updated here
                 swipeRefreshLayout.setRefreshing(false);
                 showCustomToast("Failed to load profile: " + databaseError.getMessage(), false);
                 displayCachedProfileData();
@@ -688,10 +725,34 @@ public class ProfileFragment extends Fragment {
         toast.show();
     }
 
+    @SuppressLint("RestrictedApi")
+    private void showCustomLoader() {
+        if (isAdded() && getActivity() instanceof BaseActivity) {
+            BaseActivity baseActivity = (BaseActivity) getActivity();
+            BaseActivity.LoaderConfig config = new BaseActivity.LoaderConfig()
+                    .setAnimationResId(R.raw.loading_global)
+                    .setWidthDp(40)
+                    .setHeightDp(40)
+                    .setUseRoundedBox(true)
+                    .setOverlayColor(Color.parseColor("#80000000"))
+                    .setChangeJsonColor(false);
+            baseActivity.showCustomLoader(config);
+            Log.d(TAG, "Custom loader shown");
+        }
+    }
+
+    private void hideLoader() {
+        if (isAdded() && requireActivity() instanceof BaseActivity) {
+            BaseActivity baseActivity = (BaseActivity) requireActivity();
+            baseActivity.hideLoader();
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         if (countdownTimer != null) countdownTimer.cancel();
-        rootView = null; // Clear the view reference
+        hideLoader(); // Updated here
+        rootView = null;
     }
 }

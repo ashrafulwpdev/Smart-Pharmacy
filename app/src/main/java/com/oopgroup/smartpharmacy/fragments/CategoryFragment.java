@@ -15,14 +15,15 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.CategoryGridAdapter;
 import com.oopgroup.smartpharmacy.models.Category;
+import com.oopgroup.smartpharmacy.utils.LoadingSpinnerUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +34,12 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
     private TextView categoryTitle, viewAllCategories;
     private CategoryGridAdapter categoryAdapter;
     private List<Category> categoryList;
-    private DatabaseReference categoriesRef;
+    private CollectionReference categoriesRef;
     private FirebaseAuth mAuth;
-    private ValueEventListener categoriesListener;
+    private ListenerRegistration categoriesListener;
     private static final String TAG = "CategoryFragment";
+    private LoadingSpinnerUtil loadingSpinnerUtil;
+    private boolean isLoading = false;
 
     public CategoryFragment() {
         // Required empty public constructor
@@ -53,7 +56,7 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        categoriesRef = FirebaseDatabase.getInstance().getReference("categories");
+        categoriesRef = FirebaseFirestore.getInstance().collection("categories");
 
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
@@ -68,14 +71,29 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         }
 
         // Initialize UI
+        initializeUI(view);
+
+        // Fetch categories
+        fetchCategories();
+    }
+
+    private void initializeUI(View view) {
         categoryTitle = view.findViewById(R.id.categoryTitle);
         viewAllCategories = view.findViewById(R.id.viewAllCategories);
         categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView);
 
         if (categoriesRecyclerView == null) {
             Log.e(TAG, "categoriesRecyclerView not found in layout");
-            Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
+            if (isAdded()) {
+                Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
+            }
             return;
+        }
+
+        // Initialize LoadingSpinnerUtil
+        loadingSpinnerUtil = LoadingSpinnerUtil.initialize(requireContext(), view, R.id.loadingSpinner);
+        if (loadingSpinnerUtil == null) {
+            Log.e(TAG, "Failed to initialize LoadingSpinnerUtil");
         }
 
         // Initialize list and adapter
@@ -94,7 +112,7 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         // Set up "View All" click listener
         if (viewAllCategories != null) {
             viewAllCategories.setOnClickListener(v -> {
-                if (isAdded()) {
+                if (isAdded() && !isLoading) {
                     requireActivity().getSupportFragmentManager()
                             .beginTransaction()
                             .replace(R.id.fragment_container, new NavCategoriesFragment())
@@ -103,45 +121,67 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
                 }
             });
         }
-
-        // Fetch categories
-        fetchCategories();
     }
 
     private void fetchCategories() {
-        categoriesListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!isAdded()) return;
-                categoryList.clear();
-                for (DataSnapshot categorySnapshot : snapshot.getChildren()) {
-                    String id = categorySnapshot.getKey();
-                    String name = categorySnapshot.child("name").getValue(String.class);
-                    Integer productCount = categorySnapshot.child("productCount").getValue(Integer.class);
-                    String imageUrl = categorySnapshot.child("imageUrl").getValue(String.class);
+        if (isLoading) return;
+        isLoading = true;
 
-                    if (name != null && productCount != null && imageUrl != null) {
-                        Category category = new Category(id, name, productCount, imageUrl);
-                        categoryList.add(category);
-                    }
-                }
-                categoryAdapter.notifyDataSetChanged();
-            }
+        // Show loading spinner
+        if (loadingSpinnerUtil != null) {
+            loadingSpinnerUtil.toggleLoadingSpinner(true);
+            disableUserInteractions(true);
+        }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
+        categoriesListener = categoriesRef.addSnapshotListener((snapshot, error) -> {
+            if (!isAdded()) return;
+
+            if (error != null) {
                 Log.e(TAG, "Failed to load categories: " + error.getMessage());
                 if (isAdded()) {
                     Toast.makeText(requireContext(), "Failed to load categories: " + error.getMessage(), Toast.LENGTH_LONG).show();
                 }
+                checkLoadingComplete();
+                return;
             }
-        };
-        categoriesRef.addValueEventListener(categoriesListener);
+
+            categoryList.clear();
+            if (snapshot != null) {
+                for (QueryDocumentSnapshot doc : snapshot) {  // Fixed: Iterate directly over QuerySnapshot
+                    String id = doc.getId();
+                    String name = doc.getString("name");
+                    Long productCountLong = doc.getLong("productCount");
+                    String imageUrl = doc.getString("imageUrl");
+
+                    if (name != null && productCountLong != null && imageUrl != null) {
+                        Category category = new Category(id, name, productCountLong.intValue(), imageUrl);
+                        categoryList.add(category);
+                    }
+                }
+                if (categoryAdapter != null) {
+                    categoryAdapter.notifyDataSetChanged();
+                }
+            }
+            checkLoadingComplete();
+        });
+    }
+
+    private void checkLoadingComplete() {
+        isLoading = false;
+        if (loadingSpinnerUtil != null) {
+            loadingSpinnerUtil.toggleLoadingSpinner(false);
+        }
+        disableUserInteractions(false);
+    }
+
+    private void disableUserInteractions(boolean disable) {
+        if (categoriesRecyclerView != null) categoriesRecyclerView.setEnabled(!disable);
+        if (viewAllCategories != null) viewAllCategories.setEnabled(!disable);
     }
 
     @Override
     public void onCategoryClick(Category category) {
-        if (!isAdded()) return;
+        if (!isAdded() || isLoading) return;
         Bundle args = new Bundle();
         args.putString("categoryId", category.getId());
         args.putString("categoryName", category.getName());
@@ -157,8 +197,9 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (categoriesRef != null && categoriesListener != null) {
-            categoriesRef.removeEventListener(categoriesListener);
+        if (categoriesListener != null) {
+            categoriesListener.remove();
+            categoriesListener = null;
         }
         if (categoriesRecyclerView != null) {
             categoriesRecyclerView.setAdapter(null);
@@ -167,5 +208,6 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         categoriesRecyclerView = null;
         categoryTitle = null;
         viewAllCategories = null;
+        loadingSpinnerUtil = null;
     }
 }

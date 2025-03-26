@@ -402,12 +402,6 @@
             </RelativeLayout>
         </androidx.core.widget.NestedScrollView>
 
-        <!-- Loading Progress -->
-        <ProgressBar
-            android:id="@+id/loadingProgress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:layout_centerInParent="true" />
+
     </RelativeLayout>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

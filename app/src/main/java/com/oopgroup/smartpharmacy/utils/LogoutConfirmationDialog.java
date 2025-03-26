@@ -1,9 +1,8 @@
-package com.oopgroup.smartpharmacy;
+package com.oopgroup.smartpharmacy.utils;
 
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -13,6 +12,8 @@ import androidx.annotation.NonNull;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 import android.view.animation.AccelerateDecelerateInterpolator;
+
+import com.oopgroup.smartpharmacy.R;
 
 public class LogoutConfirmationDialog extends Dialog {
 

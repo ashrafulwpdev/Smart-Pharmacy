@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.oopgroup.smartpharmacy">
 
     <!-- Permissions -->
     <uses-feature
@@ -27,6 +28,10 @@
         <meta-data
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
+        <!-- Firebase API Key (optional, for debugging) -->
+        <meta-data
+            android:name="com.google.firebase.api_key"
+            android:value="AIzaSyBG8QphDWEL653YdcrTOs69IWLT6NkiJQE" />
 
         <activity
             android:name=".SplashActivity"
@@ -56,7 +61,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".MainActivity" android:exported="false" />
-        <activity android:name=".ProfileActivity" android:exported="false" />
         <activity android:name=".EditProfileActivity" android:exported="false" />
         <activity android:name=".ChangePasswordActivity" android:exported="false" />
         <activity android:name=".AdminActivity" android:exported="false" />

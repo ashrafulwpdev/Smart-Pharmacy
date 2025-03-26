@@ -1,6 +1,7 @@
 package com.oopgroup.smartpharmacy;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
@@ -16,20 +17,20 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.appcompat.app.AppCompatActivity;
+
 import androidx.core.content.ContextCompat;
-import com.airbnb.lottie.LottieAnimationView;
+
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
+import com.oopgroup.smartpharmacy.utils.BaseActivity;
 
-public class ResetPasswordActivity extends AppCompatActivity {
+public class ResetPasswordActivity extends BaseActivity {
 
     private static final String TAG = "ResetPasswordActivity";
     private EditText newPasswordInput, confirmPasswordInput;
     private ImageView newPasswordToggle, confirmPasswordToggle;
     private Button resetPasswordBtn, resetAgainBtn;
     private ImageView githubLogin, googleLogin, facebookLogin;
-    private LottieAnimationView loadingSpinner;
     private TextView errorText, errorTitle, loginLink, signupLink;
     private LinearLayout resetFormContainer, errorContainer, bottomSection;
     private FirebaseAuth mAuth;
@@ -39,6 +40,21 @@ public class ResetPasswordActivity extends AppCompatActivity {
     private String oobCode;
     private boolean isNewPasswordVisible = false;
     private boolean isConfirmPasswordVisible = false;
+
+    // Single unified loader method
+    private void showLoadingIndicator() {
+        showCustomLoader(
+
+                R.raw.loading_global,       // Custom animation (replace with your resource)
+                dpToPx(40),      // Width: 60dp
+                dpToPx(40),      // Height: 60dp
+                true,
+                DEFAULT_OVERLAY_COLOR,
+                true,
+                Color.parseColor("#FF5722"),
+                1f                     // 1x animation speed
+        );
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,7 +72,6 @@ public class ResetPasswordActivity extends AppCompatActivity {
         githubLogin = findViewById(R.id.githubLogin);
         googleLogin = findViewById(R.id.googleLogin);
         facebookLogin = findViewById(R.id.facebookLogin);
-        loadingSpinner = findViewById(R.id.loadingSpinner);
         errorText = findViewById(R.id.errorText);
         errorTitle = findViewById(R.id.errorTitle);
         loginLink = findViewById(R.id.loginLink);
@@ -86,40 +101,25 @@ public class ResetPasswordActivity extends AppCompatActivity {
             return;
         } else {
             Log.d(TAG, "Launched via app flow with credentials: " + credentials);
-            bottomSection.setVisibility(View.VISIBLE); // Show bottom section for valid state
+            bottomSection.setVisibility(View.VISIBLE);
         }
 
-        // Add TextWatchers to reset borders when typing
+        // TextWatchers to reset borders on typing
         newPasswordInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                resetInputBorders();
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { resetInputBorders(); }
+            @Override public void afterTextChanged(Editable s) {}
         });
 
         confirmPasswordInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                resetInputBorders();
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { resetInputBorders(); }
+            @Override public void afterTextChanged(Editable s) {}
         });
 
-        // Set click listeners for password visibility toggles
+        // Click listeners
         newPasswordToggle.setOnClickListener(v -> toggleNewPasswordVisibility());
         confirmPasswordToggle.setOnClickListener(v -> toggleConfirmPasswordVisibility());
-
         resetPasswordBtn.setOnClickListener(v -> handlePasswordReset());
         resetAgainBtn.setOnClickListener(v -> {
             startActivity(new Intent(this, ForgotPassActivity.class));
@@ -160,10 +160,7 @@ public class ResetPasswordActivity extends AppCompatActivity {
         String newPassword = newPasswordInput.getText().toString().trim();
         String confirmPassword = confirmPasswordInput.getText().toString().trim();
 
-        // Reset borders to default first
         resetInputBorders();
-
-        // Check empty fields with priority
         boolean hasErrors = false;
         if (newPassword.isEmpty()) {
             setErrorBorder(newPasswordInput);
@@ -178,14 +175,12 @@ public class ResetPasswordActivity extends AppCompatActivity {
             return;
         }
 
-        // Check if passwords match
         if (!newPassword.equals(confirmPassword)) {
             showCustomToast("Passwords do not match", false);
             setErrorBorder(confirmPasswordInput);
             return;
         }
 
-        // Check password length
         if (newPassword.length() < 6) {
             showCustomToast("Password must be at least 6 characters", false);
             setErrorBorder(newPasswordInput);
@@ -193,7 +188,7 @@ public class ResetPasswordActivity extends AppCompatActivity {
         }
 
         setUiEnabled(false);
-        loadingSpinner.setVisibility(View.VISIBLE);
+        showLoadingIndicator();
         errorContainer.setVisibility(View.GONE);
 
         if (isEmailReset && oobCode != null) {
@@ -204,10 +199,10 @@ public class ResetPasswordActivity extends AppCompatActivity {
     }
 
     private void validateResetCode(String actionCode) {
-        loadingSpinner.setVisibility(View.VISIBLE);
+        showLoadingIndicator();
         mAuth.verifyPasswordResetCode(actionCode)
                 .addOnCompleteListener(task -> {
-                    loadingSpinner.setVisibility(View.GONE);
+                    hideLoader();
                     if (task.isSuccessful()) {
                         credentials = task.getResult();
                         Log.d(TAG, "Reset code validated. Email: " + credentials);
@@ -221,9 +216,10 @@ public class ResetPasswordActivity extends AppCompatActivity {
     }
 
     private void resetEmailPassword(String actionCode, String newPassword) {
+        showLoadingIndicator();
         mAuth.confirmPasswordReset(actionCode, newPassword)
                 .addOnCompleteListener(task -> {
-                    loadingSpinner.setVisibility(View.GONE);
+                    hideLoader();
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         signInAndRedirect(credentials, newPassword);
@@ -235,14 +231,14 @@ public class ResetPasswordActivity extends AppCompatActivity {
 
     private void resetPhonePassword(String phoneNumber, String newPassword) {
         if (mAuth.getCurrentUser() != null) {
+            showLoadingIndicator();
             mAuth.getCurrentUser().updatePassword(newPassword)
                     .addOnCompleteListener(task -> {
-                        loadingSpinner.setVisibility(View.GONE);
+                        hideLoader();
                         setUiEnabled(true);
                         if (task.isSuccessful()) {
                             resetInputBorders();
                             showCustomToast("Password reset successfully", true);
-                            // Clear the session after successful reset
                             mAuth.signOut();
                             Intent intent = new Intent(this, LoginActivity.class);
                             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -253,21 +249,21 @@ public class ResetPasswordActivity extends AppCompatActivity {
                         }
                     });
         } else {
-            loadingSpinner.setVisibility(View.GONE);
+            hideLoader();
             setUiEnabled(true);
             showErrorState("Session Expired", "Your session has timed out. Please try again.");
         }
     }
 
     private void signInAndRedirect(String email, String newPassword) {
+        showLoadingIndicator();
         mAuth.signInWithEmailAndPassword(email, newPassword)
                 .addOnCompleteListener(task -> {
-                    loadingSpinner.setVisibility(View.GONE);
+                    hideLoader();
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         resetInputBorders();
                         showCustomToast("Password reset successfully", true);
-                        // Clear the session after successful reset
                         mAuth.signOut();
                         Intent intent = new Intent(this, LoginActivity.class);
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -292,7 +288,6 @@ public class ResetPasswordActivity extends AppCompatActivity {
             message = "An unexpected error occurred.";
         }
         Log.e(TAG, title + ": " + message, exception);
-        // Highlight input fields in case of server-side error
         setErrorBorder(newPasswordInput);
         setErrorBorder(confirmPasswordInput);
         showErrorState(title, message);
@@ -332,7 +327,6 @@ public class ResetPasswordActivity extends AppCompatActivity {
         }
     }
 
-    // Helper methods for border handling
     private void setErrorBorder(EditText editText) {
         editText.setBackgroundResource(R.drawable.edittext_error_bg);
     }
@@ -344,7 +338,6 @@ public class ResetPasswordActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // Redirect to OtpVerificationActivity
         Intent intent = new Intent(this, OtpVerificationActivity.class);
         intent.putExtra("credentials", credentials);
         intent.putExtra("verificationId", verificationId);
@@ -357,7 +350,6 @@ public class ResetPasswordActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Sign out the user if the password reset hasn't been completed
         if (resetFormContainer.getVisibility() == View.VISIBLE) {
             mAuth.signOut();
             Log.d(TAG, "User signed out on pause due to incomplete password reset");

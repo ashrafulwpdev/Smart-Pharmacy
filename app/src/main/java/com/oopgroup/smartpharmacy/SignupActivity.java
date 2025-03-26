@@ -42,6 +42,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.hbb20.CountryCodePicker;
+import com.oopgroup.smartpharmacy.utils.AuthUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;

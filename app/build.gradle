@@ -1,4 +1,3 @@
-// App-level build.gradle (app module)
 plugins {
     id 'com.android.application'
     id 'com.google.gms.google-services'
@@ -7,7 +6,6 @@ plugins {
 android {
     namespace "com.oopgroup.smartpharmacy"
     compileSdk 34
-
     defaultConfig {
         applicationId "com.oopgroup.smartpharmacy"
         minSdk 24
@@ -15,7 +13,6 @@ android {
         versionCode 1
         versionName "1.0"
     }
-
     buildTypes {
         release {
             minifyEnabled false
@@ -40,18 +37,19 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:1.1.5"
     androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"
 
-    // Firebase BoM (Bill of Materials)
-    implementation platform("com.google.firebase:firebase-bom:33.9.0") // Verify this is latest
+    // Firebase BoM
+    implementation platform("com.google.firebase:firebase-bom:33.9.0")
 
-    // Firebase services (managed by BoM)
+    // Firebase services (no explicit versions)
     implementation "com.google.firebase:firebase-auth"
     implementation "com.google.firebase:firebase-firestore"
     implementation "com.google.firebase:firebase-database"
     implementation "com.google.firebase:firebase-storage"
     implementation "com.google.firebase:firebase-appcheck-debug" // Debug only
 
-    // Google Play Services for Auth (managed by BOM or latest version)
-    implementation "com.google.android.gms:play-services-auth" // Remove explicit version
+    // Google Play Services (no explicit versions unless required)
+    implementation "com.google.android.gms:play-services-auth:21.2.0"// For Google Sign-In
+    implementation "com.google.android.gms:play-services-base" // For availability checks
 
     // Social Media Login
     implementation "com.facebook.android:facebook-login:17.0.1"
@@ -61,22 +59,14 @@ dependencies {
     implementation "com.github.bumptech.glide:glide:4.16.0"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
     implementation "com.airbnb.android:lottie:6.4.0"
-
-    // Glide annotation processor
     annotationProcessor "com.github.bumptech.glide:compiler:4.16.0"
 
-    // Firebase App Check with Play Integrity
-    implementation "com.google.firebase:firebase-appcheck-playintegrity:17.1.2"
+    // Firebase App Check
+    implementation "com.google.firebase:firebase-appcheck-playintegrity"
 
     // Material Components
     implementation "androidx.cardview:cardview:1.0.0"
 
-    // Play Services Base (for availability checks)
-    implementation "com.google.android.gms:play-services-base:18.5.0" // Optional, for explicit checks
-
-    implementation 'androidx.viewpager2:viewpager2:1.0.0'
-
-    implementation 'com.google.android.gms:play-services-base:18.5.0'
-
-
+    // ViewPager2
+    implementation "androidx.viewpager2:viewpager2:1.0.0"
 }

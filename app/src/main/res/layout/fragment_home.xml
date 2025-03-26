@@ -36,7 +36,7 @@
                 android:text="Smart Pharmacy"
                 android:textSize="24sp"
                 android:textStyle="bold"
-                android:textColor="#1976D2" />
+                android:textColor="#083EC9" />
         </LinearLayout>
 
         <ImageButton
@@ -139,6 +139,7 @@
                     android:orientation="horizontal"
                     android:gravity="center"
                     android:padding="12dp"
+                    android:layout_marginTop="8dp"
                     app:layout_constraintTop_toBottomOf="@id/bannerViewPager"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
@@ -151,7 +152,8 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:layout_marginTop="24dp"
-                    app:layout_constraintTop_toBottomOf="@id/indicatorLayout">
+                    app:layout_constraintTop_toBottomOf="@id/indicatorLayout"
+                    app:layout_constraintStart_toStartOf="parent">
 
                     <ImageView
                         android:layout_width="14dp"
@@ -183,6 +185,7 @@
                     android:id="@+id/categoriesRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:padding="8dp"
                     app:layout_constraintTop_toBottomOf="@id/categoriesTitleContainer" />
 
@@ -194,7 +197,8 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:layout_marginTop="24dp"
-                    app:layout_constraintTop_toBottomOf="@id/categoriesRecyclerView">
+                    app:layout_constraintTop_toBottomOf="@id/categoriesRecyclerView"
+                    app:layout_constraintStart_toStartOf="parent">
 
                     <ImageView
                         android:layout_width="14dp"
@@ -226,6 +230,7 @@
                     android:id="@+id/labTestsRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:padding="8dp"
                     app:layout_constraintTop_toBottomOf="@id/labTestsTitleContainer" />
 
@@ -237,7 +242,8 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:layout_marginTop="24dp"
-                    app:layout_constraintTop_toBottomOf="@id/labTestsRecyclerView">
+                    app:layout_constraintTop_toBottomOf="@id/labTestsRecyclerView"
+                    app:layout_constraintStart_toStartOf="parent">
 
                     <ImageView
                         android:layout_width="14dp"
@@ -269,6 +275,7 @@
                     android:id="@+id/productsRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:padding="8dp"
                     app:layout_constraintTop_toBottomOf="@id/productsTitleContainer" />
 
@@ -279,8 +286,8 @@
     <!-- Loading Spinner -->
     <com.airbnb.lottie.LottieAnimationView
         android:id="@+id/loadingSpinner"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

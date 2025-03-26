@@ -36,7 +36,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.hbb20.CountryCodePicker;
 import com.oopgroup.smartpharmacy.AdminActivity;
-import com.oopgroup.smartpharmacy.AuthUtils;
+import com.oopgroup.smartpharmacy.utils.AuthUtils;
 import com.oopgroup.smartpharmacy.ForgotPassActivity;
 import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;

@@ -1,4 +1,4 @@
-package com.oopgroup.smartpharmacy;
+package com.oopgroup.smartpharmacy.utils;
 
 import android.Manifest;
 import android.app.Activity;
@@ -20,7 +20,8 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.google.android.gms.tasks.Task;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
@@ -766,6 +767,28 @@ public class AuthUtils {
             if (callback != null) callback.onFailure("Invalid parameters");
             return;
         }
+
+        // Check Google Play Services availability
+        int result = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(activity);
+        if (result != ConnectionResult.SUCCESS) {
+            Log.e(TAG, "Google Play Services unavailable: " + result);
+            // Optionally prompt the user to resolve it
+            GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(activity)
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "Play Services now available, retrying Google login");
+                        performGoogleLogin(activity, idToken, callback);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to resolve Play Services: " + e.getMessage());
+                        callback.onFailure("Google Play Services unavailable: " + e.getMessage());
+                    });
+            return;
+        }
+
+        performGoogleLogin(activity, idToken, callback);
+    }
+
+    private static void performGoogleLogin(Activity activity, String idToken, AuthCallback callback) {
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
         FirebaseAuth.getInstance()
                 .signInWithCredential(credential)

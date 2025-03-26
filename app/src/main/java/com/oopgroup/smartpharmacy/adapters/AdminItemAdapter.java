@@ -61,7 +61,7 @@ public class AdminItemAdapter extends RecyclerView.Adapter<AdminItemAdapter.View
             Glide.with(holder.itemView.getContext())
                     .load(banner.getImageUrl())
                     .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.placeholder_image) // Add error image
+                    .error(R.drawable.placeholder_image)
                     .into(holder.imageView);
         } else if (item instanceof Category) {
             Category category = (Category) item;
@@ -126,11 +126,14 @@ public class AdminItemAdapter extends RecyclerView.Adapter<AdminItemAdapter.View
 
     @Override
     public int getItemCount() {
-        return items != null ? items.size() : 0;
+        int count = items != null ? items.size() : 0;
+        Log.d(TAG, "getItemCount: " + count);
+        return count;
     }
 
     public void updateItems(List<Object> newItems) {
-        this.items = newItems;
+        this.items.clear();
+        this.items.addAll(newItems);
         notifyDataSetChanged();
     }
 

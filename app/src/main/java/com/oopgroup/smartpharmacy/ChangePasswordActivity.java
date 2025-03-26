@@ -2,6 +2,7 @@ package com.oopgroup.smartpharmacy;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
@@ -16,11 +17,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.AuthCredential;
@@ -32,10 +31,9 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import com.oopgroup.smartpharmacy.LoginActivity;
-import com.oopgroup.smartpharmacy.R;
+import com.oopgroup.smartpharmacy.utils.BaseActivity;
 
-public class ChangePasswordActivity extends AppCompatActivity {
+public class ChangePasswordActivity extends BaseActivity {
 
     private static final String PREFS_NAME = "UserProfile";
     private static final String TAG = "ChangePasswordActivity";
@@ -45,11 +43,10 @@ public class ChangePasswordActivity extends AppCompatActivity {
     private EditText currentPassword, newPassword, confirmPassword;
     private ImageView currentPasswordToggle, newPasswordToggle, confirmPasswordToggle;
     private Button updatePasswordButton;
-    private LottieAnimationView loadingSpinner;
     private ImageButton backButton;
     private TextView socialWarningText;
     private ScrollView scrollView;
-    private SwipeRefreshLayout swipeRefreshLayout; // Added SwipeRefreshLayout reference
+    private SwipeRefreshLayout swipeRefreshLayout;
     private SharedPreferences sharedPreferences;
 
     @Override
@@ -79,17 +76,23 @@ public class ChangePasswordActivity extends AppCompatActivity {
         newPasswordToggle = findViewById(R.id.newPasswordToggle);
         confirmPasswordToggle = findViewById(R.id.confirmPasswordToggle);
         updatePasswordButton = findViewById(R.id.updatePasswordButton);
-        loadingSpinner = findViewById(R.id.loadingSpinner);
         backButton = findViewById(R.id.backButton);
         socialWarningText = findViewById(R.id.changePassSocialWarningText);
         scrollView = findViewById(R.id.scrollView);
-        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout); // Initialize SwipeRefreshLayout
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+
+        // Verify back button initialization
+        if (backButton == null) {
+            Log.e(TAG, "Back button not found! Check XML ID.");
+        } else {
+            Log.d(TAG, "Back button initialized successfully.");
+        }
 
         // Check sign-in method
         checkSignInMethod(currentUser);
 
         // Setup click listeners
-        backButton.setOnClickListener(v -> onBackPressed());
+        setupBackButton();
         setupPasswordToggles();
 
         updatePasswordButton.setOnClickListener(v -> {
@@ -109,20 +112,34 @@ public class ChangePasswordActivity extends AppCompatActivity {
         setupSwipeRefresh();
     }
 
+    private void setupBackButton() {
+        backButton.setOnClickListener(v -> {
+            Log.d(TAG, "Back button clicked");
+            navigateToProfileFragment();
+        });
+    }
+
+    private void navigateToProfileFragment() {
+        Log.d(TAG, "Navigating to ProfileFragment");
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("SHOW_PROFILE_FRAGMENT", true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
+    }
+
     private void setupSwipeRefresh() {
         swipeRefreshLayout.setOnRefreshListener(() -> {
-            // Perform refresh action (e.g., reset fields and recheck sign-in method)
             currentPassword.setText("");
             newPassword.setText("");
             confirmPassword.setText("");
             resetInputBorders();
             checkSignInMethod(mAuth.getCurrentUser());
 
-            // Simulate a short delay to mimic a refresh operation, then stop refreshing
             new android.os.Handler().postDelayed(() -> {
                 swipeRefreshLayout.setRefreshing(false);
                 showCustomToast("Fields refreshed", true);
-            }, 1000); // 1-second delay for demo; adjust as needed
+            }, 1000);
         });
     }
 
@@ -139,7 +156,7 @@ public class ChangePasswordActivity extends AppCompatActivity {
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
             int rootHeight = getWindow().getDecorView().getHeight();
             int visibleHeight = getWindow().getDecorView().getRootView().getHeight();
-            if (rootHeight - visibleHeight > 200) { // Keyboard likely visible
+            if (rootHeight - visibleHeight > 200) {
                 scrollToBottom();
             }
         });
@@ -208,7 +225,7 @@ public class ChangePasswordActivity extends AppCompatActivity {
     }
 
     private boolean validateInputs(String currentPass, String newPass, String confirmPass) {
-        resetInputBorders();
+        resetInputBorders(); // Reset to default borders before validation
 
         if (currentPass.isEmpty()) {
             setErrorBorder(currentPassword);
@@ -246,7 +263,7 @@ public class ChangePasswordActivity extends AppCompatActivity {
     private void changePassword(String currentPass, String newPass) {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null && user.getEmail() != null) {
-            loadingSpinner.setVisibility(View.VISIBLE);
+            showCustomLoader(); // Show custom loader
             setUiEnabled(false);
 
             AuthCredential credential = EmailAuthProvider.getCredential(user.getEmail(), currentPass);
@@ -258,17 +275,17 @@ public class ChangePasswordActivity extends AppCompatActivity {
                                     .addOnSuccessListener(new OnSuccessListener<Void>() {
                                         @Override
                                         public void onSuccess(Void aVoid) {
-                                            loadingSpinner.setVisibility(View.GONE);
+                                            hideLoader(); // Call inherited BaseActivity's hideLoader()
                                             setUiEnabled(true);
                                             resetInputBorders();
                                             showCustomToast("Password updated successfully", true);
-                                            finish();
+                                            navigateToProfileFragment();
                                         }
                                     })
                                     .addOnFailureListener(new OnFailureListener() {
                                         @Override
                                         public void onFailure(@NonNull Exception e) {
-                                            loadingSpinner.setVisibility(View.GONE);
+                                            hideLoader(); // Call inherited BaseActivity's hideLoader()
                                             setUiEnabled(true);
                                             setErrorBorder(newPassword);
                                             showCustomToast("Failed to update password: " + e.getMessage(), false);
@@ -280,7 +297,7 @@ public class ChangePasswordActivity extends AppCompatActivity {
                     .addOnFailureListener(new OnFailureListener() {
                         @Override
                         public void onFailure(@NonNull Exception e) {
-                            loadingSpinner.setVisibility(View.GONE);
+                            hideLoader(); // Call inherited BaseActivity's hideLoader()
                             setUiEnabled(true);
                             setErrorBorder(currentPassword);
                             showCustomToast("Incorrect current password", false);
@@ -289,7 +306,7 @@ public class ChangePasswordActivity extends AppCompatActivity {
                         }
                     });
         } else {
-            loadingSpinner.setVisibility(View.GONE);
+            hideLoader(); // Call inherited BaseActivity's hideLoader()
             setUiEnabled(true);
             showCustomToast("User not logged in or email not found", false);
             startActivity(new Intent(this, LoginActivity.class));
@@ -331,9 +348,28 @@ public class ChangePasswordActivity extends AppCompatActivity {
         confirmPassword.setBackgroundResource(R.drawable.edittext_bg);
     }
 
+    // Custom loader method similar to ProfileFragment
+    private void showCustomLoader() {
+        LoaderConfig config = new LoaderConfig()
+                .setAnimationResId(R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"))
+                .setChangeJsonColor(false);
+        showCustomLoader(config);
+        Log.d(TAG, "Custom loader shown");
+    }
+
     @Override
     public void onBackPressed() {
-        super.onBackPressed();
-        finish();
+        Log.d(TAG, "Hardware back pressed");
+        navigateToProfileFragment();
     }
-} 
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        hideLoader(); // Call inherited BaseActivity's hideLoader()
+    }
+}

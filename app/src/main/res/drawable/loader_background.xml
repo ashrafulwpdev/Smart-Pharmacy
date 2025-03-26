@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@android:color/white" />
+    <corners android:radius="12dp" /> <!-- Changed to 12dp -->
+    <padding
+        android:left="16dp"
+        android:top="16dp"
+        android:right="16dp"
+        android:bottom="16dp" />
+    <size
+        android:width="100dp"
+        android:height="100dp" />
+
+    <!-- Optional: Keep stroke if you want a very light border or remove it -->
+    <!-- Remove or tweak the color if you don’t want the grey border effect -->
+    <stroke android:width="1dp" android:color="#dddddd"/> -->
+</shape>

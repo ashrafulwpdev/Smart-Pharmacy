@@ -1,38 +1,46 @@
 package com.oopgroup.smartpharmacy.fragments;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.BestsellerProductAdapter;
 import com.oopgroup.smartpharmacy.models.Product;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class ProductsFragment extends Fragment implements BestsellerProductAdapter.OnAddToCartClickListener {
 
+    private static final String TAG = "ProductsFragment";
+
     private RecyclerView productsRecyclerView;
     private TextView productsTitle;
     private BestsellerProductAdapter productAdapter;
     private List<Product> productList;
-    private DatabaseReference productsRef;
+    private CollectionReference productsRef;
     private FirebaseAuth mAuth;
     private String categoryId;
     private String categoryName;
+    private ListenerRegistration productsListener;
 
     public ProductsFragment() {
         // Required empty public constructor
@@ -49,15 +57,17 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        productsRef = FirebaseDatabase.getInstance().getReference("products");
+        productsRef = FirebaseFirestore.getInstance().collection("products");
 
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
-            Toast.makeText(requireContext(), "Please log in to view products.", Toast.LENGTH_LONG).show();
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, new LoginFragment())
-                    .commit();
+            if (isAdded()) {
+                Toast.makeText(requireContext(), "Please log in to view products.", Toast.LENGTH_LONG).show();
+                requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new LoginFragment())
+                        .commit();
+            }
             return;
         }
 
@@ -71,6 +81,11 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
         // Initialize UI
         productsTitle = view.findViewById(R.id.productsTitle);
         productsRecyclerView = view.findViewById(R.id.productsRecyclerView);
+        if (productsRecyclerView == null) {
+            Log.e(TAG, "productsRecyclerView not found in layout");
+            Toast.makeText(requireContext(), "Error: Products view not found", Toast.LENGTH_LONG).show();
+            return;
+        }
         productsRecyclerView.setLayoutManager(new GridLayoutManager(requireContext(), 2));
 
         // Set title
@@ -84,70 +99,74 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
         productList = new ArrayList<>();
         productAdapter = new BestsellerProductAdapter(requireContext(), productList, this);
         productsRecyclerView.setAdapter(productAdapter);
+        productsRecyclerView.setHasFixedSize(true);
 
         // Fetch products
         fetchProducts();
     }
 
     private void fetchProducts() {
-        DatabaseReference queryRef = productsRef;
+        Query query = productsRef;
         if (categoryId != null) {
-            queryRef = productsRef.child(categoryId);
+            // Assuming products have a "categoryId" field linking them to categories
+            query = productsRef.whereEqualTo("categoryId", categoryId);
         }
 
-        queryRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
+        productsListener = query.addSnapshotListener((snapshot, error) -> {
+            if (!isAdded()) return;
+
+            if (error != null) {
+                Log.e(TAG, "Failed to load products: " + error.getMessage());
+                Toast.makeText(requireContext(), "Failed to load products: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            if (snapshot != null) {
                 productList.clear();
-                if (categoryId != null) {
-                    for (DataSnapshot productSnapshot : snapshot.getChildren()) {
-                        String id = productSnapshot.getKey();
-                        String name = productSnapshot.child("name").getValue(String.class);
-                        Double price = productSnapshot.child("price").getValue(Double.class);
-                        String imageUrl = productSnapshot.child("imageUrl").getValue(String.class);
-                        Integer rating = productSnapshot.child("rating").getValue(Integer.class);
-                        Integer reviewCount = productSnapshot.child("reviewCount").getValue(Integer.class);
-                        String quantity = productSnapshot.child("quantity").getValue(String.class);
-                        Double originalPrice = productSnapshot.child("originalPrice").getValue(Double.class);
-                        Double discountedPrice = productSnapshot.child("discountedPrice").getValue(Double.class);
+                for (QueryDocumentSnapshot doc : snapshot) {
+                    String id = doc.getId();
+                    String name = doc.getString("name");
+                    Double price = doc.getDouble("price");
+                    String imageUrl = doc.getString("imageUrl");
+                    Long ratingLong = doc.getLong("rating"); // Firestore stores numbers as Long
+                    Long reviewCountLong = doc.getLong("reviewCount");
+                    String quantity = doc.getString("quantity");
+                    Double originalPrice = doc.getDouble("originalPrice");
+                    Double discountedPrice = doc.getDouble("discountedPrice");
 
-                        if (name != null && price != null && imageUrl != null && rating != null && reviewCount != null) {
-                            Product product = new Product(id, name, price, imageUrl, rating, reviewCount, quantity, originalPrice != null ? originalPrice : price, discountedPrice != null ? discountedPrice : 0.0);
-                            productList.add(product);
-                        }
-                    }
-                } else {
-                    for (DataSnapshot categorySnapshot : snapshot.getChildren()) {
-                        for (DataSnapshot productSnapshot : categorySnapshot.getChildren()) {
-                            String id = productSnapshot.getKey();
-                            String name = productSnapshot.child("name").getValue(String.class);
-                            Double price = productSnapshot.child("price").getValue(Double.class);
-                            String imageUrl = productSnapshot.child("imageUrl").getValue(String.class);
-                            Integer rating = productSnapshot.child("rating").getValue(Integer.class);
-                            Integer reviewCount = productSnapshot.child("reviewCount").getValue(Integer.class);
-                            String quantity = productSnapshot.child("quantity").getValue(String.class);
-                            Double originalPrice = productSnapshot.child("originalPrice").getValue(Double.class);
-                            Double discountedPrice = productSnapshot.child("discountedPrice").getValue(Double.class);
-
-                            if (name != null && price != null && imageUrl != null && rating != null && reviewCount != null) {
-                                Product product = new Product(id, name, price, imageUrl, rating, reviewCount, quantity, originalPrice != null ? originalPrice : price, discountedPrice != null ? discountedPrice : 0.0);
-                                productList.add(product);
-                            }
-                        }
+                    if (name != null && price != null && imageUrl != null && ratingLong != null && reviewCountLong != null) {
+                        int rating = ratingLong.intValue();
+                        int reviewCount = reviewCountLong.intValue();
+                        Product product = new Product(id, name, price, imageUrl, rating, reviewCount, quantity,
+                                originalPrice != null ? originalPrice : price,
+                                discountedPrice != null ? discountedPrice : 0.0);
+                        productList.add(product);
                     }
                 }
                 productAdapter.notifyDataSetChanged();
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(requireContext(), "Failed to load products: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                Log.d(TAG, "Products loaded: " + productList.size());
             }
         });
     }
 
     @Override
     public void onAddToCartClick(Product product) {
+        if (!isAdded()) return;
         Toast.makeText(requireContext(), "Added to cart: " + product.getName(), Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (productsListener != null) {
+            productsListener.remove();
+            productsListener = null;
+        }
+        if (productsRecyclerView != null) {
+            productsRecyclerView.setAdapter(null);
+            productsRecyclerView = null;
+        }
+        productAdapter = null;
+        productsTitle = null;
     }
 }

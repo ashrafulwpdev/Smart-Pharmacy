@@ -20,8 +20,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 
-import com.google.android.gms.tasks.Task;
-import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
@@ -33,6 +31,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
@@ -58,6 +57,7 @@ public class ProfileAuthHelper {
     private final DatabaseReference phoneNumbersReference;
     private final DatabaseReference usernamesReference;
     private final StorageReference storageReference;
+    private final FirebaseFirestore firestore;
 
     public ProfileAuthHelper(Context context, OnAuthCompleteListener listener) {
         this.context = context;
@@ -70,6 +70,7 @@ public class ProfileAuthHelper {
         this.phoneNumbersReference = FirebaseDatabase.getInstance().getReference("phoneNumbers");
         this.usernamesReference = FirebaseDatabase.getInstance().getReference("usernames");
         this.storageReference = FirebaseStorage.getInstance().getReference("profile_images").child(currentUser.getUid());
+        this.firestore = FirebaseFirestore.getInstance();
     }
 
     public void saveProfile(String fullName, String gender, String birthday, String phoneNumber, String email,
@@ -178,16 +179,40 @@ public class ProfileAuthHelper {
             UploadTask uploadTask = fileRef.putFile(selectedImageUri);
             uploadTask.addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
                 String downloadedImageUrl = uri.toString();
-                writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, downloadedImageUrl,
-                        originalEmail, originalPhoneNumber, originalUsername);
+                // Save imageUrl to Firestore 'users' collection
+                firestore.collection("users").document(currentUser.getUid())
+                        .set(new HashMap<String, Object>() {{
+                            put("imageUrl", downloadedImageUrl);
+                        }}, com.google.firebase.firestore.SetOptions.merge()) // Merge to avoid overwriting other fields
+                        .addOnSuccessListener(aVoid -> {
+                            writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, downloadedImageUrl,
+                                    originalEmail, originalPhoneNumber, originalUsername);
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to save imageUrl to Firestore: " + e.getMessage());
+                            showToast("Failed to save image: " + e.getMessage(), false);
+                            authCompleteListener.onAuthFailed();
+                        });
             })).addOnFailureListener(e -> {
                 Log.e(TAG, "Image upload failed: " + e.getMessage());
                 showToast("Image upload failed: " + e.getMessage(), false);
                 authCompleteListener.onAuthFailed();
             });
         } else {
-            writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, currentImageUrl,
-                    originalEmail, originalPhoneNumber, originalUsername);
+            // If no new image, ensure currentImageUrl is preserved in Firestore
+            firestore.collection("users").document(currentUser.getUid())
+                    .set(new HashMap<String, Object>() {{
+                        put("imageUrl", currentImageUrl != null ? currentImageUrl : "");
+                    }}, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnSuccessListener(aVoid -> {
+                        writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, currentImageUrl,
+                                originalEmail, originalPhoneNumber, originalUsername);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to update imageUrl in Firestore: " + e.getMessage());
+                        showToast("Failed to save image reference: " + e.getMessage(), false);
+                        authCompleteListener.onAuthFailed();
+                    });
         }
     }
 
@@ -197,7 +222,7 @@ public class ProfileAuthHelper {
         String uid = currentUser.getUid();
         String signInMethod = authPrefs.getString("signInMethod", "email");
 
-        // Step 1: Prepare user data
+        // Prepare user data for Realtime Database (excluding imageUrl)
         Map<String, Object> userData = new HashMap<>();
         userData.put("fullName", fullName);
         userData.put("gender", gender);
@@ -205,7 +230,6 @@ public class ProfileAuthHelper {
         userData.put("phoneNumber", phoneNumber);
         userData.put("email", email);
         userData.put("username", username);
-        userData.put("imageUrl", imageUrl != null ? imageUrl : "");
         userData.put("signInMethod", signInMethod);
 
         String pendingEmail = authPrefs.getString("pendingEmail", null);
@@ -223,7 +247,7 @@ public class ProfileAuthHelper {
             userData.put("pendingPhoneNumber", null);
         }
 
-        // Step 2: Fetch current user data to determine changes
+        // Fetch current user data to determine changes
         databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
@@ -231,7 +255,7 @@ public class ProfileAuthHelper {
                 String currentEmail = snapshot.child("email").getValue(String.class);
                 String currentUsername = snapshot.child("username").getValue(String.class);
 
-                // Step 3: Prepare multi-path update
+                // Prepare multi-path update for Realtime Database
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("/users/" + uid, userData);
 
@@ -263,7 +287,7 @@ public class ProfileAuthHelper {
                     updates.put("/usernames/" + username, uid); // Add new username
                 }
 
-                // Step 4: Perform atomic update
+                // Perform atomic update in Realtime Database
                 FirebaseDatabase.getInstance().getReference().updateChildren(updates)
                         .addOnSuccessListener(aVoid -> {
                             SharedPreferences.Editor editor = authPrefs.edit();
@@ -525,24 +549,10 @@ public class ProfileAuthHelper {
                                                         .putLong(LAST_VERIFICATION_TIME, System.currentTimeMillis())
                                                         .apply();
 
-                                                if (selectedImageUri != null) {
-                                                    StorageReference fileRef = storageReference.child("profile.jpg");
-                                                    UploadTask uploadTask = fileRef.putFile(selectedImageUri);
-                                                    uploadTask.addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                                                        String downloadedImageUrl = uri.toString();
-                                                        saveProfileWithPendingEmail(fullName, gender, birthday, phoneNumber,
-                                                                email, username, downloadedImageUrl, originalEmail,
-                                                                originalPhoneNumber, originalUsername);
-                                                    })).addOnFailureListener(e -> {
-                                                        Log.e(TAG, "Image upload failed: " + e.getMessage());
-                                                        showToast("Image upload failed: " + e.getMessage(), false);
-                                                        authCompleteListener.onAuthFailed();
-                                                    });
-                                                } else {
-                                                    saveProfileWithPendingEmail(fullName, gender, birthday, phoneNumber,
-                                                            email, username, currentImageUrl, originalEmail,
-                                                            originalPhoneNumber, originalUsername);
-                                                }
+                                                // Save profile with pending email
+                                                saveProfileWithPendingEmail(fullName, gender, birthday, phoneNumber,
+                                                        email, username, selectedImageUri != null ? null : currentImageUrl,
+                                                        originalEmail, originalPhoneNumber, originalUsername);
                                             })
                                             .addOnFailureListener(e -> {
                                                 Log.e(TAG, "Failed to send verification email: " + e.getMessage());
@@ -571,18 +581,40 @@ public class ProfileAuthHelper {
         user.put("gender", gender);
         user.put("birthday", birthday);
         user.put("phoneNumber", phoneNumber);
-        user.put("email", currentUser.getEmail());
+        user.put("email", currentUser.getEmail()); // Current email until verified
         user.put("username", username);
-        user.put("imageUrl", imageUrl != null ? imageUrl : "");
         user.put("signInMethod", "email");
         user.put("pendingEmail", email);
 
         databaseReference.setValue(user)
                 .addOnSuccessListener(aVoid -> {
-                    authCompleteListener.onEmailVerificationSent(
-                            fullName, gender, birthday, phoneNumber,
-                            currentUser.getEmail(), username, email,
-                            originalEmail, originalPhoneNumber, originalUsername);
+                    // Update Firestore with imageUrl
+                    firestore.collection("users").document(currentUser.getUid())
+                            .set(new HashMap<String, Object>() {{
+                                put("imageUrl", imageUrl != null ? imageUrl : "");
+                            }}, com.google.firebase.firestore.SetOptions.merge())
+                            .addOnSuccessListener(aVoid1 -> {
+                                SharedPreferences.Editor editor = authPrefs.edit();
+                                editor.putString("fullName", fullName);
+                                editor.putString("gender", gender);
+                                editor.putString("birthday", birthday);
+                                editor.putString("phoneNumber", phoneNumber);
+                                editor.putString("email", currentUser.getEmail());
+                                editor.putString("username", username);
+                                editor.putString("imageUrl", imageUrl != null ? imageUrl : "");
+                                editor.putString("pendingEmail", email);
+                                editor.apply();
+
+                                authCompleteListener.onEmailVerificationSent(
+                                        fullName, gender, birthday, phoneNumber,
+                                        currentUser.getEmail(), username, email,
+                                        originalEmail, originalPhoneNumber, originalUsername);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to update Firestore with imageUrl: " + e.getMessage());
+                                showToast("Failed to save image reference: " + e.getMessage(), false);
+                                authCompleteListener.onAuthFailed();
+                            });
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to update database with pending email: " + e.getMessage());
@@ -632,16 +664,16 @@ public class ProfileAuthHelper {
                     authPrefs.edit().putLong(LAST_VERIFICATION_TIME, System.currentTimeMillis()).apply();
                     showToast("Verification email resent to " + email, true);
                     authCompleteListener.onEmailVerificationSent(
-                            (String) databaseReference.child("fullName").getKey(),
-                            (String) databaseReference.child("gender").getKey(),
-                            (String) databaseReference.child("birthday").getKey(),
-                            (String) databaseReference.child("phoneNumber").getKey(),
+                            authPrefs.getString("fullName", ""),
+                            authPrefs.getString("gender", ""),
+                            authPrefs.getString("birthday", ""),
+                            authPrefs.getString("phoneNumber", ""),
                             currentUser.getEmail(),
-                            (String) databaseReference.child("username").getKey(),
+                            authPrefs.getString("username", ""),
                             email,
                             currentUser.getEmail(),
-                            (String) databaseReference.child("phoneNumber").getKey(),
-                            (String) databaseReference.child("username").getKey());
+                            authPrefs.getString("phoneNumber", ""),
+                            authPrefs.getString("username", ""));
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to resend verification email: " + e.getMessage());

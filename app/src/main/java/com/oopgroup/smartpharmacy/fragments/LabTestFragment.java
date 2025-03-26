@@ -15,11 +15,11 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.LabTestGridAdapter;
 import com.oopgroup.smartpharmacy.models.LabTest;
@@ -35,9 +35,9 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
     private TextView labTestTitle;
     private LabTestGridAdapter labTestAdapter;
     private List<LabTest> labTestList;
-    private DatabaseReference labTestsRef;
+    private CollectionReference labTestsRef;  // Changed to Firestore CollectionReference
     private FirebaseAuth mAuth;
-    private ValueEventListener labTestsListener;
+    private ListenerRegistration labTestsListener;  // Changed to Firestore ListenerRegistration
 
     public LabTestFragment() {
         // Required empty public constructor
@@ -54,7 +54,7 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        labTestsRef = FirebaseDatabase.getInstance().getReference("labTests");
+        labTestsRef = FirebaseFirestore.getInstance().collection("labTests");  // Changed to Firestore
 
         // Initialize UI
         labTestTitle = view.findViewById(R.id.labTestTitle);
@@ -90,15 +90,23 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
     }
 
     private void fetchLabTests() {
-        labTestsListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!isAdded()) return;
-                labTestList.clear();
-                for (DataSnapshot labTestSnapshot : snapshot.getChildren()) {
-                    String id = labTestSnapshot.getKey();
-                    String name = labTestSnapshot.child("name").getValue(String.class);
-                    String imageUrl = labTestSnapshot.child("imageUrl").getValue(String.class);
+        labTestsListener = labTestsRef.addSnapshotListener((snapshot, error) -> {
+            if (!isAdded()) return;
+
+            if (error != null) {
+                Log.e(TAG, "Failed to load lab tests: " + error.getMessage());
+                if (isAdded()) {
+                    Toast.makeText(requireContext(), "Failed to load lab tests: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+
+            labTestList.clear();
+            if (snapshot != null) {
+                for (QueryDocumentSnapshot doc : snapshot) {
+                    String id = doc.getId();
+                    String name = doc.getString("name");
+                    String imageUrl = doc.getString("imageUrl");
 
                     if (name != null && imageUrl != null) {
                         LabTest labTest = new LabTest(id, name, imageUrl);
@@ -107,16 +115,7 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
                 }
                 labTestAdapter.notifyDataSetChanged();
             }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Failed to load lab tests: " + error.getMessage());
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), "Failed to load lab tests: " + error.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-        };
-        labTestsRef.addValueEventListener(labTestsListener);
+        });
     }
 
     @Override
@@ -128,8 +127,9 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (labTestsRef != null && labTestsListener != null) {
-            labTestsRef.removeEventListener(labTestsListener);
+        if (labTestsListener != null) {
+            labTestsListener.remove();  // Firestore cleanup
+            labTestsListener = null;
         }
         if (labTestsRecyclerView != null) {
             labTestsRecyclerView.setAdapter(null);

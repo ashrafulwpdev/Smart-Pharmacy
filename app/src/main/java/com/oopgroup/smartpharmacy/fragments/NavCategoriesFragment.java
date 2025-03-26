@@ -15,11 +15,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.CategoryListAdapter;
 import com.oopgroup.smartpharmacy.models.Category;
@@ -29,15 +29,15 @@ import java.util.List;
 
 public class NavCategoriesFragment extends Fragment implements CategoryListAdapter.OnCategoryClickListener {
 
-    private static final String TAG = "AllCategoriesFragment";
+    private static final String TAG = "NavCategoriesFragment";
 
     private RecyclerView categoriesRecyclerView;
     private ImageButton cartButton;
     private CategoryListAdapter categoryAdapter;
     private List<Category> categoryList;
-    private DatabaseReference categoriesRef;
+    private CollectionReference categoriesRef;
     private FirebaseAuth mAuth;
-    private ValueEventListener categoriesListener;
+    private ListenerRegistration categoriesListener;
 
     public NavCategoriesFragment() {
         // Required empty public constructor
@@ -54,7 +54,7 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        categoriesRef = FirebaseDatabase.getInstance().getReference("categories");
+        categoriesRef = FirebaseFirestore.getInstance().collection("categories");
 
         // Initialize UI
         categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView);
@@ -89,44 +89,41 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
         if (cartButton != null) {
             cartButton.setOnClickListener(v -> {
                 Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
-                // Navigate to CartFragment here
+                // Navigate to CartFragment here if needed
             });
         }
 
-        // Fetch categories
+        // Fetch categories from Firestore
         fetchCategories();
     }
 
     private void fetchCategories() {
-        categoriesListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!isAdded()) return;
+        categoriesListener = categoriesRef.addSnapshotListener((querySnapshot, error) -> {
+            if (!isAdded()) return;
+
+            if (error != null) {
+                Log.e(TAG, "Failed to load categories: " + error.getMessage());
+                Toast.makeText(requireContext(), "Failed to load categories: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            if (querySnapshot != null) {
                 categoryList.clear();
+                for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                    String id = doc.getId();
+                    String name = doc.getString("name");
+                    Long productCountLong = doc.getLong("productCount"); // Firestore stores numbers as Long
+                    String imageUrl = doc.getString("imageUrl");
 
-                for (DataSnapshot categorySnapshot : snapshot.getChildren()) {
-                    String id = categorySnapshot.getKey();
-                    String name = categorySnapshot.child("name").getValue(String.class);
-                    Integer productCount = categorySnapshot.child("productCount").getValue(Integer.class);
-                    String imageUrl = categorySnapshot.child("imageUrl").getValue(String.class);
-
-                    if (name != null && productCount != null && imageUrl != null) {
+                    if (name != null && productCountLong != null && imageUrl != null) {
+                        int productCount = productCountLong.intValue(); // Convert Long to int
                         Category category = new Category(id, name, productCount, imageUrl);
                         categoryList.add(category);
                     }
                 }
                 categoryAdapter.notifyDataSetChanged();
             }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Failed to load categories: " + error.getMessage());
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), "Failed to load categories: " + error.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-        };
-        categoriesRef.addValueEventListener(categoriesListener);
+        });
     }
 
     @Override
@@ -148,14 +145,15 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (categoriesRef != null && categoriesListener != null) {
-            categoriesRef.removeEventListener(categoriesListener);
+        if (categoriesListener != null) {
+            categoriesListener.remove(); // Remove Firestore listener
+            categoriesListener = null;
         }
         if (categoriesRecyclerView != null) {
             categoriesRecyclerView.setAdapter(null);
+            categoriesRecyclerView = null;
         }
         categoryAdapter = null;
-        categoriesRecyclerView = null;
         cartButton = null;
     }
 }

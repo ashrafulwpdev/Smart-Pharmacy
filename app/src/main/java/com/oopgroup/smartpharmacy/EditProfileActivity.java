@@ -37,11 +37,13 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.hbb20.CountryCodePicker;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
+import com.oopgroup.smartpharmacy.utils.AuthUtils;
 
 import java.util.Calendar;
 import java.util.Map;
@@ -73,6 +75,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     private FirebaseAuth auth;
     private FirebaseUser currentUser;
     private DatabaseReference databaseReference;
+    private FirebaseFirestore firestore;
     private StorageReference storageReference;
     private SharedPreferences sharedPreferences;
     private ProfileAuthHelper authHelper;
@@ -160,6 +163,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
             return;
         }
         databaseReference = FirebaseDatabase.getInstance().getReference("users").child(currentUser.getUid());
+        firestore = FirebaseFirestore.getInstance();
         storageReference = FirebaseStorage.getInstance().getReference("profile_images").child(currentUser.getUid());
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         currentEmail = currentUser.getEmail();
@@ -242,7 +246,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     }
 
     private void setupListeners() {
-        backButton.setOnClickListener(v -> finish()); // Simply finish to return to ProfileFragment
+        backButton.setOnClickListener(v -> finish());
         cameraIcon.setOnClickListener(v -> pickImage.launch("image/*"));
         birthdayEditText.setOnClickListener(v -> showDatePickerDialog());
         saveButton.setOnClickListener(v -> saveProfileData());
@@ -456,6 +460,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                 showCustomToast("Failed to refresh session: " + task.getException().getMessage(), false);
             }
 
+            // Load profile data from Realtime Database
             databaseReference.get().addOnCompleteListener(dbTask -> {
                 if (dbTask.isSuccessful() && dbTask.getResult().exists()) {
                     Map<String, Object> userData = (Map<String, Object>) dbTask.getResult().getValue();
@@ -467,7 +472,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                     originalUsername = userData.get("username") != null ? (String) userData.get("username") : "";
                     pendingEmail = userData.get("pendingEmail") != null ? (String) userData.get("pendingEmail") : "";
                     pendingPhoneNumber = userData.get("pendingPhoneNumber") != null ? (String) userData.get("pendingPhoneNumber") : "";
-                    currentImageUrl = userData.get("imageUrl") != null ? (String) userData.get("imageUrl") : "";
                     signInMethod = userData.get("signInMethod") != null ? (String) userData.get("signInMethod") : "email";
 
                     fullNameEditText.setText(fullName);
@@ -488,7 +492,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                     editor.putString("phoneNumber", phoneNumber);
                     editor.putString("email", email);
                     editor.putString("username", originalUsername);
-                    editor.putString("imageUrl", currentImageUrl);
                     editor.putString("signInMethod", signInMethod);
                     editor.putString("pendingEmail", pendingEmail);
                     editor.putString("pendingPhoneNumber", pendingPhoneNumber);
@@ -499,9 +502,28 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                     previousEmail = currentEmail;
                     previousPhoneNumber = currentPhoneNumber;
 
-                    if (selectedImageUri == null) {
-                        loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
-                    }
+                    // Load imageUrl from Firestore 'users' collection
+                    firestore.collection("users").document(currentUser.getUid()).get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists()) {
+                                    currentImageUrl = documentSnapshot.getString("imageUrl");
+                                    editor.putString("imageUrl", currentImageUrl);
+                                    editor.apply();
+                                    if (selectedImageUri == null) {
+                                        loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
+                                    }
+                                } else if (selectedImageUri == null) {
+                                    loadProfileImage(null);
+                                }
+                                swipeRefreshLayout.setRefreshing(false);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to fetch imageUrl from Firestore: " + e.getMessage());
+                                if (selectedImageUri == null) {
+                                    loadProfileImage(null);
+                                }
+                                swipeRefreshLayout.setRefreshing(false);
+                            });
 
                     if (!phoneNumber.isEmpty() && AuthUtils.isValidPhoneNumber(AuthUtils.normalizePhoneNumberForBackend(phoneNumber, ccp, AuthUtils.getSimCountry(this)))) {
                         isPhoneInput = true;
@@ -524,9 +546,24 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                     }
                     emailInput.setText(currentEmail);
                     showCustomToast("No profile data found.", false);
+                    swipeRefreshLayout.setRefreshing(false);
+
+                    // Still attempt to load imageUrl even if Realtime DB data is missing
+                    firestore.collection("users").document(currentUser.getUid()).get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists()) {
+                                    currentImageUrl = documentSnapshot.getString("imageUrl");
+                                    SharedPreferences.Editor editor = sharedPreferences.edit();
+                                    editor.putString("imageUrl", currentImageUrl);
+                                    editor.apply();
+                                    if (selectedImageUri == null) {
+                                        loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
+                                    }
+                                }
+                            });
                 }
-                swipeRefreshLayout.setRefreshing(false);
             }).addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to fetch profile data from Realtime Database: " + e.getMessage());
                 showCustomToast("Failed to fetch profile data: " + e.getMessage(), false);
                 swipeRefreshLayout.setRefreshing(false);
             });
@@ -850,7 +887,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         setResult(RESULT_OK, resultIntent);
 
         showCustomToast("Profile saved successfully.", true);
-        finish(); // Return to ProfileFragment
+        finish();
     }
 
     @Override
@@ -880,7 +917,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         resultIntent.putExtra("pendingPhoneNumber", pendingPhoneNumber);
         setResult(RESULT_OK, resultIntent);
 
-        finish(); // Return to ProfileFragment
+        finish();
     }
 
     @Override
@@ -910,7 +947,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         resultIntent.putExtra("pendingPhoneNumber", pendingPhoneNumber);
         setResult(RESULT_OK, resultIntent);
 
-        finish(); // Return to ProfileFragment
+        finish();
     }
 
     @Override

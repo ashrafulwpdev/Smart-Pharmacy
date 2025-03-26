@@ -38,51 +38,43 @@ public class BannerAdapter extends RecyclerView.Adapter<BannerAdapter.BannerView
 
     @Override
     public void onBindViewHolder(@NonNull BannerViewHolder holder, int position) {
+        if (bannerList == null || position >= bannerList.size()) {
+            android.util.Log.e("BannerAdapter", "Invalid position or bannerList is null: " + position);
+            return;
+        }
+
         Banner banner = bannerList.get(position);
 
-        if (holder.bannerTitle != null) {
-            holder.bannerTitle.setText(banner.getTitle());
-        } else {
-            android.util.Log.e("BannerAdapter", "bannerTitle is null");
-        }
+        holder.bannerTitle.setText(banner.getTitle() != null ? banner.getTitle() : "Banner Title");
+        holder.bannerDescription.setText(banner.getDescription() != null ? banner.getDescription() : "This is a placeholder description.");
+        holder.bannerDiscount.setText(banner.getDiscount() != null ? banner.getDiscount() : "Save Upto 50% off");
 
-        if (holder.bannerDescription != null) {
-            holder.bannerDescription.setText(banner.getDescription());
-        } else {
-            android.util.Log.e("BannerAdapter", "bannerDescription is null");
-        }
-
-        if (holder.bannerDiscount != null) {
-            holder.bannerDiscount.setText(banner.getDiscount());
-        } else {
-            android.util.Log.e("BannerAdapter", "bannerDiscount is null");
-        }
-
-        if (holder.bannerImage != null) {
+        if (banner.getImageUrl() != null && !banner.getImageUrl().isEmpty()) {
             Glide.with(context)
                     .load(banner.getImageUrl())
-                    .placeholder(R.drawable.ic_delivery_person) // Match your old drawable
+                    .placeholder(R.drawable.ic_delivery_person)
                     .error(R.drawable.ic_delivery_person)
                     .transition(DrawableTransitionOptions.withCrossFade())
                     .into(holder.bannerImage);
         } else {
-            android.util.Log.e("BannerAdapter", "bannerImage is null");
+            holder.bannerImage.setImageResource(R.drawable.ic_delivery_person);
         }
 
-        if (holder.orderNowButton != null) {
-            holder.orderNowButton.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onOrderNowClick(banner);
-                }
-            });
-        } else {
-            android.util.Log.e("BannerAdapter", "orderNowButton is null");
-        }
+        holder.orderNowButton.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onOrderNowClick(banner);
+            }
+        });
     }
 
     @Override
     public int getItemCount() {
         return bannerList != null ? bannerList.size() : 0;
+    }
+
+    public void updateBanners(List<Banner> newBannerList) {
+        this.bannerList = newBannerList;
+        notifyDataSetChanged();
     }
 
     static class BannerViewHolder extends RecyclerView.ViewHolder {
@@ -100,7 +92,6 @@ public class BannerAdapter extends RecyclerView.Adapter<BannerAdapter.BannerView
             bannerDiscount = itemView.findViewById(R.id.bannerDiscount);
             orderNowButton = itemView.findViewById(R.id.orderNowButton);
 
-            // Log missing views
             if (bannerImage == null) android.util.Log.e("BannerViewHolder", "bannerImage not found");
             if (bannerTitle == null) android.util.Log.e("BannerViewHolder", "bannerTitle not found");
             if (bannerDescription == null) android.util.Log.e("BannerViewHolder", "bannerDescription not found");

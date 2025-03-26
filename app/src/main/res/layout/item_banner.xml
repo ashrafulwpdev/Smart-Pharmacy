@@ -12,7 +12,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:weightSum="2">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -29,7 +30,9 @@
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black"
-                android:padding="8dp" />
+                android:padding="8dp"
+                android:maxLines="2"
+                android:ellipsize="end" />
 
             <TextView
                 android:id="@+id/bannerDescription"
@@ -38,7 +41,9 @@
                 android:text="This is a placeholder description for the banner."
                 android:textSize="14sp"
                 android:textColor="@android:color/black"
-                android:padding="8dp" />
+                android:padding="8dp"
+                android:maxLines="3"
+                android:ellipsize="end" />
 
             <TextView
                 android:id="@+id/bannerDiscount"
@@ -48,7 +53,8 @@
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="#F44336"
-                android:padding="8dp" />
+                android:padding="8dp"
+                android:maxLines="1" />
 
             <Button
                 android:id="@+id/orderNowButton"
@@ -60,16 +66,17 @@
                 android:textColor="@android:color/white"
                 android:layout_gravity="start"
                 android:layout_marginTop="12dp"
-                android:padding="8dp" />
+                android:padding="8dp"
+                android:minWidth="100dp" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/bannerImage"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="150dp"
             android:layout_weight="1"
-            android:scaleType="fitCenter"
+            android:scaleType="centerCrop"
             android:src="@drawable/ic_delivery_person"
-            android:contentDescription="Delivery Person" />
+            android:contentDescription="Banner Image" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>
