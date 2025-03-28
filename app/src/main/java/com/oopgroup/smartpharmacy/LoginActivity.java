@@ -10,6 +10,7 @@ import androidx.fragment.app.FragmentTransaction;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
 import com.oopgroup.smartpharmacy.fragments.LoginFragment;
 
 public class LoginActivity extends AppCompatActivity {

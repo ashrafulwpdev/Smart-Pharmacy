@@ -41,13 +41,15 @@
 
         <ImageButton
             android:id="@+id/cartButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:src="@drawable/ic_cart"
             android:contentDescription="Cart"
             android:scaleType="centerInside"
-            android:padding="8dp"
-            android:background="@null" />
+            android:padding="4dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+        />
     </LinearLayout>
 
     <!-- Search Bar -->

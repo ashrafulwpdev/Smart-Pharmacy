@@ -66,17 +66,19 @@
     <string name="delete">Delete</string>
 
 
-        <string name="notification_target">Target Audience</string>
+    <string name="notification_target">Target Audience</string>
 
-        <string name="scanner_settings">Scanner Settings</string>
+    <string name="scanner_settings">Scanner Settings</string>
 
-        <string name="item_image">Item Image</string>
-        <string name="placeholder_item_name">Item Name</string>
+    <string name="item_image">Item Image</string>
+    <string name="placeholder_item_name">Item Name</string>
     <string name="no_items_available">No Items</string>
     <string name="logout">Logout</string>
     <string name="navigation_drawer_open">Open</string>
     <string name="navigation_drawer_close">Close</string>
     <string name="admin_email_placeholder">admin@example.com</string>
+    <string name="product_description_hint">Product Description</string>
+    <string name="brand_hint">Brand</string>
 
 
 </resources>

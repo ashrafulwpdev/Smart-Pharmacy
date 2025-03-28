@@ -202,7 +202,7 @@
             android:layout_marginTop="40dp"
             android:orientation="horizontal"
             android:gravity="center"
-            android:background="@drawable/login_btn_interactive_bg"
+            android:background="@drawable/btn_interactive_bg"
             android:enabled="true">
 
             <Button
@@ -261,7 +261,7 @@
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:background="@drawable/login_btn_interactive_bg" />
+                android:background="@drawable/btn_interactive_bg" />
         </LinearLayout>
     </RelativeLayout>
 </RelativeLayout>

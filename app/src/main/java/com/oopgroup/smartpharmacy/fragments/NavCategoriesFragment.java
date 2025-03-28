@@ -5,11 +5,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -19,7 +19,6 @@ import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.QuerySnapshot;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.CategoryListAdapter;
 import com.oopgroup.smartpharmacy.models.Category;
@@ -32,7 +31,7 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
     private static final String TAG = "NavCategoriesFragment";
 
     private RecyclerView categoriesRecyclerView;
-    private ImageButton cartButton;
+    private Toolbar toolbar;  // Replace ImageButton with Toolbar
     private CategoryListAdapter categoryAdapter;
     private List<Category> categoryList;
     private CollectionReference categoriesRef;
@@ -57,14 +56,30 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
         categoriesRef = FirebaseFirestore.getInstance().collection("categories");
 
         // Initialize UI
+        toolbar = view.findViewById(R.id.toolbar);
         categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView);
-        cartButton = view.findViewById(R.id.cartButton);
 
         if (categoriesRecyclerView == null) {
             Log.e(TAG, "categoriesRecyclerView not found in layout");
             Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
             return;
         }
+
+        // Set up Toolbar
+        toolbar.setTitle("All Categories");
+        toolbar.inflateMenu(R.menu.menu_products);  // Inflate the menu with search and cart
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_search) {
+                Toast.makeText(requireContext(), "Search clicked", Toast.LENGTH_SHORT).show();
+                // Add search functionality here if needed
+                return true;
+            } else if (item.getItemId() == R.id.action_cart) {
+                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
+                // Navigate to CartFragment here if needed
+                return true;
+            }
+            return false;
+        });
 
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
@@ -85,14 +100,6 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
         categoriesRecyclerView.setAdapter(categoryAdapter);
         categoriesRecyclerView.setHasFixedSize(true);
 
-        // Set up cart button click listener
-        if (cartButton != null) {
-            cartButton.setOnClickListener(v -> {
-                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
-                // Navigate to CartFragment here if needed
-            });
-        }
-
         // Fetch categories from Firestore
         fetchCategories();
     }
@@ -112,11 +119,11 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
                 for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
                     String id = doc.getId();
                     String name = doc.getString("name");
-                    Long productCountLong = doc.getLong("productCount"); // Firestore stores numbers as Long
+                    Long productCountLong = doc.getLong("productCount");
                     String imageUrl = doc.getString("imageUrl");
 
                     if (name != null && productCountLong != null && imageUrl != null) {
-                        int productCount = productCountLong.intValue(); // Convert Long to int
+                        int productCount = productCountLong.intValue();
                         Category category = new Category(id, name, productCount, imageUrl);
                         categoryList.add(category);
                     }
@@ -146,7 +153,7 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
     public void onDestroyView() {
         super.onDestroyView();
         if (categoriesListener != null) {
-            categoriesListener.remove(); // Remove Firestore listener
+            categoriesListener.remove();
             categoriesListener = null;
         }
         if (categoriesRecyclerView != null) {
@@ -154,6 +161,6 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
             categoriesRecyclerView = null;
         }
         categoryAdapter = null;
-        cartButton = null;
+        toolbar = null;  // Clean up Toolbar reference
     }
 }

@@ -1,4 +1,4 @@
-package com.oopgroup.smartpharmacy;
+package com.oopgroup.smartpharmacy.adminstaff;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -18,12 +18,11 @@ import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.oopgroup.smartpharmacy.LoginActivity;
+import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.utils.LoadingSpinnerUtil;
 import com.oopgroup.smartpharmacy.utils.LogoutConfirmationDialog;
 
-/**
- * AdminActivity: Core activity class managing lifecycle, navigation, and high-level control.
- */
 public class AdminActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "AdminActivity";
 
@@ -95,7 +94,6 @@ public class AdminActivity extends AppCompatActivity implements NavigationView.O
         checkUserRole();
     }
 
-    /** Sets up the toolbar and navigation drawer. */
     private void setupToolbarAndDrawer() {
         toolbar = findViewById(R.id.toolbar);
         if (toolbar == null) {
@@ -127,13 +125,12 @@ public class AdminActivity extends AppCompatActivity implements NavigationView.O
         navView.setNavigationItemSelectedListener(this);
     }
 
-    /** Verifies if the user is an admin and initializes UI if true. */
     private void checkUserRole() {
-        loadingSpinnerUtil.toggleLoadingSpinner(true); // Show spinner while checking role
+        loadingSpinnerUtil.toggleLoadingSpinner(true);
         dataManager.checkUserRole(
                 role -> {
                     loadingSpinnerUtil.toggleLoadingSpinner(false);
-                    isAdmin = "admin".equalsIgnoreCase(role); // Case-insensitive check
+                    isAdmin = "admin".equalsIgnoreCase(role);
                     if (isAdmin) {
                         Log.d(TAG, "User confirmed as admin, initializing UI");
                         uiHelper.initializeUI();
@@ -152,7 +149,6 @@ public class AdminActivity extends AppCompatActivity implements NavigationView.O
         );
     }
 
-    /** Redirects to LoginActivity if user is not authenticated. */
     private void redirectToLogin() {
         Toast.makeText(this, "Please log in to access admin panel.", Toast.LENGTH_LONG).show();
         startActivity(new Intent(this, LoginActivity.class));
@@ -191,13 +187,11 @@ public class AdminActivity extends AppCompatActivity implements NavigationView.O
         return true;
     }
 
-    /** Displays logout confirmation dialog. */
     private void showLogoutConfirmationDialog() {
         LogoutConfirmationDialog dialog = new LogoutConfirmationDialog(this, this::logoutAndRedirectToLogin);
         dialog.show();
     }
 
-    /** Logs out the user and redirects to LoginActivity. */
     private void logoutAndRedirectToLogin() {
         mAuth.signOut();
         Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
@@ -220,7 +214,7 @@ public class AdminActivity extends AppCompatActivity implements NavigationView.O
     protected void onDestroy() {
         super.onDestroy();
         if (loadingSpinnerUtil != null) {
-            loadingSpinnerUtil.cleanup(); // Ensure spinner is cleaned up
+            loadingSpinnerUtil.cleanup();
         }
     }
 }

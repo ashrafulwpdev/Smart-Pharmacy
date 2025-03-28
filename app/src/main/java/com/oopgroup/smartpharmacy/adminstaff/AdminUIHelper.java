@@ -1,11 +1,9 @@
-package com.oopgroup.smartpharmacy;
+package com.oopgroup.smartpharmacy.adminstaff;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -16,7 +14,6 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
@@ -26,7 +23,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.firebase.database.FirebaseDatabase;
+import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.AdminItemAdapter;
 import com.oopgroup.smartpharmacy.models.Banner;
 import com.oopgroup.smartpharmacy.models.Category;
@@ -38,9 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * AdminUIHelper: Manages UI components, form handling, user interactions, and swipe-to-refresh.
- */
+@SuppressWarnings("unchecked")
 public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private static final String TAG = "AdminUIHelper";
     private static final int PICK_IMAGE_REQUEST = 1;
@@ -50,7 +45,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private EditText bannerTitleInput, bannerDescriptionInput, bannerDiscountInput;
     private EditText categoryNameInput;
     private EditText labTestNameInput;
-    private EditText productNameInput, productPriceInput, productRatingInput, productReviewCountInput, productQuantityInput, productDiscountedPriceInput;
+    private EditText productNameInput, productPriceInput, productRatingInput, productReviewCountInput, productQuantityInput, productDiscountPriceInput, productDescriptionInput, productBrandInput;
     private EditText notificationTitleInput, notificationMessageInput, scannerInstructionsInput;
     private MaterialButton uploadBannerImageButton, uploadCategoryImageButton, uploadLabTestImageButton, uploadProductImageButton;
     private MaterialButton addBannerButton, addCategoryButton, addLabTestButton, addProductButton, sendNotificationButton, updateScannerSettingsButton;
@@ -96,7 +91,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         );
     }
 
-    /** Initializes all UI components, listeners, and swipe-to-refresh. */
     public void initializeUI() {
         findViews();
         setupRecyclerView();
@@ -105,10 +99,9 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         showSection("banner"); // Default section
     }
 
-    /** Refreshes the data for the currently active section. */
     public void refreshCurrentSection() {
         Log.d(TAG, "Refreshing current section: " + currentTab);
-        swipeRefreshLayout.setRefreshing(true); // Show the refresh indicator
+        swipeRefreshLayout.setRefreshing(true);
         switch (currentTab) {
             case "banner":
                 dataManager.fetchBanners(items -> {
@@ -166,12 +159,11 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 });
                 break;
             default:
-                swipeRefreshLayout.setRefreshing(false); // No refresh for notifications or scanner
+                swipeRefreshLayout.setRefreshing(false);
                 break;
         }
     }
 
-    /** Finds all views by ID. */
     private void findViews() {
         bannerSection = activity.findViewById(R.id.bannerSection);
         categoriesSection = activity.findViewById(R.id.categoriesSection);
@@ -191,7 +183,9 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         productRatingInput = activity.findViewById(R.id.productRatingInput);
         productReviewCountInput = activity.findViewById(R.id.productReviewCountInput);
         productQuantityInput = activity.findViewById(R.id.productQuantityInput);
-        productDiscountedPriceInput = activity.findViewById(R.id.productDiscountedPriceInput);
+        productDiscountPriceInput = activity.findViewById(R.id.productDiscountPriceInput); // Renamed
+        productDescriptionInput = activity.findViewById(R.id.productDescriptionInput);
+        productBrandInput = activity.findViewById(R.id.productBrandInput);
         notificationTitleInput = activity.findViewById(R.id.notificationTitleInput);
         notificationMessageInput = activity.findViewById(R.id.notificationMessageInput);
         scannerInstructionsInput = activity.findViewById(R.id.scannerInstructionsInput);
@@ -213,7 +207,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         emptyView = activity.findViewById(R.id.emptyView);
     }
 
-    /** Sets up the RecyclerView with adapter. */
     private void setupRecyclerView() {
         adminRecyclerView.setLayoutManager(new LinearLayoutManager(activity));
         adminRecyclerView.setHasFixedSize(true);
@@ -222,7 +215,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         Log.d(TAG, "RecyclerView setup completed");
     }
 
-    /** Sets up all button click listeners. */
     private void setupClickListeners() {
         uploadBannerImageButton.setOnClickListener(v -> openImagePicker());
         uploadCategoryImageButton.setOnClickListener(v -> openImagePicker());
@@ -238,7 +230,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         updateScannerSettingsButton.setOnClickListener(v -> updateScannerSettings());
     }
 
-    /** Shows the specified section and fetches relevant data. */
     public void showSection(String section) {
         Log.d(TAG, "Showing section: " + section);
         currentTab = section;
@@ -251,11 +242,10 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         notificationsSection.setVisibility(section.equals("notifications") ? View.VISIBLE : View.GONE);
         scannerSection.setVisibility(section.equals("scanner") ? View.VISIBLE : View.GONE);
 
-        // Reset the UI before fetching new data
         itemList.clear();
         adminAdapter.notifyDataSetChanged();
-        adminRecyclerView.setVisibility(View.GONE); // Hide RecyclerView initially
-        emptyView.setVisibility(View.VISIBLE); // Show emptyView until data is loaded
+        adminRecyclerView.setVisibility(View.GONE);
+        emptyView.setVisibility(View.VISIBLE);
 
         switch (section) {
             case "banner":
@@ -279,12 +269,11 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 break;
             case "notifications":
             case "scanner":
-                updateRecyclerView(new ArrayList<>()); // Ensure empty state for these sections
+                updateRecyclerView(new ArrayList<>());
                 break;
         }
     }
 
-    /** Opens the image picker with permission handling. */
     private void openImagePicker() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
@@ -300,7 +289,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         imagePickerLauncher.launch("image/*");
     }
 
-    /** Adds or updates a banner. */
     private void addOrUpdateBanner() {
         String title = bannerTitleInput.getText().toString().trim();
         String description = bannerDescriptionInput.getText().toString().trim();
@@ -343,7 +331,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         }
     }
 
-    /** Adds a new category. */
     private void addCategory() {
         String name = categoryNameInput.getText().toString().trim();
         if (name.isEmpty()) {
@@ -358,8 +345,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
 
         dataManager.uploadImageAndExecute(imageUri, "categories",
                 imageUrl -> {
-                    String categoryId = FirebaseDatabase.getInstance().getReference("categories").push().getKey();
-                    Category category = new Category(categoryId, name, 0, imageUrl);
+                    Category category = new Category(null, name, 0, imageUrl); // ID will be set in saveCategory
                     dataManager.saveCategory(category,
                             () -> {
                                 Toast.makeText(activity, "Category added", Toast.LENGTH_SHORT).show();
@@ -373,7 +359,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
-    /** Adds a new lab test. */
     private void addLabTest() {
         String name = labTestNameInput.getText().toString().trim();
         if (name.isEmpty()) {
@@ -388,8 +373,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
 
         dataManager.uploadImageAndExecute(imageUri, "labTests",
                 imageUrl -> {
-                    String labTestId = FirebaseDatabase.getInstance().getReference("labTests").push().getKey();
-                    LabTest labTest = new LabTest(labTestId, name, imageUrl);
+                    LabTest labTest = new LabTest(null, name, imageUrl); // ID will be set in saveLabTest
                     dataManager.saveLabTest(labTest,
                             () -> {
                                 Toast.makeText(activity, "Lab Test added", Toast.LENGTH_SHORT).show();
@@ -402,14 +386,15 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
-    /** Adds a new product. */
     private void addProduct() {
         String name = productNameInput.getText().toString().trim();
         String quantity = productQuantityInput.getText().toString().trim();
         String priceStr = productPriceInput.getText().toString().trim();
-        String discountedPriceStr = productDiscountedPriceInput.getText().toString().trim();
+        String discountPriceStr = productDiscountPriceInput.getText().toString().trim(); // Renamed
         String ratingStr = productRatingInput.getText().toString().trim();
         String reviewCountStr = productReviewCountInput.getText().toString().trim();
+        String description = productDescriptionInput.getText().toString().trim();
+        String brand = productBrandInput.getText().toString().trim();
         int categoryPosition = categorySpinner.getSelectedItemPosition();
 
         if (categoryPosition < 0 || categoryIds.isEmpty()) {
@@ -418,7 +403,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         }
         String categoryId = categoryIds.get(categoryPosition);
 
-        if (name.isEmpty() || quantity.isEmpty() || priceStr.isEmpty() || ratingStr.isEmpty() || reviewCountStr.isEmpty()) {
+        if (name.isEmpty() || quantity.isEmpty() || priceStr.isEmpty() || ratingStr.isEmpty() || reviewCountStr.isEmpty() || description.isEmpty() || brand.isEmpty()) {
             Toast.makeText(activity, "Please fill all required fields", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -429,13 +414,13 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         }
 
         double price;
-        double discountedPrice;
+        double discountPrice; // Renamed
         int rating;
         int reviewCount;
 
         try {
             price = Double.parseDouble(priceStr);
-            discountedPrice = discountedPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountedPriceStr);
+            discountPrice = discountPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountPriceStr); // Renamed
             rating = Integer.parseInt(ratingStr);
             reviewCount = Integer.parseInt(reviewCountStr);
         } catch (NumberFormatException e) {
@@ -445,8 +430,32 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
 
         dataManager.uploadImageAndExecute(imageUri, "products",
                 imageUrl -> {
-                    String productId = FirebaseDatabase.getInstance().getReference("products").child(categoryId).push().getKey();
-                    Product product = new Product(productId, name, price, imageUrl, rating, reviewCount, quantity, price, discountedPrice);
+                    // Calculate discount percentage
+                    double discountPercentage = 0.0;
+                    if (discountPrice > 0 && price > discountPrice) {
+                        discountPercentage = ((price - discountPrice) / price) * 100;
+                        discountPercentage = Math.round(discountPercentage * 10) / 10.0; // Round to 1 decimal place
+                    }
+
+                    Product product = new Product(
+                            null, // ID will be set in saveProduct
+                            name,
+                            price,
+                            imageUrl,
+                            rating,
+                            reviewCount,
+                            quantity,
+                            price, // originalPrice
+                            discountPrice, // Renamed
+                            description,
+                            "", // deliveryDate
+                            "", // deliveryAddress
+                            categoryId
+                    );
+                    product.setBrand(brand);
+                    product.setNameLower(name.toLowerCase());
+                    product.setDiscountPercentage(discountPercentage);
+
                     dataManager.saveProduct(categoryId, product,
                             () -> {
                                 Toast.makeText(activity, "Product added", Toast.LENGTH_SHORT).show();
@@ -458,7 +467,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
-    /** Sends a notification. */
     private void sendNotification() {
         String title = notificationTitleInput.getText().toString().trim();
         String message = notificationMessageInput.getText().toString().trim();
@@ -478,7 +486,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
-    /** Updates scanner settings. */
     private void updateScannerSettings() {
         String instructions = scannerInstructionsInput.getText().toString().trim();
         if (instructions.isEmpty()) {
@@ -494,7 +501,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
-    /** Resets the banner form fields. */
     private void resetBannerForm() {
         bannerTitleInput.setText("");
         bannerDescriptionInput.setText("");
@@ -504,41 +510,37 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         imageUri = null;
     }
 
-    /** Resets the product form fields. */
     private void resetProductForm() {
         productNameInput.setText("");
         productQuantityInput.setText("");
         productPriceInput.setText("");
-        productDiscountedPriceInput.setText("");
+        productDiscountPriceInput.setText(""); // Renamed
         productRatingInput.setText("");
         productReviewCountInput.setText("");
+        productDescriptionInput.setText("");
+        productBrandInput.setText("");
         imageUri = null;
     }
 
-    /** Updates RecyclerView with fetched data and toggles visibility. */
     private void updateRecyclerView(List<Object> items) {
         Log.d(TAG, "Updating RecyclerView with " + items.size() + " items");
         itemList.clear();
         itemList.addAll(items);
-        adminAdapter.notifyDataSetChanged(); // Notify adapter of data change
+        adminAdapter.notifyDataSetChanged();
         if (itemList.isEmpty()) {
-            Log.d(TAG, "Item list is empty, hiding RecyclerView and showing emptyView");
             adminRecyclerView.setVisibility(View.GONE);
             emptyView.setVisibility(View.VISIBLE);
         } else {
-            Log.d(TAG, "Item list is not empty, showing RecyclerView and hiding emptyView");
             adminRecyclerView.setVisibility(View.VISIBLE);
             emptyView.setVisibility(View.GONE);
         }
     }
 
-    /** Displays error messages. */
     private void showError(String message) {
         Log.e(TAG, "Error: " + message);
         Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
     }
 
-    /** Fetches categories for the spinner. */
     private void fetchCategoriesForSpinner() {
         dataManager.fetchCategoriesForSpinner(
                 names -> {
@@ -628,7 +630,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         }
     }
 
-    /** Edits a banner by populating the form. */
     private void editBanner(Banner banner) {
         currentBanner = banner;
         bannerTitleInput.setText(banner.getTitle());
@@ -637,7 +638,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         addBannerButton.setText("Update Banner");
     }
 
-    /** Edits a category by populating the form and setting update logic. */
     private void editCategory(Category category) {
         categoryNameInput.setText(category.getName());
         addCategoryButton.setText("Update Category");
@@ -681,7 +681,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         });
     }
 
-    /** Edits a lab test by populating the form and setting update logic. */
     private void editLabTest(LabTest labTest) {
         labTestNameInput.setText(labTest.getName());
         addLabTestButton.setText("Update Lab Test");
@@ -723,50 +722,82 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         });
     }
 
-    /** Edits a product by populating the form and setting update logic. */
     private void editProduct(Product product) {
         productNameInput.setText(product.getName());
         productQuantityInput.setText(product.getQuantity());
         productPriceInput.setText(String.valueOf(product.getPrice()));
-        productDiscountedPriceInput.setText(product.getDiscountedPrice() != 0.0 ? String.valueOf(product.getDiscountedPrice()) : "");
+        productDiscountPriceInput.setText(product.getDiscountedPrice() != 0.0 ? String.valueOf(product.getDiscountedPrice()) : ""); // Renamed
         productRatingInput.setText(String.valueOf(product.getRating()));
         productReviewCountInput.setText(String.valueOf(product.getReviewCount()));
+        productDescriptionInput.setText(product.getDescription());
+        productBrandInput.setText(product.getBrand());
+        int categoryPosition = categoryIds.indexOf(product.getCategoryId());
+        if (categoryPosition >= 0) {
+            categorySpinner.setSelection(categoryPosition);
+        }
         addProductButton.setText("Update Product");
         addProductButton.setOnClickListener(v -> {
             String name = productNameInput.getText().toString().trim();
             String quantity = productQuantityInput.getText().toString().trim();
             String priceStr = productPriceInput.getText().toString().trim();
-            String discountedPriceStr = productDiscountedPriceInput.getText().toString().trim();
+            String discountPriceStr = productDiscountPriceInput.getText().toString().trim(); // Renamed
             String ratingStr = productRatingInput.getText().toString().trim();
             String reviewCountStr = productReviewCountInput.getText().toString().trim();
-            int categoryPosition = categorySpinner.getSelectedItemPosition();
-            if (categoryPosition < 0 || categoryIds.isEmpty()) {
+            String description = productDescriptionInput.getText().toString().trim();
+            String brand = productBrandInput.getText().toString().trim();
+            int newCategoryPosition = categorySpinner.getSelectedItemPosition();
+            if (newCategoryPosition < 0 || categoryIds.isEmpty()) {
                 Toast.makeText(activity, "Please select a category", Toast.LENGTH_SHORT).show();
                 return;
             }
-            String newCategoryId = categoryIds.get(categoryPosition);
-            if (name.isEmpty() || quantity.isEmpty() || priceStr.isEmpty() || ratingStr.isEmpty() || reviewCountStr.isEmpty()) {
+            String newCategoryId = categoryIds.get(newCategoryPosition);
+            if (name.isEmpty() || quantity.isEmpty() || priceStr.isEmpty() || ratingStr.isEmpty() || reviewCountStr.isEmpty() || description.isEmpty() || brand.isEmpty()) {
                 Toast.makeText(activity, "Please fill all required fields", Toast.LENGTH_SHORT).show();
                 return;
             }
             double price;
-            double discountedPrice;
+            double discountPrice; // Renamed
             int rating;
             int reviewCount;
             try {
                 price = Double.parseDouble(priceStr);
-                discountedPrice = discountedPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountedPriceStr);
+                discountPrice = discountPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountPriceStr); // Renamed
                 rating = Integer.parseInt(ratingStr);
                 reviewCount = Integer.parseInt(reviewCountStr);
             } catch (NumberFormatException e) {
                 Toast.makeText(activity, "Invalid number format in price, rating, or review count", Toast.LENGTH_SHORT).show();
                 return;
             }
-            Product updatedProduct = new Product(product.getId(), name, price, product.getImageUrl(), rating, reviewCount, quantity, price, discountedPrice);
+
             if (imageUri != null) {
                 dataManager.uploadImageAndExecute(imageUri, "products",
                         imageUrl -> {
-                            updatedProduct.setImageUrl(imageUrl);
+                            // Calculate discount percentage
+                            double discountPercentage = 0.0;
+                            if (discountPrice > 0 && price > discountPrice) {
+                                discountPercentage = ((price - discountPrice) / price) * 100;
+                                discountPercentage = Math.round(discountPercentage * 10) / 10.0;
+                            }
+
+                            Product updatedProduct = new Product(
+                                    product.getId(),
+                                    name,
+                                    price,
+                                    imageUrl,
+                                    rating,
+                                    reviewCount,
+                                    quantity,
+                                    price, // originalPrice
+                                    discountPrice, // Renamed
+                                    description,
+                                    "", // deliveryDate
+                                    "", // deliveryAddress
+                                    newCategoryId
+                            );
+                            updatedProduct.setBrand(brand);
+                            updatedProduct.setNameLower(name.toLowerCase());
+                            updatedProduct.setDiscountPercentage(discountPercentage);
+
                             dataManager.updateProduct(product, newCategoryId, updatedProduct,
                                     () -> {
                                         Toast.makeText(activity, "Product updated", Toast.LENGTH_SHORT).show();
@@ -779,6 +810,32 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                         },
                         this::showError);
             } else {
+                // Calculate discount percentage
+                double discountPercentage = 0.0;
+                if (discountPrice > 0 && price > discountPrice) {
+                    discountPercentage = ((price - discountPrice) / price) * 100;
+                    discountPercentage = Math.round(discountPercentage * 10) / 10.0;
+                }
+
+                Product updatedProduct = new Product(
+                        product.getId(),
+                        name,
+                        price,
+                        product.getImageUrl(),
+                        rating,
+                        reviewCount,
+                        quantity,
+                        price, // originalPrice
+                        discountPrice, // Renamed
+                        description,
+                        "", // deliveryDate
+                        "", // deliveryAddress
+                        newCategoryId
+                );
+                updatedProduct.setBrand(brand);
+                updatedProduct.setNameLower(name.toLowerCase());
+                updatedProduct.setDiscountPercentage(discountPercentage);
+
                 dataManager.updateProduct(product, newCategoryId, updatedProduct,
                         () -> {
                             Toast.makeText(activity, "Product updated", Toast.LENGTH_SHORT).show();

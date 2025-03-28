@@ -401,7 +401,7 @@
                                 app:boxStrokeWidthFocused="2dp"
                                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                                 <com.google.android.material.textfield.TextInputEditText
-                                    android:id="@+id/productDiscountedPriceInput"
+                                    android:id="@+id/productDiscountPriceInput"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:hint="@string/discounted_price_hint"
@@ -446,6 +446,47 @@
                                     android:textColor="@color/text_primary"
                                     android:textColorHint="@color/text_secondary"
                                     android:inputType="number" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <!-- Add this after the productReviewCountInput TextInputLayout -->
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                app:hintTextColor="@color/text_hint"
+                                app:boxBackgroundColor="@color/white"
+                                app:boxStrokeColor="@color/accent_blue"
+                                app:boxStrokeWidth="1dp"
+                                app:boxStrokeWidthFocused="2dp"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/productDescriptionInput"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:hint="@string/product_description_hint"
+                                    android:textColor="@color/text_primary"
+                                    android:textColorHint="@color/text_secondary"
+                                    android:inputType="textMultiLine"
+                                    android:minLines="3"
+                                    android:maxLines="5" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                app:hintTextColor="@color/text_hint"
+                                app:boxBackgroundColor="@color/white"
+                                app:boxStrokeColor="@color/accent_blue"
+                                app:boxStrokeWidth="1dp"
+                                app:boxStrokeWidthFocused="2dp"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/productBrandInput"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:hint="@string/brand_hint"
+                                    android:textColor="@color/text_primary"
+                                    android:textColorHint="@color/text_secondary"
+                                    android:inputType="text" />
                             </com.google.android.material.textfield.TextInputLayout>
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/uploadProductImageButton"

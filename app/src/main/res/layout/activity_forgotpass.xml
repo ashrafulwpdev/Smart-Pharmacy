@@ -145,7 +145,7 @@
             android:layout_below="@id/validationMessage"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="15dp"
-            android:background="@drawable/login_btn_interactive_bg"
+            android:background="@drawable/btn_interactive_bg"
             android:foreground="?android:attr/selectableItemBackground"
             android:stateListAnimator="@animator/button_elevation_anim"
             android:text="Send Reset Link"

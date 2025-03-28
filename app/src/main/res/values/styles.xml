@@ -32,4 +32,23 @@
         <item name="hintTextColor">@color/text_hint</item>
         <item name="android:textColorHint">@color/text_secondary</item>
     </style>
+
+    <style name="CustomBottomSheetTheme" parent="Theme.MaterialComponents.Light.BottomSheetDialog">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="bottomSheetStyle">@style/CustomBottomSheet</item>
+        <item name="buttonStyle">@style/CustomButtonStyle</item>
+    </style>
+
+    <style name="CustomBottomSheet" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="android:background">@android:color/white</item>
+    </style>
+
+    <style name="CustomButtonStyle" parent="Widget.AppCompat.Button">
+        <item name="android:background">@null</item>
+        <item name="android:backgroundTint">@null</item>
+        <item name="materialButtonStyle">@null</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+
+
 </resources>

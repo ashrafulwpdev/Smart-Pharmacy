@@ -46,11 +46,14 @@ import android.text.Editable;
 import android.text.TextWatcher;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCategoryClickListener,
         LabTestGridAdapter.OnLabTestClickListener, BestsellerProductAdapter.OnAddToCartClickListener,
-        BannerAdapter.OnOrderNowClickListener, FeaturedAdapter.OnFeaturedClickListener {
+        BannerAdapter.OnOrderNowClickListener, FeaturedAdapter.OnFeaturedClickListener,
+        BestsellerProductAdapter.OnProductClickListener {
 
     private static final String TAG = "HomeFragment";
     private static final int AUTO_SCROLL_INTERVAL = 10000; // 10 seconds
@@ -76,13 +79,14 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
     private List<Category> featuredList;
     private CollectionReference bannersRef, categoriesRef, labTestsRef, productsRef;
     private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
     private ListenerRegistration bannerListener, categoriesListener, labTestsListener, productsListener;
     private boolean isLoading = false;
     private Handler autoScrollHandler, searchHandler;
     private Runnable autoScrollRunnable, searchRunnable;
     private boolean isUserInteracting = false;
     private LoadingSpinnerUtil loadingSpinnerUtil;
-    private boolean bannersLoaded, categoriesLoaded, labTestsLoaded, productsLoaded; // Track listener completion
+    private boolean bannersLoaded, categoriesLoaded, labTestsLoaded, productsLoaded;
 
     public HomeFragment() {
         // Required empty public constructor
@@ -99,10 +103,11 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        bannersRef = FirebaseFirestore.getInstance().collection("banners");
-        categoriesRef = FirebaseFirestore.getInstance().collection("categories");
-        labTestsRef = FirebaseFirestore.getInstance().collection("labTests");
-        productsRef = FirebaseFirestore.getInstance().collection("products");
+        db = FirebaseFirestore.getInstance();
+        bannersRef = db.collection("banners");
+        categoriesRef = db.collection("categories");
+        labTestsRef = db.collection("labTests");
+        productsRef = db.collection("products");
 
         // Initialize UI first
         initializeUI(view);
@@ -157,9 +162,7 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
         if (swipeRefreshLayout == null) Log.e(TAG, "swipeRefreshLayout not found");
 
         loadingSpinnerUtil = LoadingSpinnerUtil.initialize(requireContext(), view, R.id.loadingSpinner);
-        if (loadingSpinnerUtil == null) {
-            Log.e(TAG, "Failed to initialize LoadingSpinnerUtil");
-        }
+        if (loadingSpinnerUtil == null) Log.e(TAG, "Failed to initialize LoadingSpinnerUtil");
 
         bannerList = new ArrayList<>();
         categoryList = new ArrayList<>();
@@ -174,7 +177,7 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
         bannerAdapter = new BannerAdapter(requireContext(), bannerList, this);
         categoryAdapter = new CategoryGridAdapter(requireContext(), categoryList, this);
         labTestAdapter = new LabTestGridAdapter(requireContext(), labTestList, this);
-        bestsellerProductAdapter = new BestsellerProductAdapter(requireContext(), bestsellerProductList, this);
+        bestsellerProductAdapter = new BestsellerProductAdapter(requireContext(), bestsellerProductList, this, this);
         featuredAdapter = new FeaturedAdapter(requireContext(), featuredList, this);
 
         if (bannerViewPager != null) {
@@ -217,23 +220,16 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
             performFirestoreSearch(query);
         };
 
-        // Add TextWatcher for search
         if (searchEditText != null) {
             searchEditText.addTextChangedListener(new TextWatcher() {
                 @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                    // No action needed
-                }
-
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    // No action needed
-                }
-
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
                 @Override
                 public void afterTextChanged(Editable s) {
-                    searchHandler.removeCallbacks(searchRunnable); // Remove pending searches
-                    searchHandler.postDelayed(searchRunnable, SEARCH_DELAY); // Debounce search
+                    searchHandler.removeCallbacks(searchRunnable);
+                    searchHandler.postDelayed(searchRunnable, SEARCH_DELAY);
                 }
             });
         }
@@ -248,21 +244,11 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
             });
         }
 
-        if (cartButton != null) {
-            cartButton.setOnClickListener(v -> onCartClick());
-        }
-        if (scanButton != null) {
-            scanButton.setOnClickListener(v -> onScanClick());
-        }
-        if (viewAllCategories != null) {
-            viewAllCategories.setOnClickListener(v -> onViewAllCategoriesClick());
-        }
-        if (viewAllLabTests != null) {
-            viewAllLabTests.setOnClickListener(v -> onViewAllLabTestsClick());
-        }
-        if (viewAllProducts != null) {
-            viewAllProducts.setOnClickListener(v -> onViewAllProductsClick());
-        }
+        if (cartButton != null) cartButton.setOnClickListener(v -> onCartClick());
+        if (scanButton != null) scanButton.setOnClickListener(v -> onScanClick());
+        if (viewAllCategories != null) viewAllCategories.setOnClickListener(v -> onViewAllCategoriesClick());
+        if (viewAllLabTests != null) viewAllLabTests.setOnClickListener(v -> onViewAllLabTestsClick());
+        if (viewAllProducts != null) viewAllProducts.setOnClickListener(v -> onViewAllProductsClick());
     }
 
     private void setupBannerAnimation() {
@@ -421,7 +407,6 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
         if (isLoading) return;
         isLoading = true;
 
-        // Reset loaded flags
         bannersLoaded = false;
         categoriesLoaded = false;
         labTestsLoaded = false;
@@ -437,13 +422,11 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
         if (isLoading) return;
         isLoading = true;
 
-        // Reset loaded flags
         bannersLoaded = false;
         categoriesLoaded = false;
         labTestsLoaded = false;
         productsLoaded = false;
 
-        // Remove existing listeners and reattach them to force a refresh
         stopListening();
         initializeListeners();
 
@@ -485,22 +468,10 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
     }
 
     private void stopListening() {
-        if (bannerListener != null) {
-            bannerListener.remove();
-            bannerListener = null;
-        }
-        if (categoriesListener != null) {
-            categoriesListener.remove();
-            categoriesListener = null;
-        }
-        if (labTestsListener != null) {
-            labTestsListener.remove();
-            labTestsListener = null;
-        }
-        if (productsListener != null) {
-            productsListener.remove();
-            productsListener = null;
-        }
+        if (bannerListener != null) { bannerListener.remove(); bannerListener = null; }
+        if (categoriesListener != null) { categoriesListener.remove(); categoriesListener = null; }
+        if (labTestsListener != null) { labTestsListener.remove(); labTestsListener = null; }
+        if (productsListener != null) { productsListener.remove(); productsListener = null; }
     }
 
     private void updateIndicators(int position) {
@@ -521,19 +492,11 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
             if (i == position) {
                 indicator.setScaleX(1.0f);
                 indicator.setScaleY(1.0f);
-                indicator.animate()
-                        .scaleX(1.1f)
-                        .scaleY(1.1f)
-                        .setDuration(150)
-                        .start();
+                indicator.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
             } else {
                 indicator.setScaleX(1.0f);
                 indicator.setScaleY(1.0f);
-                indicator.animate()
-                        .scaleX(1.0f)
-                        .scaleY(1.0f)
-                        .setDuration(150)
-                        .start();
+                indicator.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
             }
 
             indicatorLayout.addView(indicator);
@@ -549,17 +512,14 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
         disableUserInteractions(true);
 
         if (query.isEmpty()) {
-            // Revert to default bestseller list
             fetchDefaultProducts();
             return;
         }
 
-        // Firestore query: search products where name contains the query
-        // Note: Requires an index on 'name' field in Firestore (ascending order)
         productsRef
-                .orderBy("name")
-                .startAt(query)
-                .endAt(query + "\uf8ff")
+                .orderBy("nameLower")
+                .startAt(query.toLowerCase())
+                .endAt(query.toLowerCase() + "\uf8ff")
                 .limit(10)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
@@ -634,11 +594,17 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
     private void onCartClick() {
         if (!isAdded() || isLoading) return;
         Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
+        // Optionally navigate to a CartFragment here
     }
 
     private void onScanClick() {
         if (!isAdded() || isLoading) return;
         Toast.makeText(requireContext(), "Scan clicked", Toast.LENGTH_SHORT).show();
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, new ScannerFragment())
+                .addToBackStack(null)
+                .commit();
     }
 
     private void onViewAllCategoriesClick() {
@@ -699,7 +665,109 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
     @Override
     public void onAddToCartClick(Product product) {
         if (!isAdded() || isLoading) return;
-        Toast.makeText(requireContext(), "Added to cart: " + product.getName(), Toast.LENGTH_SHORT).show();
+
+        if (mAuth.getCurrentUser() == null) {
+            Toast.makeText(requireContext(), "Please log in to add items to cart.", Toast.LENGTH_SHORT).show();
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new LoginFragment())
+                    .addToBackStack(null)
+                    .commit();
+            return;
+        }
+
+        String userId = mAuth.getCurrentUser().getUid();
+        double price = (product.getDiscountedPrice() > 0.0 && product.getDiscountedPrice() < product.getPrice())
+                ? product.getDiscountedPrice()
+                : product.getPrice();
+
+        if (price <= 0.0) {
+            Log.e(TAG, "Invalid price for product: " + product.getName());
+            Toast.makeText(requireContext(), "Cannot add " + product.getName() + " to cart: Invalid price", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        db.collection("cart")
+                .document(userId)
+                .collection("items")
+                .whereEqualTo("productId", product.getId())
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!isAdded()) return;
+
+                    if (!querySnapshot.isEmpty()) {
+                        // Item exists, update quantity
+                        QueryDocumentSnapshot existingItem = (QueryDocumentSnapshot) querySnapshot.getDocuments().get(0);
+                        int currentQuantity = existingItem.getLong("quantity").intValue();
+                        double currentTotal = existingItem.getDouble("total");
+
+                        db.collection("cart")
+                                .document(userId)
+                                .collection("items")
+                                .document(existingItem.getId())
+                                .update(
+                                        "quantity", currentQuantity + 1,
+                                        "total", currentTotal + price,
+                                        "addedAt", com.google.firebase.Timestamp.now()
+                                )
+                                .addOnSuccessListener(aVoid -> {
+                                    if (isAdded()) {
+                                        Toast.makeText(requireContext(), product.getName() + " quantity updated in cart!", Toast.LENGTH_SHORT).show();
+                                    }
+                                })
+                                .addOnFailureListener(e -> {
+                                    if (isAdded()) {
+                                        Log.e(TAG, "Failed to update cart: " + e.getMessage());
+                                        Toast.makeText(requireContext(), "Failed to update cart: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                    }
+                                });
+                    } else {
+                        // New item, add it
+                        Map<String, Object> cartItem = new HashMap<>();
+                        cartItem.put("productId", product.getId());
+                        cartItem.put("quantity", 1);
+                        cartItem.put("total", price);
+                        cartItem.put("addedAt", com.google.firebase.Timestamp.now());
+
+                        db.collection("cart")
+                                .document(userId)
+                                .collection("items")
+                                .add(cartItem)
+                                .addOnSuccessListener(documentReference -> {
+                                    if (isAdded()) {
+                                        Toast.makeText(requireContext(), product.getName() + " added to cart!", Toast.LENGTH_SHORT).show();
+                                    }
+                                })
+                                .addOnFailureListener(e -> {
+                                    if (isAdded()) {
+                                        Log.e(TAG, "Failed to add to cart: " + e.getMessage());
+                                        Toast.makeText(requireContext(), "Failed to add to cart: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                    }
+                                });
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    if (isAdded()) {
+                        Log.e(TAG, "Failed to check cart: " + e.getMessage());
+                        Toast.makeText(requireContext(), "Failed to add to cart: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    @Override
+    public void onProductClick(Product product) {
+        if (!isAdded() || isLoading) return;
+
+        Bundle args = new Bundle();
+        args.putParcelable("product", product);
+        ProductDetailsFragment productDetailsFragment = new ProductDetailsFragment();
+        productDetailsFragment.setArguments(args);
+
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, productDetailsFragment)
+                .addToBackStack(null)
+                .commit();
     }
 
     @Override

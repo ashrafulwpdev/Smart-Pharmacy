@@ -5,11 +5,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -32,12 +32,12 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
     private static final String TAG = "LabTestFragment";
 
     private RecyclerView labTestsRecyclerView;
-    private TextView labTestTitle;
+    private Toolbar toolbar;  // Replace TextView with Toolbar
     private LabTestGridAdapter labTestAdapter;
     private List<LabTest> labTestList;
-    private CollectionReference labTestsRef;  // Changed to Firestore CollectionReference
+    private CollectionReference labTestsRef;
     private FirebaseAuth mAuth;
-    private ListenerRegistration labTestsListener;  // Changed to Firestore ListenerRegistration
+    private ListenerRegistration labTestsListener;
 
     public LabTestFragment() {
         // Required empty public constructor
@@ -54,10 +54,10 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        labTestsRef = FirebaseFirestore.getInstance().collection("labTests");  // Changed to Firestore
+        labTestsRef = FirebaseFirestore.getInstance().collection("labTests");
 
         // Initialize UI
-        labTestTitle = view.findViewById(R.id.labTestTitle);
+        toolbar = view.findViewById(R.id.toolbar);
         labTestsRecyclerView = view.findViewById(R.id.labTestsRecyclerView);
 
         if (labTestsRecyclerView == null) {
@@ -65,6 +65,22 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
             Toast.makeText(requireContext(), "Error: Lab tests view not found", Toast.LENGTH_LONG).show();
             return;
         }
+
+        // Set up Toolbar
+        toolbar.setTitle("Lab Tests");
+        toolbar.inflateMenu(R.menu.menu_products);  // Inflate the menu with search and cart
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_search) {
+                Toast.makeText(requireContext(), "Search clicked", Toast.LENGTH_SHORT).show();
+                // Add search functionality here if needed
+                return true;
+            } else if (item.getItemId() == R.id.action_cart) {
+                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
+                // Navigate to CartFragment here if needed
+                return true;
+            }
+            return false;
+        });
 
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
@@ -128,7 +144,7 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
     public void onDestroyView() {
         super.onDestroyView();
         if (labTestsListener != null) {
-            labTestsListener.remove();  // Firestore cleanup
+            labTestsListener.remove();
             labTestsListener = null;
         }
         if (labTestsRecyclerView != null) {
@@ -136,6 +152,6 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
         }
         labTestAdapter = null;
         labTestsRecyclerView = null;
-        labTestTitle = null;
+        toolbar = null;  // Clean up Toolbar reference
     }
 }

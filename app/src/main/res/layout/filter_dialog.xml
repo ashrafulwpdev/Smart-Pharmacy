@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/white"
+    android:padding="16dp"
+    android:clipToPadding="false"
+    android:clipChildren="false">
+
+    <!-- Header -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/tv_filter_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Filter"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/closeButton"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/close_btn"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- ScrollView for Filter Options -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="16dp"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:scrollbarStyle="outsideOverlay"
+        android:fadeScrollbars="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Brands Section -->
+            <LinearLayout
+                android:id="@+id/brandsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="12dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="8dp">
+
+                    <TextView
+                        android:id="@+id/brandsTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Brands"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/black" />
+
+                    <ImageView
+                        android:id="@+id/brandsArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:src="@drawable/arrow_left"
+                        android:contentDescription="Expand" />
+                </RelativeLayout>
+
+                <LinearLayout
+                    android:id="@+id/brandsOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Product Type Section -->
+            <LinearLayout
+                android:id="@+id/productTypeSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="12dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="8dp">
+
+                    <TextView
+                        android:id="@+id/productTypeTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Product Type"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/black" />
+
+                    <ImageView
+                        android:id="@+id/productTypeArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:src="@drawable/arrow_left"
+                        android:contentDescription="Expand" />
+                </RelativeLayout>
+
+                <LinearLayout
+                    android:id="@+id/productTypeOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Discount Section -->
+            <LinearLayout
+                android:id="@+id/discountSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="12dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="8dp">
+
+                    <TextView
+                        android:id="@+id/discountTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Discount"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/black" />
+
+                    <ImageView
+                        android:id="@+id/discountArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:src="@drawable/arrow_left"
+                        android:contentDescription="Expand" />
+                </RelativeLayout>
+
+                <LinearLayout
+                    android:id="@+id/discountOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Price Section -->
+            <LinearLayout
+                android:id="@+id/priceSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="12dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="8dp">
+
+                    <TextView
+                        android:id="@+id/priceTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Price"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/black" />
+
+                    <ImageView
+                        android:id="@+id/priceArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:src="@drawable/arrow_left"
+                        android:contentDescription="Expand" />
+                </RelativeLayout>
+
+                <LinearLayout
+                    android:id="@+id/priceOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Action Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:paddingTop="8dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/clearAllButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Clear All"
+            android:textColor="@android:color/black"
+            android:background="@drawable/btn_interactive_white"
+            android:backgroundTint="@null"
+            android:layout_marginEnd="8dp"
+            android:paddingHorizontal="16dp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/applyFilterButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Apply Filter"
+            android:textColor="@android:color/white"
+            android:background="@drawable/btn_interactive_bg"
+            android:backgroundTint="@null"
+            android:paddingHorizontal="16dp" />
+    </LinearLayout>
+</LinearLayout>

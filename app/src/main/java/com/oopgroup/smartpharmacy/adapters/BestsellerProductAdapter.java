@@ -8,12 +8,15 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.models.Product;
+
 import java.util.List;
 
 public class BestsellerProductAdapter extends RecyclerView.Adapter<BestsellerProductAdapter.ProductViewHolder> {
@@ -21,11 +24,21 @@ public class BestsellerProductAdapter extends RecyclerView.Adapter<BestsellerPro
     private Context context;
     private List<Product> productList;
     private OnAddToCartClickListener onAddToCartClickListener;
+    private OnProductClickListener onProductClickListener;
 
     public BestsellerProductAdapter(Context context, List<Product> productList, OnAddToCartClickListener listener) {
         this.context = context;
         this.productList = productList;
         this.onAddToCartClickListener = listener;
+    }
+
+    public BestsellerProductAdapter(Context context, List<Product> productList,
+                                    OnAddToCartClickListener addToCartListener,
+                                    OnProductClickListener productClickListener) {
+        this.context = context;
+        this.productList = productList;
+        this.onAddToCartClickListener = addToCartListener;
+        this.onProductClickListener = productClickListener;
     }
 
     @NonNull
@@ -44,59 +57,48 @@ public class BestsellerProductAdapter extends RecyclerView.Adapter<BestsellerPro
 
         Product product = productList.get(position);
 
-        if (holder.productName != null) {
-            holder.productName.setText(product.getName());
+        holder.productName.setText(product.getName() != null ? product.getName() : "Unknown Product");
+        holder.productQuantity.setText(product.getQuantity() != null ? product.getQuantity() : "N/A");
+
+        // Rating: Assuming out of 10, display as 5-star scale
+        int rating = product.getRating();
+        int reviewCount = product.getReviewCount();
+        holder.ratingText.setText(String.format("★ %.1f (%d Reviews)", rating / 2.0f, reviewCount));
+
+        // Price handling
+        double price = product.getPrice();
+        double discountedPrice = product.getDiscountedPrice();
+
+        if (discountedPrice > 0.0 && discountedPrice < price) {
+            holder.productPriceDiscounted.setText(String.format("RM%.2f", discountedPrice));
+            holder.productPriceOriginal.setText(String.format("RM%.2f", price));
+            holder.productPriceOriginal.setPaintFlags(holder.productPriceOriginal.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            holder.productPriceOriginal.setVisibility(View.VISIBLE);
         } else {
-            android.util.Log.e("Adapter", "productName is null");
+            holder.productPriceDiscounted.setText(String.format("RM%.2f", price));
+            holder.productPriceOriginal.setVisibility(View.GONE);
         }
 
-        if (holder.productQuantity != null) {
-            holder.productQuantity.setText(product.getQuantity());
-        } else {
-            android.util.Log.e("Adapter", "productQuantity is null");
-        }
+        Glide.with(context)
+                .load(product.getImageUrl())
+                .placeholder(R.drawable.default_product_image)
+                .error(R.drawable.default_product_image)
+                .transition(DrawableTransitionOptions.withCrossFade())
+                .into(holder.productImage);
 
-        if (holder.ratingText != null) {
-            holder.ratingText.setText(String.format("★ %.1f (%d Reviews)", (float) product.getRating() / 2, product.getReviewCount()));
-        } else {
-            android.util.Log.e("Adapter", "ratingText is null");
-        }
-
-        if (holder.productPriceDiscounted != null && holder.productPriceOriginal != null) {
-            if (product.getDiscountedPrice() > 0.0) {
-                // Show both discounted and original price with strikethrough
-                holder.productPriceDiscounted.setText(String.format("RM%.2f", product.getDiscountedPrice()));
-                holder.productPriceOriginal.setText(String.format("RM%.2f", product.getOriginalPrice()));
-                holder.productPriceOriginal.setPaintFlags(holder.productPriceOriginal.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-                holder.productPriceOriginal.setVisibility(View.VISIBLE);
-            } else {
-                // Show only the original price without strikethrough
-                holder.productPriceDiscounted.setText(String.format("RM%.2f", product.getOriginalPrice()));
-                holder.productPriceOriginal.setVisibility(View.GONE);
-            }
-        } else {
-            android.util.Log.e("Adapter", "productPriceDiscounted or productPriceOriginal is null");
-        }
-
-        if (holder.productImage != null) {
-            Glide.with(context)
-                    .load(product.getImageUrl())
-                    .placeholder(R.drawable.default_product_image)
-                    .error(R.drawable.default_product_image)
-                    .transition(DrawableTransitionOptions.withCrossFade())
-                    .into(holder.productImage);
-        } else {
-            android.util.Log.e("Adapter", "productImage is null");
-        }
-
-        if (holder.addToCartButton != null) {
-            holder.addToCartButton.setOnClickListener(v -> {
-                if (onAddToCartClickListener != null) {
-                    onAddToCartClickListener.onAddToCartClick(product);
+        holder.addToCartButton.setOnClickListener(v -> {
+            if (onAddToCartClickListener != null) {
+                double effectivePrice = (discountedPrice > 0.0 && discountedPrice < price) ? discountedPrice : price;
+                if (effectivePrice <= 0.0) {
+                    android.util.Log.e("Adapter", "Cannot add to cart: Invalid price for " + product.getName());
+                    return;
                 }
-            });
-        } else {
-            android.util.Log.e("Adapter", "addToCartButton is null");
+                onAddToCartClickListener.onAddToCartClick(product);
+            }
+        });
+
+        if (onProductClickListener != null) {
+            holder.itemView.setOnClickListener(v -> onProductClickListener.onProductClick(product));
         }
     }
 
@@ -128,19 +130,14 @@ public class BestsellerProductAdapter extends RecyclerView.Adapter<BestsellerPro
             productPriceOriginal = itemView.findViewById(R.id.productPriceOriginal);
             ratingText = itemView.findViewById(R.id.ratingText);
             addToCartButton = itemView.findViewById(R.id.addToCartButton);
-
-            // Log missing views for debugging
-            if (productImage == null) android.util.Log.e("ViewHolder", "productImage not found");
-            if (productName == null) android.util.Log.e("ViewHolder", "productName not found");
-            if (productQuantity == null) android.util.Log.e("ViewHolder", "productQuantity not found");
-            if (productPriceDiscounted == null) android.util.Log.e("ViewHolder", "productPriceDiscounted not found");
-            if (productPriceOriginal == null) android.util.Log.e("ViewHolder", "productPriceOriginal not found");
-            if (ratingText == null) android.util.Log.e("ViewHolder", "ratingText not found");
-            if (addToCartButton == null) android.util.Log.e("ViewHolder", "addToCartButton not found");
         }
     }
 
     public interface OnAddToCartClickListener {
         void onAddToCartClick(Product product);
+    }
+
+    public interface OnProductClickListener {
+        void onProductClick(Product product);
     }
 }

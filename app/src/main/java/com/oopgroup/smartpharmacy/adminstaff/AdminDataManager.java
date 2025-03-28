@@ -1,9 +1,8 @@
-package com.oopgroup.smartpharmacy;
+package com.oopgroup.smartpharmacy.adminstaff;
 
 import android.net.Uri;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseUser;
@@ -27,9 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/**
- * AdminDataManager: Manages Firebase interactions and all data-related operations using Firestore.
- */
 public class AdminDataManager {
     private static final String TAG = "AdminDataManager";
     private static final int MAX_IMAGE_SIZE_MB = 5;
@@ -53,7 +49,6 @@ public class AdminDataManager {
         storageRef = FirebaseStorage.getInstance().getReference();
     }
 
-    /** Checks the user's role in Firestore. */
     public void checkUserRole(Consumer<String> onSuccess, Consumer<String> onFailure) {
         if (currentUser == null) {
             onFailure.accept("No user logged in");
@@ -76,7 +71,6 @@ public class AdminDataManager {
                 .addOnFailureListener(e -> onFailure.accept(e.getMessage()));
     }
 
-    /** Uploads an image to Firebase Storage and returns the URL. */
     public void uploadImageAndExecute(Uri imageUri, String path, Consumer<String> onSuccess, Consumer<String> onFailure) {
         if (imageUri == null || currentUser == null) {
             onFailure.accept("Please select an image or log in.");
@@ -115,7 +109,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Saves or updates a banner in Firestore. */
     public void saveBanner(Map<String, Object> bannerData, String bannerId, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         String id = bannerId != null ? bannerId : db.collection("banners").document().getId();
@@ -131,10 +124,11 @@ public class AdminDataManager {
                 });
     }
 
-    /** Saves a category in Firestore. */
     public void saveCategory(Category category, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
-        db.collection("categories").document(category.getId()).set(category)
+        String id = category.getId() != null ? category.getId() : db.collection("categories").document().getId();
+        category.setId(id); // Set the ID if it was null
+        db.collection("categories").document(id).set(category)
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
                     onSuccess.run();
@@ -146,10 +140,11 @@ public class AdminDataManager {
                 });
     }
 
-    /** Saves a lab test in Firestore. */
     public void saveLabTest(LabTest labTest, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
-        db.collection("labTests").document(labTest.getId()).set(labTest)
+        String id = labTest.getId() != null ? labTest.getId() : db.collection("labTests").document().getId();
+        labTest.setId(id); // Set the ID if it was null
+        db.collection("labTests").document(id).set(labTest)
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
                     onSuccess.run();
@@ -161,10 +156,11 @@ public class AdminDataManager {
                 });
     }
 
-    /** Saves a product in Firestore and updates product count. */
     public void saveProduct(String categoryId, Product product, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
-        db.collection("products").document(product.getId()).set(product)
+        String id = product.getId() != null ? product.getId() : db.collection("products").document().getId();
+        product.setId(id); // Set the ID if it was null
+        db.collection("products").document(id).set(product)
                 .addOnSuccessListener(aVoid -> {
                     updateProductCount(categoryId, 1);
                     showLoading(false);
@@ -177,14 +173,12 @@ public class AdminDataManager {
                 });
     }
 
-    /** Updates the product count for a category in Firestore. */
     public void updateProductCount(String categoryId, int change) {
         db.collection("categories").document(categoryId)
                 .update("productCount", FieldValue.increment(change))
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Product count updated for category: " + categoryId))
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to update product count: " + e.getMessage());
-                    // Handle initial case where category doesn't exist
                     if (e.getMessage().contains("No document to update")) {
                         Category newCategory = new Category(categoryId, "Unknown", change < 0 ? 0 : change, "");
                         db.collection("categories").document(categoryId).set(newCategory);
@@ -192,7 +186,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches banners from Firestore. */
     public void fetchBanners(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         List<Object> itemList = new ArrayList<>();
@@ -213,7 +206,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches categories from Firestore. */
     public void fetchCategories(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         List<Object> itemList = new ArrayList<>();
@@ -234,7 +226,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches lab tests from Firestore. */
     public void fetchLabTests(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         List<Object> itemList = new ArrayList<>();
@@ -255,7 +246,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches products from Firestore. */
     public void fetchProducts(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         List<Object> itemList = new ArrayList<>();
@@ -276,7 +266,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches users from Firestore (non-admins only). */
     public void fetchUsers(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         List<Object> itemList = new ArrayList<>();
@@ -298,7 +287,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches orders from Firestore. */
     public void fetchOrders(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         List<Object> itemList = new ArrayList<>();
@@ -320,7 +308,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Sends a notification to Firestore. */
     public void sendNotification(String title, String message, String target, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         String notificationId = db.collection("notifications").document().getId();
@@ -342,7 +329,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Updates scanner settings in Firestore. */
     public void updateScannerSettings(String instructions, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         Map<String, Object> settings = new HashMap<>();
@@ -359,7 +345,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Fetches categories for spinner population from Firestore. */
     public void fetchCategoriesForSpinner(Consumer<List<String>> namesConsumer, Consumer<List<String>> idsConsumer, Consumer<String> onFailure) {
         List<String> categoryNames = new ArrayList<>();
         List<String> categoryIds = new ArrayList<>();
@@ -381,7 +366,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Deletes a banner from Firestore. */
     public void deleteBanner(Banner banner, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("banners").document(banner.getId()).delete()
@@ -396,7 +380,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Deletes a category from Firestore (products must be deleted separately). */
     public void deleteCategory(Category category, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("categories").document(category.getId()).delete()
@@ -411,7 +394,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Deletes a lab test from Firestore. */
     public void deleteLabTest(LabTest labTest, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("labTests").document(labTest.getId()).delete()
@@ -426,14 +408,11 @@ public class AdminDataManager {
                 });
     }
 
-    /** Deletes a product from Firestore and updates product count. */
     public void deleteProduct(Product product, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("products").document(product.getId()).delete()
                 .addOnSuccessListener(aVoid -> {
-                    // Note: categoryId isn't stored in Product, so you'll need to fetch it or pass it
-                    // For now, assuming categoryId is managed elsewhere or not needed
-                    // updateProductCount(categoryId, -1); // Uncomment if categoryId is available
+                    updateProductCount(product.getCategoryId(), -1); // Decrease count
                     showLoading(false);
                     onSuccess.run();
                 })
@@ -444,7 +423,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Deletes a user from Firestore. */
     public void deleteUser(String userId, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("users").document(userId).delete()
@@ -459,7 +437,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Deletes an order from Firestore. */
     public void deleteOrder(String orderId, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("orders").document(orderId).delete()
@@ -474,7 +451,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Updates a category in Firestore. */
     public void updateCategory(Category category, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("categories").document(category.getId()).set(category)
@@ -489,7 +465,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Updates a lab test in Firestore. */
     public void updateLabTest(LabTest labTest, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("labTests").document(labTest.getId()).set(labTest)
@@ -504,13 +479,15 @@ public class AdminDataManager {
                 });
     }
 
-    /** Updates a product in Firestore, handling category changes. */
     public void updateProduct(Product originalProduct, String newCategoryId, Product updatedProduct, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("products").document(updatedProduct.getId()).set(updatedProduct)
                 .addOnSuccessListener(aVoid -> {
-                    // Note: If categoryId changes, you'll need to update productCount separately
-                    // For simplicity, assuming categoryId is not stored in Product
+                    // Handle category change
+                    if (!originalProduct.getCategoryId().equals(newCategoryId)) {
+                        updateProductCount(originalProduct.getCategoryId(), -1); // Decrease old category count
+                        updateProductCount(newCategoryId, 1); // Increase new category count
+                    }
                     showLoading(false);
                     onSuccess.run();
                 })
@@ -521,7 +498,6 @@ public class AdminDataManager {
                 });
     }
 
-    /** Toggles loading spinner visibility. */
     private void showLoading(boolean isLoading) {
         Log.d(TAG, "Loading state: " + isLoading);
         loadingSpinnerUtil.toggleLoadingSpinner(isLoading);
