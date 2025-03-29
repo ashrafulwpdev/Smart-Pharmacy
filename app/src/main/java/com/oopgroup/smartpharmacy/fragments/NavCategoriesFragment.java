@@ -5,7 +5,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -31,7 +30,7 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
     private static final String TAG = "NavCategoriesFragment";
 
     private RecyclerView categoriesRecyclerView;
-    private Toolbar toolbar;  // Replace ImageButton with Toolbar
+    private Toolbar toolbar;
     private CategoryListAdapter categoryAdapter;
     private List<Category> categoryList;
     private CollectionReference categoriesRef;
@@ -61,7 +60,6 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
 
         if (categoriesRecyclerView == null) {
             Log.e(TAG, "categoriesRecyclerView not found in layout");
-            Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -70,12 +68,10 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
         toolbar.inflateMenu(R.menu.menu_products);  // Inflate the menu with search and cart
         toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_search) {
-                Toast.makeText(requireContext(), "Search clicked", Toast.LENGTH_SHORT).show();
                 // Add search functionality here if needed
                 return true;
             } else if (item.getItemId() == R.id.action_cart) {
-                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
-                // Navigate to CartFragment here if needed
+                navigateToCartFragment();
                 return true;
             }
             return false;
@@ -84,7 +80,6 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
             if (isAdded()) {
-                Toast.makeText(requireContext(), "Please log in to view categories.", Toast.LENGTH_LONG).show();
                 requireActivity().getSupportFragmentManager()
                         .beginTransaction()
                         .replace(R.id.fragment_container, new LoginFragment())
@@ -110,7 +105,6 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
 
             if (error != null) {
                 Log.e(TAG, "Failed to load categories: " + error.getMessage());
-                Toast.makeText(requireContext(), "Failed to load categories: " + error.getMessage(), Toast.LENGTH_LONG).show();
                 return;
             }
 
@@ -133,10 +127,22 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
         });
     }
 
+    private void navigateToCartFragment() {
+        if (!isAdded()) return;
+
+        // Navigate to CartFragment
+        CartFragment cartFragment = new CartFragment();
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, cartFragment)
+                .addToBackStack(null) // Allows returning to NavCategoriesFragment
+                .commit();
+    }
+
     @Override
     public void onCategoryClick(Category category) {
         if (!isAdded()) return;
-        Toast.makeText(requireContext(), "Category clicked: " + category.getName(), Toast.LENGTH_SHORT).show();
+
         Bundle args = new Bundle();
         args.putString("categoryId", category.getId());
         args.putString("categoryName", category.getName());
@@ -161,6 +167,6 @@ public class NavCategoriesFragment extends Fragment implements CategoryListAdapt
             categoriesRecyclerView = null;
         }
         categoryAdapter = null;
-        toolbar = null;  // Clean up Toolbar reference
+        toolbar = null;
     }
 }

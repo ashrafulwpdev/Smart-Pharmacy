@@ -1,0 +1,22 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <size android:width="40dp" android:height="40dp"/>
+            <solid android:color="#22000000"/>
+            <padding android:bottom="2dp" android:top="2dp" android:left="2dp" android:right="2dp"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <size android:width="36dp" android:height="36dp"/>
+            <gradient
+                android:startColor="#FF6666"
+                android:endColor="#CC0000"
+                android:angle="45"/>
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_delete"
+        android:width="24dp"
+        android:height="24dp"
+        android:gravity="center"/>
+</layer-list>

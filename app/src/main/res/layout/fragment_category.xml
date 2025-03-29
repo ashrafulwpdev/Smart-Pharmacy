@@ -5,24 +5,15 @@
     android:layout_height="match_parent"
     android:padding="8dp">
 
-    <TextView
-        android:id="@+id/categoryTitle"
+    <!-- Toolbar replacing categoryTitle and viewAllCategories -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Categories"
-        android:textSize="18sp"
-        android:textStyle="bold"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@android:color/white"
+        app:title="All Categories"
+        app:titleTextColor="@android:color/black"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <TextView
-        android:id="@+id/viewAllCategories"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="View All"
-        android:textColor="#2196F3"
-        android:textSize="14sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/categoryTitle" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/categoriesRecyclerView"
@@ -30,9 +21,9 @@
         android:layout_height="0dp"
         android:padding="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/categoryTitle" />
+        app:layout_constraintTop_toBottomOf="@id/toolbar" />
 
-    <!-- Added Loading Spinner -->
+    <!-- Loading Spinner -->
     <com.airbnb.lottie.LottieAnimationView
         android:id="@+id/loadingSpinner"
         android:layout_width="wrap_content"

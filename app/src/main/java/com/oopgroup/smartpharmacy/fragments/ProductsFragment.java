@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
@@ -155,7 +156,12 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
         toolbar.inflateMenu(R.menu.menu_products);
         toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_cart) {
-                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
+                // Navigate to CartFragment
+                requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new CartFragment())
+                        .addToBackStack(null)
+                        .commit();
                 return true;
             }
             return false;
@@ -367,53 +373,46 @@ public class ProductsFragment extends Fragment implements BestsellerProductAdapt
 
         String userId = mAuth.getCurrentUser().getUid();
         double price = product.getDiscountedPrice() != 0 ? product.getDiscountedPrice() : product.getPrice();
-
-        // Check if item already exists in cart
-        db.collection("cart")
+        DocumentReference cartItemRef = db.collection("cart")
                 .document(userId)
                 .collection("items")
-                .whereEqualTo("productId", product.getId())
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    if (!querySnapshot.isEmpty()) {
-                        // Item exists, update quantity
-                        QueryDocumentSnapshot existingItem = (QueryDocumentSnapshot) querySnapshot.getDocuments().get(0);
-                        int currentQuantity = existingItem.getLong("quantity").intValue();
-                        double currentTotal = existingItem.getDouble("total");
+                .document(product.getId()); // Use productId as document ID
 
-                        db.collection("cart")
-                                .document(userId)
-                                .collection("items")
-                                .document(existingItem.getId())
-                                .update(
-                                        "quantity", currentQuantity + 1,
-                                        "total", currentTotal + price,
-                                        "addedAt", com.google.firebase.Timestamp.now()
-                                )
-                                .addOnSuccessListener(aVoid -> {
-                                    Toast.makeText(getContext(), product.getName() + " quantity updated in cart!", Toast.LENGTH_SHORT).show();
-                                });
-                    } else {
-                        // New item, add it
-                        Map<String, Object> cartItem = new HashMap<>();
-                        cartItem.put("productId", product.getId());
-                        cartItem.put("quantity", 1);
-                        cartItem.put("total", price);
-                        cartItem.put("addedAt", com.google.firebase.Timestamp.now());
+        // Check if the item already exists in the cart
+        cartItemRef.get().addOnSuccessListener(documentSnapshot -> {
+            if (documentSnapshot.exists()) {
+                // Item exists, update quantity
+                int currentQuantity = documentSnapshot.getLong("quantity").intValue();
+                double currentTotal = documentSnapshot.getDouble("total");
 
-                        db.collection("cart")
-                                .document(userId)
-                                .collection("items")
-                                .add(cartItem)
-                                .addOnSuccessListener(documentReference -> {
-                                    Toast.makeText(getContext(), product.getName() + " added to cart!", Toast.LENGTH_SHORT).show();
-                                });
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to add to cart: " + e.getMessage());
-                    Toast.makeText(getContext(), "Failed to add to cart: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                cartItemRef.update(
+                        "quantity", currentQuantity + 1,
+                        "total", currentTotal + price,
+                        "addedAt", com.google.firebase.Timestamp.now()
+                ).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(getContext(), product.getName() + " quantity updated in cart!", Toast.LENGTH_SHORT).show();
                 });
+            } else {
+                // New item, add it with all necessary fields
+                Map<String, Object> cartItem = new HashMap<>();
+                cartItem.put("productId", product.getId());
+                cartItem.put("productName", product.getName());
+                cartItem.put("imageUrl", product.getImageUrl());
+                cartItem.put("quantity", 1);
+                cartItem.put("total", price);
+                cartItem.put("originalPrice", product.getOriginalPrice());
+                cartItem.put("discountedPrice", product.getDiscountedPrice());
+                cartItem.put("discountPercentage", product.getDiscountPercentage());
+                cartItem.put("addedAt", com.google.firebase.Timestamp.now());
+
+                cartItemRef.set(cartItem).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(getContext(), product.getName() + " added to cart!", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to add to cart: " + e.getMessage());
+            Toast.makeText(getContext(), "Failed to add to cart: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        });
     }
 
     @Override

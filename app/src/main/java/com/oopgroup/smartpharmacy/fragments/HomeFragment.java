@@ -593,8 +593,14 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
 
     private void onCartClick() {
         if (!isAdded() || isLoading) return;
-        Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
-        // Optionally navigate to a CartFragment here
+
+        // Navigate to CartFragment
+        CartFragment cartFragment = new CartFragment();
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, cartFragment)
+                .addToBackStack(null) // Allows user to return to HomeFragment
+                .commit();
     }
 
     private void onScanClick() {
@@ -722,11 +728,16 @@ public class HomeFragment extends Fragment implements CategoryGridAdapter.OnCate
                                     }
                                 });
                     } else {
-                        // New item, add it
+                        // New item, add it with full details
                         Map<String, Object> cartItem = new HashMap<>();
                         cartItem.put("productId", product.getId());
+                        cartItem.put("productName", product.getName());
+                        cartItem.put("imageUrl", product.getImageUrl());
                         cartItem.put("quantity", 1);
                         cartItem.put("total", price);
+                        cartItem.put("originalPrice", product.getPrice());
+                        cartItem.put("discountedPrice", product.getDiscountedPrice());
+                        cartItem.put("discountPercentage", product.getDiscountedPrice() > 0 ? ((product.getPrice() - product.getDiscountedPrice()) / product.getPrice() * 100) : 0);
                         cartItem.put("addedAt", com.google.firebase.Timestamp.now());
 
                         db.collection("cart")

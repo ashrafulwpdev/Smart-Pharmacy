@@ -1,66 +1,570 @@
 package com.oopgroup.smartpharmacy.fragments;
 
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-
-import androidx.fragment.app.Fragment;
-
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
+import com.oopgroup.smartpharmacy.adapters.CartAdapter;
+import com.oopgroup.smartpharmacy.models.CartItem;
 
-/**
- * A simple {@link Fragment} subclass.
- * Use the {@link CartFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
-public class CartFragment extends Fragment {
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
+public class CartFragment extends Fragment implements CartAdapter.OnQuantityChangeListener, AddressDialogFragment.OnAddressSelectedListener {
+    private static final String TAG = "CartFragment";
+    private static final String CURRENCY = "RM"; // Currency symbol
 
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
+    private RecyclerView rvCartItems;
+    private SwipeRefreshLayout swipeRefreshLayout;
+    private TextView tvItemTotal, tvDiscount, tvDeliveryFee, tvItemCount, tvOriginalPrice, tvSummarySavedAmount;
+    private EditText etCoupon;
+    private Button btnApplyCoupon;
+    private MaterialButton btnSelectAddress;
+    private MaterialButton btnChangeAddress;
+    private Toolbar toolbar;
+    private SearchView searchView;
+    private FirebaseFirestore db;
+    private FirebaseAuth mAuth;
+    private List<CartItem> cartItems;
+    private CartAdapter cartAdapter;
+    private LinearLayout emptyCartLayout;
+    private LinearLayout mainContentLayout;
+    private Button btnGoShopping;
+    private long lastUpdateTime = 0;
+    private static final long DEBOUNCE_DELAY = 500;
 
-    public CartFragment() {
-        // Required empty public constructor
-    }
+    private double itemTotal = 0.0;
+    private double originalTotal = 0.0;
+    private double discount = 0.0;
+    private double deliveryFee = 0.0;
+    private double grandTotal = 0.0;
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment CartFragment.
-     */
-    // TODO: Rename and change types and number of parameters
-    public static CartFragment newInstance(String param1, String param2) {
-        CartFragment fragment = new CartFragment();
-        Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
-        fragment.setArguments(args);
-        return fragment;
+    private String selectedAddressId; // Store the Firestore document ID of the selected address
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_cart, container, false);
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        Log.d(TAG, "onViewCreated called");
+
+        // Initialize views
+        toolbar = view.findViewById(R.id.toolbar);
+        rvCartItems = view.findViewById(R.id.rv_cart_items);
+        swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
+        tvItemTotal = view.findViewById(R.id.tv_item_total);
+        tvDiscount = view.findViewById(R.id.tv_discount);
+        tvDeliveryFee = view.findViewById(R.id.tv_delivery_fee);
+        tvItemCount = view.findViewById(R.id.tv_item_count);
+        tvOriginalPrice = view.findViewById(R.id.tv_original_price);
+        tvSummarySavedAmount = view.findViewById(R.id.tv_summary_saved_amount);
+        etCoupon = view.findViewById(R.id.et_coupon);
+        btnApplyCoupon = view.findViewById(R.id.btn_apply_coupon);
+        btnSelectAddress = view.findViewById(R.id.btn_select_address);
+        btnChangeAddress = view.findViewById(R.id.btn_change_address);
+        emptyCartLayout = view.findViewById(R.id.empty_cart_layout);
+        mainContentLayout = view.findViewById(R.id.main_content_layout);
+        btnGoShopping = view.findViewById(R.id.btn_go_shopping);
+
+        // Initialize Firestore and Auth
+        db = FirebaseFirestore.getInstance();
+        mAuth = FirebaseAuth.getInstance();
+
+        // Check if user is logged in
+        if (mAuth.getCurrentUser() == null) {
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new LoginFragment())
+                    .commit();
+            return;
+        }
+
+        // Setup Toolbar
+        setupToolbar();
+
+        // Initialize cart items list and adapter
+        cartItems = new ArrayList<>();
+        cartAdapter = new CartAdapter(getContext(), cartItems, this);
+        rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
+        rvCartItems.setAdapter(cartAdapter);
+
+        // Fetch cart items and initial address
+        fetchCartItems();
+        fetchInitialAddress();
+
+        // Apply coupon button click listener
+        btnApplyCoupon.setOnClickListener(v -> {
+            String couponCode = etCoupon.getText().toString().trim();
+            if (!couponCode.isEmpty()) {
+                applyCoupon(couponCode);
+            }
+        });
+
+        // Set click listener for Change Address button
+        btnChangeAddress.setOnClickListener(v -> showAddressDialog());
+
+        // Set click listener for Select Address button
+        btnSelectAddress.setOnClickListener(v -> {
+            if (cartItems.isEmpty()) {
+                Log.w(TAG, "Cart is empty, cannot proceed to checkout");
+                return;
+            }
+            if (selectedAddressId == null) {
+                showAddressDialog();
+            } else {
+                updateSummary();
+                CheckoutFragment checkoutFragment = new CheckoutFragment();
+                Bundle args = new Bundle();
+                args.putString("selected_address_id", selectedAddressId);
+                args.putDouble("grand_total", grandTotal);
+                args.putDouble("discount", discount); // Pass discount
+                args.putDouble("delivery_fee", deliveryFee); // Pass delivery fee
+                checkoutFragment.setArguments(args);
+                requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, checkoutFragment)
+                        .addToBackStack("CheckoutFragment")
+                        .commit();
+            }
+        });
+
+        // Setup Swipe-to-Refresh
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            fetchCartItems();
+            fetchInitialAddress();
+            swipeRefreshLayout.setRefreshing(false);
+        });
+
+        // Swipe-to-delete with premium icon and animation
+        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
+            private final Drawable backgroundDrawable;
+            private final Drawable deleteIcon;
+            private final int iconMargin = (int) (12 * getResources().getDisplayMetrics().density);
+
+            {
+                backgroundDrawable = ContextCompat.getDrawable(getContext(), R.drawable.swipe_background);
+                deleteIcon = ContextCompat.getDrawable(getContext(), R.drawable.premium_delete_icon);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int position = viewHolder.getAdapterPosition();
+                CartItem itemToDelete = cartItems.get(position);
+                Animation deleteAnimation = AnimationUtils.loadAnimation(getContext(), R.anim.delete_animation);
+                viewHolder.itemView.startAnimation(deleteAnimation);
+                deleteAnimation.setAnimationListener(new Animation.AnimationListener() {
+                    @Override
+                    public void onAnimationStart(Animation animation) {}
+                    @Override
+                    public void onAnimationEnd(Animation animation) {
+                        removeItem(position, itemToDelete);
+                    }
+                    @Override
+                    public void onAnimationRepeat(Animation animation) {}
+                });
+            }
+
+            private void removeItem(int position, CartItem itemToDelete) {
+                String userId = mAuth.getCurrentUser().getUid();
+                db.collection("cart")
+                        .document(userId)
+                        .collection("items")
+                        .document(itemToDelete.getProductId()) // Use productId as document ID
+                        .delete()
+                        .addOnSuccessListener(aVoid -> {
+                            requireActivity().runOnUiThread(() -> {
+                                cartItems.remove(position);
+                                cartAdapter.notifyItemRemoved(position);
+                                updateSummary();
+                                updateCartVisibility();
+                            });
+                        })
+                        .addOnFailureListener(e -> {
+                            requireActivity().runOnUiThread(() -> cartAdapter.notifyItemChanged(position));
+                        });
+            }
+
+            @Override
+            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder,
+                                    float dX, float dY, int actionState, boolean isCurrentlyActive) {
+                if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
+                    View itemView = viewHolder.itemView;
+                    float left = itemView.getRight() + dX;
+                    float right = itemView.getRight();
+                    if (left < itemView.getLeft()) left = itemView.getLeft();
+                    if (backgroundDrawable != null) {
+                        backgroundDrawable.setBounds((int) left, itemView.getTop(), (int) right, itemView.getBottom());
+                        backgroundDrawable.draw(c);
+                    }
+                    if (deleteIcon != null) {
+                        int iconWidth = deleteIcon.getIntrinsicWidth();
+                        int iconHeight = deleteIcon.getIntrinsicHeight();
+                        int iconTop = itemView.getTop() + (itemView.getBottom() - itemView.getTop() - iconHeight) / 2;
+                        int iconBottom = iconTop + iconHeight;
+                        int iconRight = (int) (itemView.getRight() - iconMargin);
+                        int iconLeft = iconRight - iconWidth;
+                        if (iconLeft < left + iconMargin) {
+                            iconLeft = (int) (left + iconMargin);
+                            iconRight = iconLeft + iconWidth;
+                        }
+                        deleteIcon.setBounds(iconLeft, iconTop, iconRight, iconBottom);
+                        deleteIcon.draw(c);
+                    }
+                    super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
+                }
+            }
+        });
+        itemTouchHelper.attachToRecyclerView(rvCartItems);
+
+        // Go Shopping button listener
+        btnGoShopping.setOnClickListener(v -> {
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).navigateToHome();
+            } else {
+                Log.e(TAG, "Activity is not MainActivity, cannot navigate to HomeFragment");
+            }
+        });
+
+        // Hide bottom navigation bar
+        hideBottomNavigation();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        hideBottomNavigation();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        hideBottomNavigation();
+        fetchCartItems();
+    }
+
+    private void hideBottomNavigation() {
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).hideBottomNav();
+            Log.d(TAG, "hideBottomNav() called in CartFragment");
+        } else {
+            Log.e(TAG, "Activity is not MainActivity, cannot hide bottom nav");
+        }
+    }
+
+    private void setupToolbar() {
+        toolbar.setTitle("Shopping Cart");
+        toolbar.setNavigationOnClickListener(v -> {
+            if (searchView != null && !searchView.isIconified()) {
+                searchView.setQuery("", false);
+                searchView.setIconified(true);
+                toolbar.setTitle("Shopping Cart");
+                return;
+            }
+            requireActivity().getSupportFragmentManager().popBackStack();
+        });
+
+        toolbar.inflateMenu(R.menu.menu_cart);
+        toolbar.setOnMenuItemClickListener(item -> item.getItemId() == R.id.action_search);
+
+        searchView = (SearchView) toolbar.getMenu().findItem(R.id.action_search).getActionView();
+        searchView.setQueryHint("Search products...");
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return true;
+            }
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                return true;
+            }
+        });
+
+        toolbar.getMenu().findItem(R.id.action_search).setOnActionExpandListener(new android.view.MenuItem.OnActionExpandListener() {
+            @Override
+            public boolean onMenuItemActionExpand(android.view.MenuItem item) {
+                return true;
+            }
+            @Override
+            public boolean onMenuItemActionCollapse(android.view.MenuItem item) {
+                toolbar.setTitle("Shopping Cart");
+                return true;
+            }
+        });
+    }
+
+    private void fetchCartItems() {
+        String userId = mAuth.getCurrentUser().getUid();
+        db.collection("cart")
+                .document(userId)
+                .collection("items")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    // Group items by productId to merge duplicates
+                    Map<String, CartItem> mergedItems = new HashMap<>();
+                    List<DocumentReference> docsToDelete = new ArrayList<>();
+
+                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                        CartItem cartItem = doc.toObject(CartItem.class);
+                        cartItem.setId(doc.getId());
+                        String productId = cartItem.getProductId();
+
+                        if (mergedItems.containsKey(productId)) {
+                            // Merge with existing item
+                            CartItem existingItem = mergedItems.get(productId);
+                            int newQuantity = existingItem.getQuantity() + cartItem.getQuantity();
+                            double newTotal = existingItem.getTotal() + cartItem.getTotal();
+                            existingItem.setQuantity(newQuantity);
+                            existingItem.setTotal(newTotal);
+                            if (!doc.getId().equals(productId)) {
+                                docsToDelete.add(db.collection("cart").document(userId).collection("items").document(doc.getId()));
+                            }
+                        } else {
+                            mergedItems.put(productId, cartItem);
+                            if (!doc.getId().equals(productId)) {
+                                // If the document ID doesn't match the productId, we'll need to update it
+                                docsToDelete.add(db.collection("cart").document(userId).collection("items").document(doc.getId()));
+                            }
+                        }
+                    }
+
+                    // Delete duplicate or incorrectly ID'd documents
+                    for (DocumentReference docRef : docsToDelete) {
+                        docRef.delete();
+                    }
+
+                    // Update merged items in Firestore with correct document ID (productId)
+                    for (CartItem item : mergedItems.values()) {
+                        db.collection("cart").document(userId)
+                                .collection("items")
+                                .document(item.getProductId()) // Use productId as document ID
+                                .set(item);
+                    }
+
+                    List<CartItem> newCartItems = new ArrayList<>(mergedItems.values());
+                    updateCartItems(newCartItems);
+                    Log.d(TAG, "Fetched and merged cart items: " + newCartItems.size());
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to fetch cart items: " + e.getMessage()));
+    }
+
+    private void fetchInitialAddress() {
+        String userId = mAuth.getCurrentUser().getUid();
+        // First, try to load the last selected address
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists() && documentSnapshot.contains("lastSelectedAddressId")) {
+                        selectedAddressId = documentSnapshot.getString("lastSelectedAddressId");
+                        updateButtonState();
+                    } else {
+                        // Fallback to default address
+                        db.collection("users")
+                                .document(userId)
+                                .collection("addresses")
+                                .whereEqualTo("isDefault", true)
+                                .limit(1)
+                                .get()
+                                .addOnSuccessListener(queryDocumentSnapshots -> {
+                                    if (!queryDocumentSnapshots.isEmpty()) {
+                                        QueryDocumentSnapshot doc = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments().get(0);
+                                        selectedAddressId = doc.getId();
+                                        saveSelectedAddress(selectedAddressId);
+                                        updateButtonState();
+                                    } else {
+                                        selectedAddressId = null;
+                                        updateButtonState();
+                                    }
+                                });
+                    }
+                });
+    }
+
+    private void saveSelectedAddress(String addressId) {
+        String userId = mAuth.getCurrentUser().getUid();
+        db.collection("users")
+                .document(userId)
+                .update("lastSelectedAddressId", addressId)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Selected address saved: " + addressId))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to save selected address: " + e.getMessage()));
+    }
+
+    private void applyCoupon(String couponCode) {
+        discount = 2.00; // Example discount, replace with actual logic
+        updateSummary();
+    }
+
+    private void updateSummary() {
+        originalTotal = 0.0;
+        itemTotal = 0.0;
+        for (CartItem item : cartItems) {
+            originalTotal += item.getOriginalPrice() * item.getQuantity();
+            itemTotal += item.getTotal();
+        }
+        grandTotal = itemTotal - discount + deliveryFee;
+        double savedAmount = originalTotal - grandTotal;
+
+        tvItemTotal.setText(String.format("%s %.2f", CURRENCY, itemTotal));
+        tvDiscount.setText(String.format("%s %.2f", CURRENCY, discount));
+        tvDeliveryFee.setText(deliveryFee == 0.0 ? "Free" : String.format("%s %.2f", CURRENCY, deliveryFee));
+        tvItemCount.setText(String.format("%d items", cartItems.size()));
+        tvOriginalPrice.setText(String.format("%s %.2f", CURRENCY, grandTotal));
+        tvSummarySavedAmount.setText(String.format("%s %.2f", CURRENCY, savedAmount));
+        tvSummarySavedAmount.setVisibility(savedAmount > 0 ? View.VISIBLE : View.GONE);
+        ((View) tvSummarySavedAmount.getParent()).findViewById(R.id.label_summary_saved_amount).setVisibility(savedAmount > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    @Override
+    public void onQuantityChanged(CartItem cartItem, int newQuantity) {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastUpdateTime < DEBOUNCE_DELAY) return;
+        lastUpdateTime = currentTime;
+
+        String userId = mAuth.getCurrentUser().getUid();
+        double price = cartItem.getDiscountedPrice() != 0 ? cartItem.getDiscountedPrice() : cartItem.getOriginalPrice(); // Fixed typo: item -> cartItem
+        double newTotal = price * newQuantity;
+
+        DocumentReference cartItemRef = db.collection("cart")
+                .document(userId)
+                .collection("items")
+                .document(cartItem.getProductId()); // Use productId as document ID
+
+        if (newQuantity > 0) {
+            cartItemRef.update(
+                    "quantity", newQuantity,
+                    "total", newTotal,
+                    "addedAt", com.google.firebase.Timestamp.now()
+            ).addOnSuccessListener(aVoid -> {
+                cartItem.setTotal(newTotal);
+                cartItem.setQuantity(newQuantity);
+                updateSummary();
+                updateCartVisibility();
+            });
+        } else {
+            cartItemRef.delete().addOnSuccessListener(aVoid -> {
+                cartItems.remove(cartItem);
+                cartAdapter.notifyDataSetChanged();
+                updateSummary();
+                updateCartVisibility();
+            });
         }
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_cart, container, false);
+    public void onAddressSelected(String addressId, String address) {
+        selectedAddressId = addressId;
+        saveSelectedAddress(addressId);
+        updateButtonState();
+    }
+
+    private void showAddressDialog() {
+        AddressDialogFragment dialog = new AddressDialogFragment();
+        dialog.setOnAddressSelectedListener(this::onAddressSelected);
+        dialog.show(getChildFragmentManager(), "AddressDialogFragment");
+    }
+
+    private void updateButtonState() {
+        if (selectedAddressId == null) {
+            btnSelectAddress.setText("Select Address");
+            btnSelectAddress.setTextColor(getResources().getColor(android.R.color.black));
+            btnSelectAddress.setBackgroundResource(R.drawable.btn_interactive_white);
+            btnChangeAddress.setVisibility(View.GONE);
+        } else {
+            btnSelectAddress.setText("Checkout");
+            btnSelectAddress.setTextColor(getResources().getColor(android.R.color.black));
+            btnSelectAddress.setBackgroundResource(R.drawable.btn_interactive_white);
+            btnChangeAddress.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void updateCartVisibility() {
+        if (cartItems.isEmpty()) {
+            emptyCartLayout.setVisibility(View.VISIBLE);
+            mainContentLayout.setVisibility(View.GONE);
+        } else {
+            emptyCartLayout.setVisibility(View.GONE);
+            mainContentLayout.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private static class CartDiffCallback extends DiffUtil.Callback {
+        private final List<CartItem> oldList;
+        private final List<CartItem> newList;
+
+        CartDiffCallback(List<CartItem> oldList, List<CartItem> newList) {
+            this.oldList = oldList;
+            this.newList = newList;
+        }
+
+        @Override
+        public int getOldListSize() {
+            return oldList.size();
+        }
+
+        @Override
+        public int getNewListSize() {
+            return newList.size();
+        }
+
+        @Override
+        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+            return oldList.get(oldItemPosition).getId().equals(newList.get(newItemPosition).getId());
+        }
+
+        @Override
+        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+            CartItem oldItem = oldList.get(oldItemPosition);
+            CartItem newItem = newList.get(newItemPosition);
+            return oldItem.getQuantity() == newItem.getQuantity() && oldItem.getTotal() == newItem.getTotal();
+        }
+    }
+
+    private void updateCartItems(List<CartItem> newCartItems) {
+        DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new CartDiffCallback(cartItems, newCartItems));
+        cartItems.clear();
+        cartItems.addAll(newCartItems);
+        diffResult.dispatchUpdatesTo(cartAdapter);
+        updateSummary();
+        updateCartVisibility();
     }
 }

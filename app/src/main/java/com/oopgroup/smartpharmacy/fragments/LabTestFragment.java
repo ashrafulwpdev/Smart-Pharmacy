@@ -32,7 +32,7 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
     private static final String TAG = "LabTestFragment";
 
     private RecyclerView labTestsRecyclerView;
-    private Toolbar toolbar;  // Replace TextView with Toolbar
+    private Toolbar toolbar;
     private LabTestGridAdapter labTestAdapter;
     private List<LabTest> labTestList;
     private CollectionReference labTestsRef;
@@ -75,8 +75,8 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
                 // Add search functionality here if needed
                 return true;
             } else if (item.getItemId() == R.id.action_cart) {
-                Toast.makeText(requireContext(), "Cart clicked", Toast.LENGTH_SHORT).show();
-                // Navigate to CartFragment here if needed
+                // Navigate to CartFragment
+                navigateToCartFragment();
                 return true;
             }
             return false;
@@ -134,10 +134,22 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
         });
     }
 
+    private void navigateToCartFragment() {
+        if (!isAdded()) return;
+
+        // Navigate to CartFragment
+        CartFragment cartFragment = new CartFragment();
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, cartFragment)
+                .addToBackStack(null) // Allows returning to LabTestFragment
+                .commit();
+
+    }
+
     @Override
     public void onLabTestClick(LabTest labTest) {
         if (!isAdded()) return;
-        Toast.makeText(requireContext(), "Lab Test clicked: " + labTest.getName(), Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -152,6 +164,6 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
         }
         labTestAdapter = null;
         labTestsRecyclerView = null;
-        toolbar = null;  // Clean up Toolbar reference
+        toolbar = null;
     }
 }

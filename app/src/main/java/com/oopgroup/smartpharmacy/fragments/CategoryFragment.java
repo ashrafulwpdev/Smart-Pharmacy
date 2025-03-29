@@ -5,11 +5,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -31,7 +30,7 @@ import java.util.List;
 public class CategoryFragment extends Fragment implements CategoryGridAdapter.OnCategoryClickListener {
 
     private RecyclerView categoriesRecyclerView;
-    private TextView categoryTitle, viewAllCategories;
+    private Toolbar toolbar; // Replaced TextView with Toolbar
     private CategoryGridAdapter categoryAdapter;
     private List<Category> categoryList;
     private CollectionReference categoriesRef;
@@ -61,7 +60,6 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         // Check if user is authenticated
         if (mAuth.getCurrentUser() == null) {
             if (isAdded()) {
-                Toast.makeText(requireContext(), "Please log in to view categories.", Toast.LENGTH_LONG).show();
                 requireActivity().getSupportFragmentManager()
                         .beginTransaction()
                         .replace(R.id.fragment_container, new LoginFragment())
@@ -78,17 +76,27 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
     }
 
     private void initializeUI(View view) {
-        categoryTitle = view.findViewById(R.id.categoryTitle);
-        viewAllCategories = view.findViewById(R.id.viewAllCategories);
+        toolbar = view.findViewById(R.id.toolbar); // Initialize Toolbar
         categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView);
 
         if (categoriesRecyclerView == null) {
             Log.e(TAG, "categoriesRecyclerView not found in layout");
-            if (isAdded()) {
-                Toast.makeText(requireContext(), "Error: Categories view not found", Toast.LENGTH_LONG).show();
-            }
             return;
         }
+
+        // Set up Toolbar
+        toolbar.setTitle("All Categories");
+        toolbar.inflateMenu(R.menu.menu_products); // Inflate menu with search and cart
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_search) {
+                // Add search functionality here if needed
+                return true;
+            } else if (item.getItemId() == R.id.action_cart) {
+                navigateToCartFragment();
+                return true;
+            }
+            return false;
+        });
 
         // Initialize LoadingSpinnerUtil
         loadingSpinnerUtil = LoadingSpinnerUtil.initialize(requireContext(), view, R.id.loadingSpinner);
@@ -108,19 +116,6 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         categoriesRecyclerView.setLayoutManager(gridLayoutManager);
         categoriesRecyclerView.setAdapter(categoryAdapter);
         categoriesRecyclerView.setHasFixedSize(true);
-
-        // Set up "View All" click listener
-        if (viewAllCategories != null) {
-            viewAllCategories.setOnClickListener(v -> {
-                if (isAdded() && !isLoading) {
-                    requireActivity().getSupportFragmentManager()
-                            .beginTransaction()
-                            .replace(R.id.fragment_container, new NavCategoriesFragment())
-                            .addToBackStack(null)
-                            .commit();
-                }
-            });
-        }
     }
 
     private void fetchCategories() {
@@ -138,16 +133,13 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
 
             if (error != null) {
                 Log.e(TAG, "Failed to load categories: " + error.getMessage());
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), "Failed to load categories: " + error.getMessage(), Toast.LENGTH_LONG).show();
-                }
                 checkLoadingComplete();
                 return;
             }
 
             categoryList.clear();
             if (snapshot != null) {
-                for (QueryDocumentSnapshot doc : snapshot) {  // Fixed: Iterate directly over QuerySnapshot
+                for (QueryDocumentSnapshot doc : snapshot) {
                     String id = doc.getId();
                     String name = doc.getString("name");
                     Long productCountLong = doc.getLong("productCount");
@@ -166,6 +158,18 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         });
     }
 
+    private void navigateToCartFragment() {
+        if (!isAdded()) return;
+
+        // Navigate to CartFragment
+        CartFragment cartFragment = new CartFragment();
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, cartFragment)
+                .addToBackStack(null) // Allows returning to CategoryFragment
+                .commit();
+    }
+
     private void checkLoadingComplete() {
         isLoading = false;
         if (loadingSpinnerUtil != null) {
@@ -176,7 +180,6 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
 
     private void disableUserInteractions(boolean disable) {
         if (categoriesRecyclerView != null) categoriesRecyclerView.setEnabled(!disable);
-        if (viewAllCategories != null) viewAllCategories.setEnabled(!disable);
     }
 
     @Override
@@ -206,8 +209,7 @@ public class CategoryFragment extends Fragment implements CategoryGridAdapter.On
         }
         categoryAdapter = null;
         categoriesRecyclerView = null;
-        categoryTitle = null;
-        viewAllCategories = null;
+        toolbar = null; // Clean up Toolbar reference
         loadingSpinnerUtil = null;
     }
 }

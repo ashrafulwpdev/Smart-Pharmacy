@@ -18,8 +18,10 @@ import androidx.fragment.app.FragmentManager;
 import com.oopgroup.smartpharmacy.fragments.NavCategoriesFragment;
 import com.oopgroup.smartpharmacy.fragments.HomeFragment;
 import com.oopgroup.smartpharmacy.fragments.LabTestFragment;
+import com.oopgroup.smartpharmacy.fragments.ProductDetailsFragment;
 import com.oopgroup.smartpharmacy.fragments.ProfileFragment;
 import com.oopgroup.smartpharmacy.fragments.ScannerFragment;
+import com.oopgroup.smartpharmacy.fragments.CartFragment;
 import com.oopgroup.smartpharmacy.utils.BaseActivity;
 
 public class MainActivity extends BaseActivity {
@@ -42,7 +44,7 @@ public class MainActivity extends BaseActivity {
 
         initializeUI();
         setupNavigationListeners();
-        setupBackStackListener(); // Add back stack listener
+        setupBackStackListener();
 
         // Set up the modern back press handling
         setupBackPressedCallback();
@@ -128,6 +130,9 @@ public class MainActivity extends BaseActivity {
             transaction.addToBackStack(null);
         }
         transaction.commit();
+
+        // Update bottom navigation visibility and selection state
+        updateBottomNavForFragment(fragment);
     }
 
     public void navigateToProfile() {
@@ -251,38 +256,56 @@ public class MainActivity extends BaseActivity {
 
     private void updateBottomNavOnBack() {
         Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        updateBottomNavForFragment(currentFragment);
+    }
+
+    private void updateBottomNavForFragment(Fragment currentFragment) {
         if (currentFragment != null) {
             Log.d(TAG, "Updating bottom nav for fragment: " + currentFragment.getClass().getSimpleName());
             if (currentFragment instanceof HomeFragment) {
                 setSelectedNavItem(navHome, icHome, homeIndicator);
+                showBottomNav();
             } else if (currentFragment instanceof NavCategoriesFragment) {
                 setSelectedNavItem(navCategories, icCategories, categoriesIndicator);
+                showBottomNav();
             } else if (currentFragment instanceof ScannerFragment) {
                 setSelectedNavItem(navScanner, icScanner, scannerIndicator);
+                showBottomNav();
             } else if (currentFragment instanceof LabTestFragment) {
                 setSelectedNavItem(navLabTest, icLabTest, labTestIndicator);
+                showBottomNav();
             } else if (currentFragment instanceof ProfileFragment) {
                 setSelectedNavItem(navProfile, icProfile, profileIndicator);
+                showBottomNav();
+            } else if (currentFragment instanceof ProductDetailsFragment || currentFragment instanceof CartFragment) {
+                hideBottomNav();
+                Log.d(TAG, "Bottom nav hidden for " + currentFragment.getClass().getSimpleName());
+            } else {
+                // Default behavior for other fragments (e.g., ProductsFragment, CheckoutFragment)
+                hideBottomNav();
+                Log.d(TAG, "Bottom nav hidden for unhandled fragment: " + currentFragment.getClass().getSimpleName());
             }
-            // Note: Fragments like ProductDetailsFragment or ProductsFragment won't update the bottom nav
-            // as they are not directly tied to a bottom nav item
+        } else {
+            hideBottomNav();
+            Log.d(TAG, "No current fragment, hiding bottom nav");
         }
-    }
-
-    @Override
-    public void onBackPressed() {
-        super.onBackPressed(); // Call super to let dispatcher handle it
     }
 
     public void showBottomNav() {
         if (bottomNav != null) {
             bottomNav.setVisibility(View.VISIBLE);
+            Log.d(TAG, "Bottom nav shown");
+        } else {
+            Log.e(TAG, "bottomNav is null in showBottomNav");
         }
     }
 
     public void hideBottomNav() {
         if (bottomNav != null) {
             bottomNav.setVisibility(View.GONE);
+            Log.d(TAG, "Bottom nav hidden in MainActivity");
+        } else {
+            Log.e(TAG, "bottomNav is null in hideBottomNav");
         }
     }
 }
