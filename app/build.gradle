@@ -28,7 +28,7 @@ android {
 dependencies {
     // Core Android dependencies
     implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "com.google.android.material:material:1.10.0"
+    implementation "com.google.android.material:material:1.12.0" // Remove the force block
     implementation "androidx.activity:activity:1.8.1"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.fragment:fragment:1.6.2"
@@ -49,7 +49,7 @@ dependencies {
     implementation "com.google.firebase:firebase-appcheck-debug" // Debug only
 
     // Google Play Services (no explicit versions unless required)
-    implementation "com.google.android.gms:play-services-auth:21.2.0"// For Google Sign-In
+    implementation "com.google.android.gms:play-services-auth:21.2.0" // For Google Sign-In
     implementation "com.google.android.gms:play-services-base" // For availability checks
 
     // Social Media Login
@@ -70,4 +70,11 @@ dependencies {
 
     // ViewPager2
     implementation "androidx.viewpager2:viewpager2:1.0.0"
+}
+
+// Force the Material Components version using resolutionStrategy
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.android.material:material:1.12.0'
+    }
 }

@@ -12,13 +12,6 @@
         <item name="buttonStyle">@style/Widget.App.Button</item>
     </style>
 
-    <!-- Tab Text Appearance -->
-    <style name="TabTextAppearance" parent="TextAppearance.MaterialComponents.Subtitle1">
-        <item name="android:textSize">14sp</item>
-        <item name="android:textStyle">normal</item>
-        <item name="android:textColor">@color/text_secondary</item>
-    </style>
-
     <!-- Custom Button Style -->
     <style name="Widget.App.Button" parent="Widget.MaterialComponents.Button">
         <item name="android:textSize">16sp</item>
@@ -50,5 +43,16 @@
         <item name="android:stateListAnimator">@null</item>
     </style>
 
+    <style name="TabTextAppearance" parent="TextAppearance.AppCompat">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
 
+
+    <!-- Custom RatingBar Style -->
+    <style name="CustomRatingBar" parent="Widget.AppCompat.RatingBar">
+        <item name="android:minHeight">28dp</item>
+        <item name="android:maxHeight">28dp</item>
+        <item name="android:progressDrawable">@drawable/custom_rating_bar_selector</item>
+    </style>
 </resources>

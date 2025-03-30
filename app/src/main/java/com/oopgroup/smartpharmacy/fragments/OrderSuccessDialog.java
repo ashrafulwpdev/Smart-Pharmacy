@@ -12,11 +12,12 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
 
 import com.google.android.material.button.MaterialButton;
+import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
 
 public class OrderSuccessDialog extends DialogFragment {
 
-    private MaterialButton doneButton;
+    private MaterialButton viewOrdersButton, doneButton;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -34,6 +35,7 @@ public class OrderSuccessDialog extends DialogFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        viewOrdersButton = view.findViewById(R.id.viewOrdersButton);
         doneButton = view.findViewById(R.id.doneButton);
 
         // Set dialog properties
@@ -44,11 +46,36 @@ public class OrderSuccessDialog extends DialogFragment {
             getDialog().getWindow().getDecorView().setPadding(16, 0, 16, 0);
         }
 
+        // View Orders button listener
+        viewOrdersButton.setOnClickListener(v -> {
+            // Navigate to OrderFragment
+            FragmentManager fragmentManager = requireActivity().getSupportFragmentManager();
+            // Clear the back stack up to the MainActivity (or CartFragment) to avoid deep nesting
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            fragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, new OrderFragment())
+                    .addToBackStack("OrderFragment")
+                    .commit();
+
+            // Show the bottom navigation bar if hidden
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).showBottomNav();
+            }
+
+            // Dismiss the dialog
+            dismiss();
+        });
+
         // Done button listener
         doneButton.setOnClickListener(v -> {
             // Pop the CheckoutFragment from the back stack to return to CartFragment
             FragmentManager fragmentManager = requireActivity().getSupportFragmentManager();
             fragmentManager.popBackStack("CheckoutFragment", 0); // Pop back to CheckoutFragment's entry
+
+            // Show the bottom navigation bar if hidden
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).showBottomNav();
+            }
 
             // Dismiss the dialog
             dismiss();

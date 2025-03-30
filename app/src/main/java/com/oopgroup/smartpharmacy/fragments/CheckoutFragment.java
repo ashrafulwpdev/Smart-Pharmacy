@@ -18,23 +18,24 @@ import androidx.fragment.app.Fragment;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
-import com.oopgroup.smartpharmacy.models.CartItem;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class CheckoutFragment extends Fragment {
 
     private static final String TAG = "CheckoutFragment";
-    private static final String CURRENCY = "RM"; // Currency symbol
+    private static final String CURRENCY = "RM";
 
     private RadioButton radioCreditCard, radioPaypal, radioCashOnDelivery;
     private LinearLayout creditCardFields;
@@ -48,6 +49,8 @@ public class CheckoutFragment extends Fragment {
     private double grandTotal;
     private double discount;
     private double deliveryFee;
+    private List<Map<String, Object>> reorderItems; // For reorder case
+    private String reorderPaymentMethod;
 
     public CheckoutFragment() {
         // Required empty public constructor
@@ -63,15 +66,12 @@ public class CheckoutFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         Log.d(TAG, "onViewCreated called");
 
-        // Initialize Firebase
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
-        // Toolbar setup
         Toolbar toolbar = view.findViewById(R.id.toolbar);
         toolbar.setNavigationOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
 
-        // Initialize views
         radioCreditCard = view.findViewById(R.id.radioCreditCard);
         radioPaypal = view.findViewById(R.id.radioPaypal);
         radioCashOnDelivery = view.findViewById(R.id.radioCashOnDelivery);
@@ -90,10 +90,10 @@ public class CheckoutFragment extends Fragment {
             grandTotal = getArguments().getDouble("grand_total", 0.0);
             discount = getArguments().getDouble("discount", 0.0);
             deliveryFee = getArguments().getDouble("delivery_fee", 0.0);
-            Log.d(TAG, "Received selected_address_id: " + selectedAddressId);
-            Log.d(TAG, "Received grand_total: " + grandTotal);
-            Log.d(TAG, "Received discount: " + discount);
-            Log.d(TAG, "Received delivery_fee: " + deliveryFee);
+            reorderItems = (List<Map<String, Object>>) getArguments().getSerializable("reorder_items");
+            reorderPaymentMethod = getArguments().getString("reorder_payment_method");
+            Log.d(TAG, "Received reorder_items: " + (reorderItems != null ? reorderItems.size() : "null"));
+            Log.d(TAG, "Received reorder_payment_method: " + reorderPaymentMethod);
         } else {
             grandTotal = 0.0;
             discount = 0.0;
@@ -101,11 +101,25 @@ public class CheckoutFragment extends Fragment {
             Log.w(TAG, "No arguments received, falling back to Firestore for address");
         }
 
-        // Fetch and set address
         fetchAndSetDeliveryAddress();
         tvGrandTotal.setText(String.format("Grand Total: %s %.2f", CURRENCY, grandTotal));
 
-        // Set up radio button group behavior
+        // Prefill payment method for reorder
+        if (reorderPaymentMethod != null) {
+            switch (reorderPaymentMethod) {
+                case "Credit Card":
+                    radioCreditCard.setChecked(true);
+                    creditCardFields.setVisibility(View.VISIBLE);
+                    break;
+                case "Paypal":
+                    radioPaypal.setChecked(true);
+                    break;
+                case "Cash on Delivery":
+                    radioCashOnDelivery.setChecked(true);
+                    break;
+            }
+        }
+
         radioCreditCard.setOnCheckedChangeListener((buttonView, isChecked) -> {
             creditCardFields.setVisibility(isChecked ? View.VISIBLE : View.GONE);
             if (isChecked) {
@@ -130,7 +144,6 @@ public class CheckoutFragment extends Fragment {
             }
         });
 
-        // Change address button
         changeAddressButton.setOnClickListener(v -> {
             AddressDialogFragment dialog = new AddressDialogFragment();
             dialog.setOnAddressSelectedListener((addressId, address) -> {
@@ -140,118 +153,105 @@ public class CheckoutFragment extends Fragment {
             dialog.show(getChildFragmentManager(), "AddressDialogFragment");
         });
 
-        // Pay Now button click
         payNowButton.setOnClickListener(v -> {
             if (!radioCreditCard.isChecked() && !radioPaypal.isChecked() && !radioCashOnDelivery.isChecked()) {
                 Toast.makeText(requireContext(), "Please select a payment method", Toast.LENGTH_SHORT).show();
                 return;
             }
-
-            Toast.makeText(requireContext(), "Payment processing...", Toast.LENGTH_SHORT).show();
-
-            // Fetch cart items and create the order
-            fetchCartItemsAndCreateOrder();
+            if (auth.getCurrentUser() == null) {
+                Log.e(TAG, "User is not authenticated");
+                Toast.makeText(requireContext(), "Please log in to place an order", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String orderId = generateCustomOrderId();
+            Toast.makeText(requireContext(), "Processing payment for Order" + orderId, Toast.LENGTH_SHORT).show();
+            createOrder(orderId);
         });
 
         hideBottomNavigation();
     }
 
-    private void fetchCartItemsAndCreateOrder() {
-        String userId = auth.getCurrentUser().getUid();
-        db.collection("cart")
-                .document(userId)
-                .collection("items")
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    List<CartItem> cartItems = new ArrayList<>();
-                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        CartItem cartItem = doc.toObject(CartItem.class);
-                        cartItems.add(cartItem);
-                    }
-
-                    // Validate the grand total
-                    double calculatedTotal = calculateOrderTotal(cartItems);
-                    if (Math.abs(calculatedTotal - grandTotal) > 0.01) {
-                        Log.w(TAG, "Grand total mismatch! Calculated: " + calculatedTotal + ", Received: " + grandTotal);
-                        Toast.makeText(requireContext(), "Total amount mismatch, please try again.", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    createOrder(cartItems);
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to fetch cart items for order: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Failed to fetch cart items: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
-    }
-
-    private double calculateOrderTotal(List<CartItem> cartItems) {
-        double itemTotal = 0.0;
-        for (CartItem item : cartItems) {
-            itemTotal += item.getTotal();
-        }
-        // Add delivery fee and subtract discount
-        double total = itemTotal + deliveryFee - discount;
-        return total > 0 ? total : 0; // Ensure total is not negative
-    }
-
-    private void createOrder(List<CartItem> cartItems) {
+    private void createOrder(String orderId) {
         String userId = auth.getCurrentUser().getUid();
         String paymentMethod = radioCreditCard.isChecked() ? "Credit Card" :
                 radioPaypal.isChecked() ? "Paypal" : "Cash on Delivery";
 
-        // Calculate item total for breakdown
-        double itemTotal = 0.0;
-        for (CartItem item : cartItems) {
-            itemTotal += item.getTotal();
-        }
-
-        // Prepare the order data
         Map<String, Object> order = new HashMap<>();
+        order.put("orderId", orderId);
         order.put("userId", userId);
-        order.put("addressId", selectedAddressId);
+        order.put("addressId", selectedAddressId != null ? selectedAddressId : "");
         order.put("paymentMethod", paymentMethod);
         order.put("grandTotal", grandTotal);
         order.put("status", "Pending");
         order.put("createdAt", com.google.firebase.Timestamp.now());
-        order.put("currency", CURRENCY); // Add currency symbol to the order
+        order.put("currency", CURRENCY);
+        order.put("isReorder", reorderItems != null && !reorderItems.isEmpty()); // Mark as reorder if reorderItems is present
 
-        // Add total breakdown
         Map<String, Object> totalBreakdown = new HashMap<>();
-        totalBreakdown.put("itemTotal", itemTotal);
+        totalBreakdown.put("itemTotal", grandTotal - deliveryFee + discount);
         totalBreakdown.put("deliveryFee", deliveryFee);
         totalBreakdown.put("discount", discount);
         totalBreakdown.put("grandTotal", grandTotal);
         order.put("totalBreakdown", totalBreakdown);
 
-        // Convert cart items to a list of maps for Firestore
-        List<Map<String, Object>> orderItems = new ArrayList<>();
-        for (CartItem item : cartItems) {
-            Map<String, Object> orderItem = new HashMap<>();
-            orderItem.put("productId", item.getProductId());
-            orderItem.put("name", item.getProductName());
-            orderItem.put("quantity", item.getQuantity());
-            orderItem.put("price", item.getDiscountedPrice() != 0 ? item.getDiscountedPrice() : item.getOriginalPrice());
-            orderItem.put("total", item.getTotal());
-            orderItems.add(orderItem);
+        // Use reorder items if present, otherwise fetch from cart
+        if (reorderItems != null && !reorderItems.isEmpty()) {
+            order.put("items", reorderItems);
+        } else {
+            db.collection("cart")
+                    .document(userId)
+                    .collection("items")
+                    .get()
+                    .addOnSuccessListener(queryDocumentSnapshots -> {
+                        List<Map<String, Object>> orderItems = new ArrayList<>();
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            Map<String, Object> orderItem = new HashMap<>();
+                            orderItem.put("productId", doc.getString("productId"));
+                            orderItem.put("name", doc.getString("productName"));
+                            orderItem.put("quantity", doc.getLong("quantity"));
+                            orderItem.put("price", doc.getDouble("discountedPrice") != null && doc.getDouble("discountedPrice") != 0 ? doc.getDouble("discountedPrice") : doc.getDouble("originalPrice"));
+                            orderItem.put("total", doc.getDouble("total"));
+                            orderItems.add(orderItem);
+                        }
+                        order.put("items", orderItems);
+                        saveOrderToFirestore(order, orderId);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to fetch cart items: " + e.getMessage());
+                        Toast.makeText(requireContext(), "Failed to fetch cart items", Toast.LENGTH_SHORT).show();
+                    });
+            return; // Wait for cart fetch to complete
         }
-        order.put("items", orderItems);
 
-        // Save the order to Firestore
+        saveOrderToFirestore(order, orderId);
+    }
+
+    private void saveOrderToFirestore(Map<String, Object> order, String orderId) {
         db.collection("orders")
-                .add(order)
-                .addOnSuccessListener(documentReference -> {
-                    Log.d(TAG, "Order created successfully with ID: " + documentReference.getId());
-                    // Clear the cart after the order is created
-                    clearCartItems();
-                    // Show the success dialog
+                .document(orderId)
+                .set(order)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Order created successfully with ID: " + orderId + " (isReorder: " + order.get("isReorder") + ")");
+                    if (reorderItems == null) { // Only clear cart for non-reorder case
+                        clearCartItems();
+                    }
                     OrderSuccessDialog dialog = new OrderSuccessDialog();
+                    Bundle args = new Bundle();
+                    args.putString("orderId", orderId);
+                    dialog.setArguments(args);
                     dialog.show(getChildFragmentManager(), "OrderSuccessDialog");
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to create order: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Failed to create order: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "Failed to create order: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
+    }
+
+    private String generateCustomOrderId() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String date = sdf.format(new Date());
+        int randomNum = (int) (Math.random() * 10000);
+        return String.format("ORDER-SPH-%s-%04d", date, randomNum); // e.g., ORDER-SPH-2025-03-30-7940
     }
 
     private void fetchAndSetDeliveryAddress() {
@@ -277,7 +277,6 @@ public class CheckoutFragment extends Fragment {
 
     private void fetchDefaultAddress() {
         String userId = auth.getCurrentUser().getUid();
-        // First, try to load the last selected address
         db.collection("users")
                 .document(userId)
                 .get()
@@ -286,7 +285,6 @@ public class CheckoutFragment extends Fragment {
                         selectedAddressId = documentSnapshot.getString("lastSelectedAddressId");
                         fetchAndSetDeliveryAddress();
                     } else {
-                        // Fallback to default address
                         db.collection("users")
                                 .document(userId)
                                 .collection("addresses")
@@ -299,7 +297,6 @@ public class CheckoutFragment extends Fragment {
                                         selectedAddressId = doc.getId();
                                         setAddressFields(doc);
                                     } else {
-                                        // Fallback to first available address
                                         db.collection("users")
                                                 .document(userId)
                                                 .collection("addresses")
@@ -318,48 +315,8 @@ public class CheckoutFragment extends Fragment {
                                                     }
                                                 });
                                     }
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Failed to fetch default address: " + e.getMessage());
-                                    addressName.setText("Error");
-                                    addressDetails.setText("Error loading address");
-                                    addressEmail.setText("Email: Error");
-                                    addressMobile.setText("Mobile: Error");
                                 });
                     }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to fetch user document: " + e.getMessage());
-                    fetchDefaultAddressFallback();
-                });
-    }
-
-    private void fetchDefaultAddressFallback() {
-        String userId = auth.getCurrentUser().getUid();
-        db.collection("users")
-                .document(userId)
-                .collection("addresses")
-                .whereEqualTo("isDefault", true)
-                .limit(1)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    if (!queryDocumentSnapshots.isEmpty()) {
-                        QueryDocumentSnapshot doc = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments().get(0);
-                        selectedAddressId = doc.getId();
-                        setAddressFields(doc);
-                    } else {
-                        addressName.setText("Error");
-                        addressDetails.setText("Error loading address");
-                        addressEmail.setText("Email: Error");
-                        addressMobile.setText("Mobile: Error");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to fetch default address (fallback): " + e.getMessage());
-                    addressName.setText("Error");
-                    addressDetails.setText("Error loading address");
-                    addressEmail.setText("Email: Error");
-                    addressMobile.setText("Mobile: Error");
                 });
     }
 

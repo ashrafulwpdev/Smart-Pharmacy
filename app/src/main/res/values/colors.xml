@@ -4,7 +4,7 @@
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="blue">#2196F3</color>
     <color name="dark_blue">#1976D2</color> <!-- Removed primary_blue as it duplicated this -->
-    <color name="green">#1D7811</color>
+    <color name="green">#16B364</color>
     <color name="orange">#FFA500</color>
     <color name="red">#D32F2F</color> <!-- Removed error_red as it duplicated this -->
 
@@ -30,4 +30,11 @@
     <!-- Navigation Colors -->
     <color name="nav_inactive">#D2D6DB</color>
     <color name="nav_active">#FFFFFF</color> <!-- Same as white, kept for semantic meaning -->
+    <color name="activeTab">#0A47E8</color>      <!-- Bright Blue -->
+    <color name="inactiveTab">#E8F0FF</color>    <!-- Light Blue -->
+    <color name="inactiveTabText">#000000</color> <!-- Black Text for Inactive Tab -->
+    <color name="tabTextSelected">#FFFFFF</color>
+    <color name="tabRippleColor">#33FFFFFF</color> <!-- Subtle white ripple -->
+
+
 </resources>

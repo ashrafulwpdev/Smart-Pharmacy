@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -12,7 +13,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.oopgroup.smartpharmacy.R;
@@ -62,42 +62,47 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
                     .into(holder.ivProductImage);
         }
 
-        holder.btnIncreaseQuantity.setOnClickListener(v -> {
-            int newQuantity = cartItem.getQuantity() + 1;
-            cartItem.setQuantity(newQuantity);
-            holder.tvQuantity.setText(String.valueOf(newQuantity));
-            quantityChangeListener.onQuantityChanged(cartItem, newQuantity);
-        });
-
-        holder.btnDecreaseQuantity.setOnClickListener(v -> {
-            int newQuantity = cartItem.getQuantity() - 1;
-            if (newQuantity >= 0) {
+        // Ensure the buttons are not null before setting click listeners
+        if (holder.btnIncreaseQuantity != null) {
+            holder.btnIncreaseQuantity.setOnClickListener(v -> {
+                int newQuantity = cartItem.getQuantity() + 1;
                 cartItem.setQuantity(newQuantity);
                 holder.tvQuantity.setText(String.valueOf(newQuantity));
-                if (newQuantity == 0) {
-                    int pos = holder.getAdapterPosition();
-                    String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-                    // Delete from Firestore when quantity reaches 0
-                    db.collection("cart")
-                            .document(userId)
-                            .collection("items")
-                            .document(cartItem.getId())
-                            .delete()
-                            .addOnSuccessListener(aVoid -> {
-                                cartItems.remove(pos);
-                                notifyItemRemoved(pos);
-                                notifyItemRangeChanged(pos, cartItems.size());
-                            })
-                            .addOnFailureListener(e -> {
-                                // Revert UI if deletion fails
-                                cartItem.setQuantity(1); // Reset to 1 if deletion fails
-                                holder.tvQuantity.setText("1");
-                                notifyItemChanged(pos);
-                            });
-                }
                 quantityChangeListener.onQuantityChanged(cartItem, newQuantity);
-            }
-        });
+            });
+        }
+
+        if (holder.btnDecreaseQuantity != null) {
+            holder.btnDecreaseQuantity.setOnClickListener(v -> {
+                int newQuantity = cartItem.getQuantity() - 1;
+                if (newQuantity >= 0) {
+                    cartItem.setQuantity(newQuantity);
+                    holder.tvQuantity.setText(String.valueOf(newQuantity));
+                    if (newQuantity == 0) {
+                        int pos = holder.getAdapterPosition();
+                        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                        // Delete from Firestore when quantity reaches 0
+                        db.collection("cart")
+                                .document(userId)
+                                .collection("items")
+                                .document(cartItem.getId())
+                                .delete()
+                                .addOnSuccessListener(aVoid -> {
+                                    cartItems.remove(pos);
+                                    notifyItemRemoved(pos);
+                                    notifyItemRangeChanged(pos, cartItems.size());
+                                })
+                                .addOnFailureListener(e -> {
+                                    // Revert UI if deletion fails
+                                    cartItem.setQuantity(1); // Reset to 1 if deletion fails
+                                    holder.tvQuantity.setText("1");
+                                    notifyItemChanged(pos);
+                                });
+                    }
+                    quantityChangeListener.onQuantityChanged(cartItem, newQuantity);
+                }
+            });
+        }
     }
 
     @Override
@@ -108,7 +113,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
     public static class CartViewHolder extends RecyclerView.ViewHolder {
         ImageView ivProductImage;
         TextView tvProductName, tvProductPrice, tvQuantity;
-        MaterialButton btnIncreaseQuantity, btnDecreaseQuantity;
+        ImageButton btnIncreaseQuantity, btnDecreaseQuantity; // Ensure these are ImageButtons
 
         public CartViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -116,8 +121,8 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
             tvProductName = itemView.findViewById(R.id.tv_product_name);
             tvProductPrice = itemView.findViewById(R.id.tv_product_price);
             tvQuantity = itemView.findViewById(R.id.tv_quantity);
-            btnIncreaseQuantity = itemView.findViewById(R.id.btn_increase_quantity);
             btnDecreaseQuantity = itemView.findViewById(R.id.btn_decrease_quantity);
+            btnIncreaseQuantity = itemView.findViewById(R.id.btn_increase_quantity);
         }
     }
 }

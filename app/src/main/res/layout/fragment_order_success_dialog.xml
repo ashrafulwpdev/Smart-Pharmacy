@@ -21,7 +21,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="ORDER PLACE SUCCESSFULLY"
+        android:text="ORDER PLACED SUCCESSFULLY"
         android:textSize="16sp"
         android:textStyle="bold"
         android:textColor="@android:color/black"
@@ -32,20 +32,48 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="YOU HAVE SUCCESSFULLY MADE ORDER"
+        android:text="YOU HAVE SUCCESSFULLY PLACED YOUR ORDER"
         android:textSize="14sp"
         android:textColor="@android:color/darker_gray"
         android:gravity="center"
         android:layout_marginBottom="16dp" />
 
-    <!-- Done Button -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/doneButton"
+    <!-- Horizontal Buttons -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Done"
-        android:textSize="16sp"
-        android:textColor="@android:color/white"
-       android:background="@drawable/btn_interactive_white"
-        android:paddingVertical="12dp" />
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="8dp">
+
+        <!-- View Orders Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/viewOrdersButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="View Orders"
+            android:textColor="@android:color/white"
+            android:background="@drawable/btn_interactive_bg"
+            android:paddingVertical="12dp"
+            app:iconGravity="start"
+            app:iconPadding="8dp"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Done Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/doneButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Done"
+            android:textSize="16sp"
+            android:textColor="@android:color/white"
+            android:background="@drawable/btn_interactive_bg"
+            android:paddingVertical="12dp"
+            app:iconGravity="start"
+            app:iconPadding="8dp" />
+
+    </LinearLayout>
+
 </LinearLayout>

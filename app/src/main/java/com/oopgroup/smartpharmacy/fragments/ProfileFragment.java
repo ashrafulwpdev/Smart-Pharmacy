@@ -247,7 +247,12 @@ public class ProfileFragment extends Fragment {
 
         allOrdersLayout.setOnClickListener(v -> {
             animateClick(v);
-            // Add logic for All Orders & Schedule
+            // Navigate to OrderFragment
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new OrderFragment())
+                    .addToBackStack("OrderFragment") // Add to back stack so user can return to ProfileFragment
+                    .commit();
         });
 
         paymentsLayout.setOnClickListener(v -> {
