@@ -1,0 +1,9 @@
+<!-- res/menu/notification_options_menu.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_clear_all"
+        android:title="Clear All Notifications" />
+    <item
+        android:id="@+id/action_mark_all_read"
+        android:title="Mark All as Read" />
+</menu>

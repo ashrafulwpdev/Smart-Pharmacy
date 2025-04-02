@@ -22,7 +22,7 @@
             android:layout_height="80dp"
             android:scaleType="centerCrop"
             android:src="@drawable/placeholder_image"
-            android:background="@drawable/rounded_image_background"
+            android:background="@drawable/rounded_white_background"
             android:clipToOutline="true"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -63,7 +63,7 @@
                 android:text="RM 13.00"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#E91E63"
+                android:textColor="#083EC9"
                 android:layout_marginTop="2dp"
                 tools:text="RM 99.00" />
         </LinearLayout>

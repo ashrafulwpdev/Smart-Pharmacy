@@ -4,8 +4,9 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
-import com.oopgroup.smartpharmacy.fragments.PastOrderFragment;
-import com.oopgroup.smartpharmacy.fragments.UpcomingOrderFragment;
+import com.oopgroup.smartpharmacy.fragments.CompletedOrdersFragment;
+import com.oopgroup.smartpharmacy.fragments.InprogressOrdersFragment;
+import com.oopgroup.smartpharmacy.fragments.TrackingFragment;
 
 public class OrderPagerAdapter extends FragmentStateAdapter {
 
@@ -16,15 +17,20 @@ public class OrderPagerAdapter extends FragmentStateAdapter {
     @NonNull
     @Override
     public Fragment createFragment(int position) {
-        if (position == 0) {
-            return new UpcomingOrderFragment();
-        } else {
-            return new PastOrderFragment();
+        switch (position) {
+            case 0:
+                return new InprogressOrdersFragment(); // Inprogress
+            case 1:
+                return new TrackingFragment();      // Status
+            case 2:
+                return new CompletedOrdersFragment();     // Completed
+            default:
+                return new InprogressOrdersFragment(); // Fallback
         }
     }
 
     @Override
     public int getItemCount() {
-        return 2; // Two tabs: Upcoming and Past
+        return 3; // 3 tabs: Inprogress, Status, Completed
     }
 }

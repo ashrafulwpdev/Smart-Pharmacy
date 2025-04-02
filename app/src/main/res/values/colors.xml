@@ -36,5 +36,70 @@
     <color name="tabTextSelected">#FFFFFF</color>
     <color name="tabRippleColor">#33FFFFFF</color> <!-- Subtle white ripple -->
 
+    <!-- From Figma to Color -->
+
+    <!-- Primary Colors -->
+    <color name="primaryLightest">#93CAFF</color>
+    <color name="primaryLighter">#4BA8FF</color>
+    <color name="primaryLight">#1E85FF</color>
+    <color name="primary">#0763FF</color>
+    <color name="primaryDark">#004BF5</color>
+    <color name="primaryDarker">#083EC9</color>
+
+    <!-- Secondary Colors -->
+    <color name="secondaryLightest">#DEE9FB</color>
+    <color name="secondaryLighter">#C4DAF9</color>
+    <color name="secondaryLight">#98C2F5</color>
+    <color name="secondary">#6BA2EF</color>
+    <color name="secondaryDark">#4880E9</color>
+    <color name="secondaryDarker">#295BDB</color>
+
+    <!-- Greyscale Colors -->
+    <color name="greyWhite">#FFFFFF</color>
+    <color name="greyLightest">#FCFBFA</color>
+    <color name="greyLighter">#ECF1F3</color>
+    <color name="greyLight">#DFE1E6</color>
+    <color name="greyMediumLight">#C1C7CF</color>
+    <color name="greyMedium">#A4AAB8</color>
+    <color name="greyMediumDark">#808B97</color>
+    <color name="greyDark">#666D80</color>
+    <color name="greyDarker">#333849</color>
+    <color name="greyBlackLight">#272B35</color>
+    <color name="greyBlack">#1A1B25</color>
+    <color name="greyBlackDarker">#141414</color>
+
+    <!-- Sky Colors -->
+    <color name="skyLightest">#EFFBFF</color>
+    <color name="skyLighter">#D1F0F9</color>
+    <color name="skyLight">#7EDCF1</color>
+    <color name="sky">#33CFFF</color>
+    <color name="skyDark">#106A97</color>
+    <color name="skyDarker">#0C4D6E</color>
+
+    <!-- Success Colors -->
+    <color name="successLightest">#EFFEFA</color>
+    <color name="successLighter">#DDF2EE</color>
+    <color name="successLight">#90E0D3</color>
+    <color name="success">#40C4AA</color>
+    <color name="successDark">#287F6E</color>
+    <color name="successDarker">#174E43</color>
+
+    <!-- Warning Colors -->
+    <color name="warningLightest">#FFFFE0</color>
+    <color name="warningLighter">#FFECCB</color>
+    <color name="warningLight">#FBD982</color>
+    <color name="warning">#FFBD4C</color>
+    <color name="warningDark">#956321</color>
+    <color name="warningDarker">#583D1E</color>
+
+    <!-- Error Colors -->
+    <color name="errorLightest">#FEFFF2</color>
+    <color name="errorLighter">#FADAEA</color>
+    <color name="errorLight">#ED8296</color>
+    <color name="error">#DF1C41</color>
+    <color name="errorDark">#95122B</color>
+    <color name="errorDarker">#710E21</color>
+
+
 
 </resources>

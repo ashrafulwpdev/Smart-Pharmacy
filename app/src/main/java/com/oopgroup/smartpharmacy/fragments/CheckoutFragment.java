@@ -49,7 +49,7 @@ public class CheckoutFragment extends Fragment {
     private double grandTotal;
     private double discount;
     private double deliveryFee;
-    private List<Map<String, Object>> reorderItems; // For reorder case
+    private List<Map<String, Object>> reorderItems;
     private String reorderPaymentMethod;
 
     public CheckoutFragment() {
@@ -84,7 +84,6 @@ public class CheckoutFragment extends Fragment {
         tvGrandTotal = view.findViewById(R.id.tvGrandTotal);
         changeAddressButton = view.findViewById(R.id.changeAddressButton);
 
-        // Get arguments
         if (getArguments() != null) {
             selectedAddressId = getArguments().getString("selected_address_id");
             grandTotal = getArguments().getDouble("grand_total", 0.0);
@@ -104,7 +103,6 @@ public class CheckoutFragment extends Fragment {
         fetchAndSetDeliveryAddress();
         tvGrandTotal.setText(String.format("Grand Total: %s %.2f", CURRENCY, grandTotal));
 
-        // Prefill payment method for reorder
         if (reorderPaymentMethod != null) {
             switch (reorderPaymentMethod) {
                 case "Credit Card":
@@ -164,7 +162,7 @@ public class CheckoutFragment extends Fragment {
                 return;
             }
             String orderId = generateCustomOrderId();
-            Toast.makeText(requireContext(), "Processing payment for Order" + orderId, Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Processing payment for Order " + orderId, Toast.LENGTH_SHORT).show();
             createOrder(orderId);
         });
 
@@ -182,10 +180,11 @@ public class CheckoutFragment extends Fragment {
         order.put("addressId", selectedAddressId != null ? selectedAddressId : "");
         order.put("paymentMethod", paymentMethod);
         order.put("grandTotal", grandTotal);
-        order.put("status", "Pending");
+        order.put("status", "Order Placed");
         order.put("createdAt", com.google.firebase.Timestamp.now());
         order.put("currency", CURRENCY);
-        order.put("isReorder", reorderItems != null && !reorderItems.isEmpty()); // Mark as reorder if reorderItems is present
+        order.put("isReorder", reorderItems != null && !reorderItems.isEmpty());
+        order.put("orderType", "Product");
 
         Map<String, Object> totalBreakdown = new HashMap<>();
         totalBreakdown.put("itemTotal", grandTotal - deliveryFee + discount);
@@ -194,9 +193,10 @@ public class CheckoutFragment extends Fragment {
         totalBreakdown.put("grandTotal", grandTotal);
         order.put("totalBreakdown", totalBreakdown);
 
-        // Use reorder items if present, otherwise fetch from cart
         if (reorderItems != null && !reorderItems.isEmpty()) {
             order.put("items", reorderItems);
+            saveOrderToFirestore(order, orderId);
+            addNotification(userId, "Order Placed", "Your reorder has been placed successfully.", "OrderPlaced");
         } else {
             db.collection("cart")
                     .document(userId)
@@ -215,15 +215,13 @@ public class CheckoutFragment extends Fragment {
                         }
                         order.put("items", orderItems);
                         saveOrderToFirestore(order, orderId);
+                        addNotification(userId, "Order Placed", "Your order has been placed successfully.", "OrderPlaced");
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to fetch cart items: " + e.getMessage());
                         Toast.makeText(requireContext(), "Failed to fetch cart items", Toast.LENGTH_SHORT).show();
                     });
-            return; // Wait for cart fetch to complete
         }
-
-        saveOrderToFirestore(order, orderId);
     }
 
     private void saveOrderToFirestore(Map<String, Object> order, String orderId) {
@@ -232,14 +230,22 @@ public class CheckoutFragment extends Fragment {
                 .set(order)
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "Order created successfully with ID: " + orderId + " (isReorder: " + order.get("isReorder") + ")");
-                    if (reorderItems == null) { // Only clear cart for non-reorder case
+                    if (reorderItems == null) {
                         clearCartItems();
                     }
+                    createTrackingEntry(orderId, "Order Placed", "Your order has been placed successfully.");
                     OrderSuccessDialog dialog = new OrderSuccessDialog();
                     Bundle args = new Bundle();
                     args.putString("orderId", orderId);
                     dialog.setArguments(args);
                     dialog.show(getChildFragmentManager(), "OrderSuccessDialog");
+
+                    // Navigate to InprogressOrdersFragment to ensure visibility
+                    requireActivity().getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, new InprogressOrdersFragment())
+                            .addToBackStack(null)
+                            .commit();
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to create order: " + e.getMessage());
@@ -247,11 +253,50 @@ public class CheckoutFragment extends Fragment {
                 });
     }
 
+    private void createTrackingEntry(String orderId, String status, String details) {
+        Map<String, Object> tracking = new HashMap<>();
+        tracking.put("status", status);
+        tracking.put("updatedAt", com.google.firebase.Timestamp.now());
+        tracking.put("details", details);
+
+        db.collection("orders")
+                .document(orderId)
+                .collection("tracking")
+                .add(tracking)
+                .addOnSuccessListener(documentReference -> {
+                    Log.d(TAG, "Tracking entry created with ID: " + documentReference.getId());
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to create tracking entry: " + e.getMessage());
+                    Toast.makeText(requireContext(), "Failed to initialize tracking: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void addNotification(String userId, String title, String message, String type) {
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("userId", userId);
+        notification.put("title", title);
+        notification.put("message", message);
+        notification.put("type", type);
+        notification.put("createdAt", com.google.firebase.Timestamp.now());
+        notification.put("isRead", false);
+
+        db.collection("notifications")
+                .add(notification)
+                .addOnSuccessListener(documentReference -> {
+                    Log.d(TAG, "Notification added with ID: " + documentReference.getId());
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to add notification: " + e.getMessage());
+                    Toast.makeText(requireContext(), "Failed to send notification: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
     private String generateCustomOrderId() {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String date = sdf.format(new Date());
         int randomNum = (int) (Math.random() * 10000);
-        return String.format("ORDER-SPH-%s-%04d", date, randomNum); // e.g., ORDER-SPH-2025-03-30-7940
+        return String.format("ORDER-SPH-%s-%04d", date, randomNum);
     }
 
     private void fetchAndSetDeliveryAddress() {

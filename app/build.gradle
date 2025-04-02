@@ -8,7 +8,7 @@ android {
     compileSdk 34
     defaultConfig {
         applicationId "com.oopgroup.smartpharmacy"
-        minSdk 24
+        minSdk 25
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -28,12 +28,13 @@ android {
 dependencies {
     // Core Android dependencies
     implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "com.google.android.material:material:1.12.0" // Remove the force block
+    implementation "com.google.android.material:material:1.12.0"
     implementation "androidx.activity:activity:1.8.1"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.fragment:fragment:1.6.2"
     implementation "androidx.core:core-splashscreen:1.0.1"
     implementation libs.appcompat
+    implementation libs.play.services.nearby
     testImplementation "junit:junit:4.13.2"
     androidTestImplementation "androidx.test.ext:junit:1.1.5"
     androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"
@@ -49,8 +50,8 @@ dependencies {
     implementation "com.google.firebase:firebase-appcheck-debug" // Debug only
 
     // Google Play Services (no explicit versions unless required)
-    implementation "com.google.android.gms:play-services-auth:21.2.0" // For Google Sign-In
-    implementation "com.google.android.gms:play-services-base" // For availability checks
+    implementation "com.google.android.gms:play-services-auth:21.2.0"
+    implementation "com.google.android.gms:play-services-base"
 
     // Social Media Login
     implementation "com.facebook.android:facebook-login:17.0.1"
@@ -70,10 +71,9 @@ dependencies {
 
     // ViewPager2
     implementation "androidx.viewpager2:viewpager2:1.0.0"
-}
+    implementation libs.sltloader}
 
-// Force the Material Components version using resolutionStrategy
-configurations.all {
+configurations.configureEach {
     resolutionStrategy {
         force 'com.google.android.material:material:1.12.0'
     }

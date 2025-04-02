@@ -128,7 +128,6 @@
                     android:padding="4dp"/>
             </LinearLayout>
 
-
             <!-- Buttons -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -137,22 +136,20 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_message"
+                    android:id="@+id/btn_tracking"
                     android:layout_width="0dp"
                     android:layout_height="40dp"
                     android:layout_weight="1"
-                    app:icon="@drawable/ic_message"
                     app:iconTint="@color/accent_blue"
                     app:iconSize="24dp"
                     app:iconPadding="8dp"
                     app:iconGravity="start"
-                    android:text="Message"
+                    android:text="Tracking"
                     android:textColor="@color/accent_blue"
                     android:background="@drawable/btn_blue_border"
                     android:textSize="15sp"
                     android:letterSpacing="0.02"
                     style="@style/Widget.MaterialComponents.Button" />
-
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_call"

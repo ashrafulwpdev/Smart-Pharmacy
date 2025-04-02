@@ -1,7 +1,5 @@
 package com.oopgroup.smartpharmacy.fragments;
 
-import static com.airbnb.lottie.L.TAG;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
@@ -10,6 +8,8 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -19,6 +19,7 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -48,14 +49,14 @@ import com.google.firebase.database.GenericTypeIndicator;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Source;
-import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
 import com.oopgroup.smartpharmacy.ChangePasswordActivity;
 import com.oopgroup.smartpharmacy.EditProfileActivity;
 import com.oopgroup.smartpharmacy.LoginActivity;
 import com.oopgroup.smartpharmacy.ProfileAuthHelper;
 import com.oopgroup.smartpharmacy.R;
-import com.oopgroup.smartpharmacy.utils.BaseActivity;
+import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
 import com.oopgroup.smartpharmacy.utils.LogoutConfirmationDialog;
+import com.softourtech.slt.SLTLoader;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -78,6 +79,7 @@ public class ProfileFragment extends Fragment {
     private RelativeLayout editProfileLayout, changePasswordLayout, allOrdersLayout, paymentsLayout, notificationsLayout, termsLayout;
     private Button logoutButton, cancelVerificationButton, adminButton;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private FrameLayout rootLayout;
     private View rootView;
 
     // Firebase and data
@@ -94,6 +96,9 @@ public class ProfileFragment extends Fragment {
 
     private SharedPreferences sharedPreferences;
     private CountDownTimer countdownTimer;
+
+    // SLTLoader instance
+    private SLTLoader sltLoader;
 
     public ProfileFragment() {
         // Required empty public constructor
@@ -142,6 +147,25 @@ public class ProfileFragment extends Fragment {
         // Initialize UI
         initializeUI(view);
 
+        // Initialize SLTLoader with activity's content view
+        View activityRoot = requireActivity().findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e("ProfileFragment", "Activity root view (android.R.id.content) not found or not a ViewGroup");
+            return;
+        }
+        sltLoader = new SLTLoader(requireContext(), (ViewGroup) activityRoot);
+        sltLoader.setLoaderCallback(new SLTLoader.LoaderCallback() {
+            @Override
+            public void onLoaderShown() {
+                Log.d("ProfileFragment", "Loader shown!");
+            }
+
+            @Override
+            public void onLoaderHidden() {
+                Log.d("ProfileFragment", "Loader hidden!");
+            }
+        });
+
         // Set up listeners
         setupMenuListeners();
         setupLogoutListener();
@@ -151,7 +175,7 @@ public class ProfileFragment extends Fragment {
 
         // Display initial data
         displayCachedProfileData();
-        showCustomLoader(); // Show loader initially
+        showCustomLoader();
         loadProfileDataFromFirebase();
     }
 
@@ -162,6 +186,7 @@ public class ProfileFragment extends Fragment {
             logoutAndRedirectToLogin();
         } else {
             currentUser = mAuth.getCurrentUser();
+            showCustomLoader();
             loadProfileDataFromFirebase();
         }
     }
@@ -198,7 +223,7 @@ public class ProfileFragment extends Fragment {
             editor.apply();
 
             displayCachedProfileData();
-            showCustomLoader(); // Show loader
+            showCustomLoader();
             loadProfileDataFromFirebase();
         }
     }
@@ -211,14 +236,12 @@ public class ProfileFragment extends Fragment {
         userPhone = view.findViewById(R.id.userPhone);
         verificationStatus = view.findViewById(R.id.verificationStatus);
         verificationTimer = view.findViewById(R.id.verificationTimer);
-
         editProfileLayout = view.findViewById(R.id.editProfileLayout);
         changePasswordLayout = view.findViewById(R.id.changePasswordLayout);
         allOrdersLayout = view.findViewById(R.id.allOrdersLayout);
         paymentsLayout = view.findViewById(R.id.paymentsLayout);
         notificationsLayout = view.findViewById(R.id.notificationsLayout);
         termsLayout = view.findViewById(R.id.termsLayout);
-
         logoutButton = view.findViewById(R.id.logoutButton);
         cancelVerificationButton = view.findViewById(R.id.cancelVerificationButton);
         adminButton = view.findViewById(R.id.adminButton);
@@ -247,11 +270,10 @@ public class ProfileFragment extends Fragment {
 
         allOrdersLayout.setOnClickListener(v -> {
             animateClick(v);
-            // Navigate to OrderFragment
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new OrderFragment())
-                    .addToBackStack("OrderFragment") // Add to back stack so user can return to ProfileFragment
+                    .addToBackStack("OrderFragment")
                     .commit();
         });
 
@@ -262,7 +284,11 @@ public class ProfileFragment extends Fragment {
 
         notificationsLayout.setOnClickListener(v -> {
             animateClick(v);
-            // Add logic for Notifications
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new NotificationFragment())
+                    .addToBackStack("NotificationFragment")
+                    .commit();
         });
 
         termsLayout.setOnClickListener(v -> {
@@ -302,14 +328,14 @@ public class ProfileFragment extends Fragment {
                 return;
             }
 
-            showCustomLoader(); // Show loader before check
+            showCustomLoader();
             firestore.collection("users").document(currentUser.getUid())
                     .get(Source.SERVER)
                     .addOnSuccessListener(documentSnapshot -> {
                         Log.d("ProfileFragment", "Firestore success: " + documentSnapshot.getData());
                         if (!isAdded()) return;
+                        hideLoader(); // Hide when data is loaded
                         String role = documentSnapshot.getString("role");
-                        hideLoader(); // Hide after result
                         if ("admin".equals(role)) {
                             startActivity(new Intent(requireContext(), AdminActivity.class));
                         } else {
@@ -416,13 +442,14 @@ public class ProfileFragment extends Fragment {
             authHelper = new ProfileAuthHelper(requireActivity(), new ProfileAuthHelper.OnAuthCompleteListener() {
                 @Override
                 public void onAuthStart() {
-                    showCustomLoader(); // Show loader
+                    showCustomLoader();
                 }
 
                 @Override
                 public void onAuthSuccess(String fullName, String gender, String birthday, String phoneNumber,
                                           String email, String username, String originalEmail,
                                           String originalPhoneNumber, String originalUsername) {
+                    showCustomLoader();
                     loadProfileDataFromFirebase();
                 }
 
@@ -430,6 +457,7 @@ public class ProfileFragment extends Fragment {
                 public void onEmailVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
                                                     String currentEmail, String username, String pendingEmail,
                                                     String originalEmail, String originalPhoneNumber, String originalUsername) {
+                    hideLoader();
                     showCustomToast("Verification email sent to " + pendingEmail, true);
                     SharedPreferences.Editor editor = sharedPreferences.edit();
                     editor.putLong("lastVerificationTime", System.currentTimeMillis());
@@ -442,6 +470,7 @@ public class ProfileFragment extends Fragment {
                 public void onPhoneVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
                                                     String currentEmail, String username, String pendingPhoneNumber,
                                                     String originalEmail, String originalPhoneNumber, String originalUsername) {
+                    hideLoader();
                     showCustomToast("Verification code sent to " + pendingPhoneNumber, true);
                     SharedPreferences.Editor editor = sharedPreferences.edit();
                     editor.putLong("lastVerificationTime", System.currentTimeMillis());
@@ -452,7 +481,7 @@ public class ProfileFragment extends Fragment {
 
                 @Override
                 public void onAuthFailed() {
-                    hideLoader(); // Updated here
+                    hideLoader();
                     showCustomToast("Operation failed. Please try again.", false);
                 }
             });
@@ -520,13 +549,13 @@ public class ProfileFragment extends Fragment {
     }
 
     private void onRefresh() {
-        showCustomLoader(); // Show loader
+        showCustomLoader();
         swipeRefreshLayout.setRefreshing(true);
-        loadProfileDataFromFirebase(true); // Pass true to force refresh
+        loadProfileDataFromFirebase(true);
     }
 
     private void loadProfileDataFromFirebase() {
-        loadProfileDataFromFirebase(false); // Default to non-forced refresh
+        loadProfileDataFromFirebase(false);
     }
 
     private void loadProfileDataFromFirebase(boolean forceRefresh) {
@@ -544,18 +573,19 @@ public class ProfileFragment extends Fragment {
                 } else {
                     showCustomToast("Error refreshing session: " + e.getMessage(), false);
                 }
-                hideLoader(); // Updated here
+                hideLoader();
                 swipeRefreshLayout.setRefreshing(false);
                 return;
             }
 
             currentUser.getIdToken(true).addOnCompleteListener(tokenTask -> {
-                if (tokenTask.isSuccessful()) {
-                    fetchProfileData(forceRefresh);
-                } else {
-                    hideLoader(); // Updated here
+                if (!tokenTask.isSuccessful()) {
+                    hideLoader();
                     swipeRefreshLayout.setRefreshing(false);
+                    showCustomToast("Failed to refresh token: " + tokenTask.getException().getMessage(), false);
+                    return;
                 }
+                fetchProfileData(forceRefresh);
             });
         });
     }
@@ -621,13 +651,13 @@ public class ProfileFragment extends Fragment {
                                 }
 
                                 displayCachedProfileData();
-                                hideLoader(); // Updated here
+                                hideLoader(); // Hide when data is fully loaded
                                 swipeRefreshLayout.setRefreshing(false);
                             })
                             .addOnFailureListener(e -> {
                                 Log.e("ProfileFragment", "Failed to fetch imageUrl from Firestore: " + e.getMessage());
                                 displayCachedProfileData();
-                                hideLoader(); // Updated here
+                                hideLoader(); // Hide on failure
                                 swipeRefreshLayout.setRefreshing(false);
                                 showCustomToast("Failed to load profile image: " + e.getMessage(), false);
                             });
@@ -646,12 +676,12 @@ public class ProfileFragment extends Fragment {
                                     editor.apply();
                                 }
                                 displayCachedProfileData();
-                                hideLoader(); // Updated here
+                                hideLoader(); // Hide when data is loaded
                                 swipeRefreshLayout.setRefreshing(false);
                             })
                             .addOnFailureListener(e -> {
                                 displayCachedProfileData();
-                                hideLoader(); // Updated here
+                                hideLoader(); // Hide on failure
                                 swipeRefreshLayout.setRefreshing(false);
                                 showCustomToast("Failed to load profile: " + e.getMessage(), false);
                             });
@@ -660,7 +690,7 @@ public class ProfileFragment extends Fragment {
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                hideLoader(); // Updated here
+                hideLoader(); // Hide on cancellation
                 swipeRefreshLayout.setRefreshing(false);
                 showCustomToast("Failed to load profile: " + databaseError.getMessage(), false);
                 displayCachedProfileData();
@@ -731,24 +761,30 @@ public class ProfileFragment extends Fragment {
 
     @SuppressLint("RestrictedApi")
     private void showCustomLoader() {
-        if (isAdded() && getActivity() instanceof BaseActivity) {
-            BaseActivity baseActivity = (BaseActivity) getActivity();
-            BaseActivity.LoaderConfig config = new BaseActivity.LoaderConfig()
-                    .setAnimationResId(R.raw.loading_global)
-                    .setWidthDp(40)
-                    .setHeightDp(40)
-                    .setUseRoundedBox(true)
-                    .setOverlayColor(Color.parseColor("#80000000"))
-                    .setChangeJsonColor(false);
-            baseActivity.showCustomLoader(config);
-            Log.d(TAG, "Custom loader shown");
+        if (!isAdded() || sltLoader == null) {
+            Log.w("ProfileFragment", "Cannot show loader: fragment not added or sltLoader null");
+            return;
+        }
+
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"))
+                .setChangeJsonColor(false);
+
+        try {
+            sltLoader.showCustomLoader(config);
+            Log.d("ProfileFragment", "Custom loader shown with SLTLoader");
+        } catch (Exception e) {
+            Log.e("ProfileFragment", "Failed to show loader: " + e.getMessage(), e);
         }
     }
 
     private void hideLoader() {
-        if (isAdded() && requireActivity() instanceof BaseActivity) {
-            BaseActivity baseActivity = (BaseActivity) requireActivity();
-            baseActivity.hideLoader();
+        if (isAdded() && sltLoader != null) {
+            sltLoader.hideLoader();
+            Log.d("ProfileFragment", "Loader hidden immediately");
         }
     }
 
@@ -756,7 +792,10 @@ public class ProfileFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         if (countdownTimer != null) countdownTimer.cancel();
-        hideLoader(); // Updated here
+        if (sltLoader != null) {
+            sltLoader.onDestroy();
+            Log.d("ProfileFragment", "SLTLoader destroyed");
+        }
         rootView = null;
     }
 }

@@ -30,15 +30,14 @@ import com.oopgroup.smartpharmacy.models.Order;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class PastOrderFragment extends Fragment {
+public class CompletedOrdersFragment extends Fragment {
 
-    private static final String TAG = "PastOrderFragment";
+    private static final String TAG = "CompletedOrdersFragment";
 
     private SwipeRefreshLayout swipeRefreshLayout;
     private RecyclerView rvOrders;
@@ -64,7 +63,7 @@ public class PastOrderFragment extends Fragment {
         rvOrders = view.findViewById(R.id.rv_orders);
 
         orderList = new ArrayList<>();
-        orderAdapter = new OrderAdapter(false); // false for past orders
+        orderAdapter = new OrderAdapter(false);
         rvOrders.setLayoutManager(new LinearLayoutManager(getContext()));
         rvOrders.setAdapter(orderAdapter);
 
@@ -86,22 +85,14 @@ public class PastOrderFragment extends Fragment {
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     orderList.clear();
                     for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        // Log the raw Firestore data
-                        Log.d(TAG, "Raw document data: " + doc.getData());
                         Order order = doc.toObject(Order.class);
-                        // Log what the app parsed for isReorder
-                        Log.d(TAG, "Parsed isReorder: " + order.isReorder());
                         order.setId(doc.getId());
                         fetchAddressForOrder(order);
                     }
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to fetch orders: " + e.getMessage());
-                    if (e.getMessage().contains("FAILED_PRECONDITION") && e.getMessage().contains("requires an index")) {
-                        Toast.makeText(getContext(), "Order history is loading. Please wait a moment and try again.", Toast.LENGTH_LONG).show();
-                    } else {
-                        Toast.makeText(getContext(), "Failed to fetch orders: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
+                    Toast.makeText(getContext(), "Failed to fetch orders: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -116,12 +107,7 @@ public class PastOrderFragment extends Fragment {
                     if (doc.exists()) {
                         Address address = doc.toObject(Address.class);
                         orderList.add(order);
-                        Collections.sort(orderList, new Comparator<Order>() {
-                            @Override
-                            public int compare(Order o1, Order o2) {
-                                return o2.getCreatedAt().compareTo(o1.getCreatedAt()); // Latest first
-                            }
-                        });
+                        Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
                         orderAdapter.notifyDataSetChanged();
                     }
                 })
@@ -140,14 +126,14 @@ public class PastOrderFragment extends Fragment {
         @Override
         public OrderViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                    .inflate(isUpcoming ? R.layout.item_order_upcoming : R.layout.item_order_past, parent, false);
+                    .inflate(R.layout.item_order_past, parent, false);
             return new OrderViewHolder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull OrderViewHolder holder, int position) {
             Order order = orderList.get(position);
-            holder.bind(order); // Removed serial number parameter
+            holder.bind(order);
         }
 
         @Override
@@ -171,21 +157,19 @@ public class PastOrderFragment extends Fragment {
                 tvItemCount = itemView.findViewById(R.id.tv_item_count);
                 tvDeliveryDate = itemView.findViewById(R.id.tv_delivery_date);
                 tvTotal = itemView.findViewById(R.id.tv_total);
+                ratingBar = itemView.findViewById(R.id.rating_bar);
+                btnReorder = itemView.findViewById(R.id.btn_reorder);
 
-                if (!isUpcoming) {
-                    ratingBar = itemView.findViewById(R.id.rating_bar);
-                    btnReorder = itemView.findViewById(R.id.btn_reorder);
-                    if (ratingBar != null) {
-                        ratingBar.setNumStars(5);
-                        ratingBar.setMax(5);
-                        ratingBar.setStepSize(1.0f);
-                    }
+                if (ratingBar != null) {
+                    ratingBar.setNumStars(5);
+                    ratingBar.setMax(5);
+                    ratingBar.setStepSize(1.0f);
                 }
             }
 
-            public void bind(Order order) { // Removed serialNumber parameter
+            public void bind(Order order) {
                 String orderText = "#" + (order.getOrderId() != null ? order.getOrderId() : order.getId()) +
-                        (order.isReorder() ? " (Reorder)" : ""); // Removed serial number
+                        (order.isReorder() ? " (Reorder)" : "");
                 tvOrderNumber.setText(orderText);
                 tvStatus.setText(order.getStatus());
                 tvItemCount.setText(order.getItems().size() + " Items");
@@ -216,12 +200,12 @@ public class PastOrderFragment extends Fragment {
                         });
 
                 SimpleDateFormat sdf = new SimpleDateFormat("EEEE, MMM dd", Locale.getDefault());
-                String deliveryDate = "Delivered on " + sdf.format(order.getCreatedAt().toDate());
-                tvDeliveryDate.setText(deliveryDate);
+                String dateLabel = order.getOrderType().equals("LabTest") ? "Completed on " : "Delivered on ";
+                tvDeliveryDate.setText(dateLabel + sdf.format(order.getCreatedAt().toDate()));
 
                 String productId = order.getFirstProductId();
                 if (productId != null) {
-                    db.collection("products")
+                    db.collection(order.getOrderType().equals("LabTest") ? "labTests" : "products")
                             .document(productId)
                             .get()
                             .addOnSuccessListener(documentSnapshot -> {
@@ -233,42 +217,43 @@ public class PastOrderFragment extends Fragment {
                                                 .placeholder(R.drawable.placeholder_image)
                                                 .error(R.drawable.default_product_image)
                                                 .into(ivProductImage);
+                                    } else {
+                                        ivProductImage.setImageResource(R.drawable.default_product_image);
                                     }
+                                } else {
+                                    ivProductImage.setImageResource(R.drawable.default_product_image);
                                 }
                             })
                             .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to fetch product image: " + e.getMessage());
+                                Log.e(TAG, "Failed to fetch image: " + e.getMessage());
                                 ivProductImage.setImageResource(R.drawable.default_product_image);
                             });
+                } else {
+                    ivProductImage.setImageResource(R.drawable.default_product_image);
                 }
 
-                // In the bind() method of PastOrderFragment's OrderViewHolder:
-                if (!isUpcoming && ratingBar != null && btnReorder != null) {
-                    // Convert int rating to float for RatingBar
-                    float normalizedRating = (float) order.getRating();
-                    ratingBar.setRating(normalizedRating);
+                float normalizedRating = (float) order.getRating();
+                ratingBar.setRating(normalizedRating);
 
-                    ratingBar.setOnRatingBarChangeListener((ratingBar, rating, fromUser) -> {
-                        if (fromUser) {
-                            int newRating = Math.round(rating);
-                            Log.d(TAG, "New rating for order " + order.getId() + ": " + newRating);
-                            db.collection("orders")
-                                    .document(order.getId())
-                                    .update("rating", newRating)
-                                    .addOnSuccessListener(aVoid -> {
-                                        Toast.makeText(itemView.getContext(), "Rating saved: " + newRating, Toast.LENGTH_SHORT).show();
-                                        order.setRating(newRating);
-                                    })
-                                    .addOnFailureListener(e -> {
-                                        Log.e(TAG, "Failed to save rating: " + e.getMessage());
-                                        Toast.makeText(itemView.getContext(), "Failed to save rating", Toast.LENGTH_SHORT).show();
-                                        ratingBar.setRating(normalizedRating);
-                                    });
-                        }
-                    });
+                ratingBar.setOnRatingBarChangeListener((ratingBar, rating, fromUser) -> {
+                    if (fromUser) {
+                        int newRating = Math.round(rating);
+                        db.collection("orders")
+                                .document(order.getId())
+                                .update("rating", newRating)
+                                .addOnSuccessListener(aVoid -> {
+                                    Toast.makeText(itemView.getContext(), "Rating saved: " + newRating, Toast.LENGTH_SHORT).show();
+                                    order.setRating(newRating);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to save rating: " + e.getMessage());
+                                    Toast.makeText(itemView.getContext(), "Failed to save rating", Toast.LENGTH_SHORT).show();
+                                    ratingBar.setRating(normalizedRating);
+                                });
+                    }
+                });
 
-                    btnReorder.setOnClickListener(v -> reorder(order));
-                }
+                btnReorder.setOnClickListener(v -> reorder(order));
             }
 
             private void reorder(Order pastOrder) {
@@ -295,7 +280,7 @@ public class PastOrderFragment extends Fragment {
                 requireActivity().getSupportFragmentManager()
                         .beginTransaction()
                         .replace(R.id.fragment_container, checkoutFragment)
-                        .addToBackStack("PastOrderFragment")
+                        .addToBackStack("CompletedOrdersFragment")
                         .commit();
 
                 Log.d(TAG, "Navigated to CheckoutFragment for reorder of order #" + pastOrder.getOrderId());

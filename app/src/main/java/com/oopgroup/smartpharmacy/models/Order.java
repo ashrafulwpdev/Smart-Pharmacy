@@ -16,12 +16,18 @@ public class Order implements Serializable {
     private String status;
     private Timestamp createdAt;
     private String currency;
-    private boolean reorder;  // Renamed field
+    private boolean reorder;
     private Map<String, Object> totalBreakdown;
     private List<Map<String, Object>> items;
-    private int rating;  // Added rating field
+    private int rating;
+    private String orderType; // "LabTest" or "Product"
+    private String deliveryBoyName; // For product orders
+    private String deliveryBoyPhone; // For product orders
 
-    public Order() {}
+    public Order() {
+        // Set a default value for orderType
+        this.orderType = "LabTest"; // Default to "LabTest" if not specified
+    }
 
     // Getters and setters
     public String getId() { return id; }
@@ -65,6 +71,15 @@ public class Order implements Serializable {
 
     public int getRating() { return rating; }
     public void setRating(int rating) { this.rating = rating; }
+
+    public String getOrderType() { return orderType; }
+    public void setOrderType(String orderType) { this.orderType = orderType; }
+
+    public String getDeliveryBoyName() { return deliveryBoyName; }
+    public void setDeliveryBoyName(String deliveryBoyName) { this.deliveryBoyName = deliveryBoyName; }
+
+    public String getDeliveryBoyPhone() { return deliveryBoyPhone; }
+    public void setDeliveryBoyPhone(String deliveryBoyPhone) { this.deliveryBoyPhone = deliveryBoyPhone; }
 
     public String getFirstProductId() {
         return (items != null && !items.isEmpty()) ? (String) items.get(0).get("productId") : null;

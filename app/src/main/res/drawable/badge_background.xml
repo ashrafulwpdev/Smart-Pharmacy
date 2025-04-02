@@ -1,0 +1,7 @@
+<!-- res/drawable/badge_background.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+  <solid android:color="#083EC9" /> <!-- Updated background color -->
+  <corners android:radius="12dp" /> <!-- Circular shape -->
+  <size android:width="24dp" android:height="24dp" /> <!-- Match TextView size -->
+  <stroke android:width="2dp" android:color="#062D91" /> <!-- Optional: Slight border for contrast -->
+</shape>

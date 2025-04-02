@@ -33,39 +33,46 @@ public class OrderFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize Toolbar
         Toolbar toolbar = view.findViewById(R.id.toolbar);
-        toolbar.setTitle("Appointments");
+        TextView toolbarTitle = view.findViewById(R.id.toolbar_title);
+        if (toolbarTitle != null) {
+            toolbarTitle.setText("Orders History"); // Set dynamically with null check
+        } else {
+            toolbar.setTitle("Orders History"); // Fallback to default title
+        }
         toolbar.setNavigationOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
 
-        // Initialize TabLayout and ViewPager
         tabLayout = view.findViewById(R.id.tab_layout);
         viewPager = view.findViewById(R.id.view_pager);
 
-        // Setup ViewPager with adapter
         OrderPagerAdapter pagerAdapter = new OrderPagerAdapter(this);
         viewPager.setAdapter(pagerAdapter);
 
-        // Connect TabLayout with ViewPager and use a custom view for tabs
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
             TextView tabView = new TextView(getContext());
-            tabView.setText(position == 0 ? "Scheduled" : "Completed");
+            switch (position) {
+                case 0:
+                    tabView.setText("Inprogress");
+                    break;
+                case 1:
+                    tabView.setText("Status");
+                    break;
+                case 2:
+                    tabView.setText("Completed");
+                    break;
+            }
             tabView.setTextSize(16);
             tabView.setTextColor(getResources().getColor(R.color.inactiveTabText, null));
-            tabView.setBackgroundResource(R.drawable.tab_background); // Using the selector
+            tabView.setBackgroundResource(R.drawable.tab_background);
 
-            // Set proper layout to avoid gaps
             int height = (int) (45 * getResources().getDisplayMetrics().density);
             tabView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
-
-            // Set padding for better UI
             tabView.setPadding(8, 8, 8, 8);
             tabView.setGravity(android.view.Gravity.CENTER);
 
             tab.setCustomView(tabView);
         }).attach();
 
-        // Update the selected/unselected state
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
@@ -91,7 +98,6 @@ public class OrderFragment extends Fragment {
             public void onTabReselected(TabLayout.Tab tab) {}
         });
 
-        // Set the first tab as selected by default
         TextView firstTabView = (TextView) tabLayout.getTabAt(0).getCustomView();
         if (firstTabView != null) {
             firstTabView.setSelected(true);
