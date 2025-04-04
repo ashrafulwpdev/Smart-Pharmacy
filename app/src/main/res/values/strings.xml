@@ -80,5 +80,17 @@
     <string name="product_description_hint">Product Description</string>
     <string name="brand_hint">Brand</string>
 
+    <!-- Add these to your strings.xml file -->
+    <string name="manage_coupons">Manage Coupons</string>
+    <string name="coupon_code_hint">Coupon Code</string>
+    <string name="coupon_discount_hint">Discount Percentage</string>
+    <string name="add_coupon">Add Coupon</string>
+
+    <string name="product_image_description">Product image</string>
+    <string name="update_status">Update</string>
+    <string name="approve_prescription">Approve</string>
+    <string name="reject_prescription">Reject</string>
+    <string name="cancel_order">Cancel</string>
+
 
 </resources>

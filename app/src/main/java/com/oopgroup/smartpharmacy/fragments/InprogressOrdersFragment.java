@@ -24,6 +24,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.models.Address;
 import com.oopgroup.smartpharmacy.models.Order;
@@ -31,7 +32,9 @@ import com.oopgroup.smartpharmacy.models.Tracking;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -121,15 +124,9 @@ public class InprogressOrdersFragment extends Fragment {
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
                         Address address = doc.toObject(Address.class);
+                        order.setAddress(address); // Store address in Order object
                         Log.d(TAG, "Address fetched for order: " + order.getId());
-                        orderList.add(order);
-                        if ("Product".equals(order.getOrderType())) {
-                            fetchTrackingForOrder(order);
-                        } else {
-                            Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
-                            orderAdapter.notifyDataSetChanged();
-                            Log.d(TAG, "Order added (non-Product): " + order.getId());
-                        }
+                        fetchEstimatedDaysForOrder(order);
                     } else {
                         Log.w(TAG, "Address not found for order: " + order.getId() + ", addressId: " + order.getAddressId());
                         orderList.add(order); // Add order even if address is missing
@@ -151,6 +148,54 @@ public class InprogressOrdersFragment extends Fragment {
                         Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
                         orderAdapter.notifyDataSetChanged();
                         Log.d(TAG, "Order added (non-Product, address fetch failed): " + order.getId());
+                    }
+                });
+    }
+
+    private void fetchEstimatedDaysForOrder(Order order) {
+        if (order.getAddress() == null || order.getAddress().getPostalCode() == null) {
+            Log.w(TAG, "No postal code available for order: " + order.getId());
+            orderList.add(order);
+            if ("Product".equals(order.getOrderType())) {
+                fetchTrackingForOrder(order);
+            } else {
+                Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
+                orderAdapter.notifyDataSetChanged();
+            }
+            return;
+        }
+
+        String postalCode = order.getAddress().getPostalCode();
+        Log.d(TAG, "Fetching estimated days for postal code: " + postalCode + " for order: " + order.getId());
+        db.collection("delivery_fees")
+                .document(postalCode)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        Integer estimatedDays = doc.getLong("estimatedDays") != null ? doc.getLong("estimatedDays").intValue() : 0;
+                        order.setEstimatedDays(estimatedDays); // Store in Order object
+                        Log.d(TAG, "Estimated days fetched: " + estimatedDays + " for order: " + order.getId());
+                    } else {
+                        order.setEstimatedDays(0); // Default to 0 if no delivery fee data
+                        Log.w(TAG, "No delivery fee data for postal code: " + postalCode + " for order: " + order.getId());
+                    }
+                    orderList.add(order);
+                    if ("Product".equals(order.getOrderType())) {
+                        fetchTrackingForOrder(order);
+                    } else {
+                        Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
+                        orderAdapter.notifyDataSetChanged();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch estimated days for order " + order.getId() + ": " + e.getMessage());
+                    order.setEstimatedDays(0); // Default to 0 on failure
+                    orderList.add(order);
+                    if ("Product".equals(order.getOrderType())) {
+                        fetchTrackingForOrder(order);
+                    } else {
+                        Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
+                        orderAdapter.notifyDataSetChanged();
                     }
                 });
     }
@@ -196,7 +241,7 @@ public class InprogressOrdersFragment extends Fragment {
         @Override
         public OrderViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_order_upcoming, parent, false);
+                    .inflate(R.layout.item_order_inprogress, parent, false);
             return new OrderViewHolder(view);
         }
 
@@ -233,43 +278,42 @@ public class InprogressOrdersFragment extends Fragment {
             public void bind(Order order) {
                 tvOrderNumber.setText("#" + (order.getOrderId() != null ? order.getOrderId() : order.getId()));
                 tvStatus.setText(order.getStatus());
-                tvItemCount.setText(order.getItems().size() + " Items");
+                tvItemCount.setText(order.getItems() != null ? order.getItems().size() + " Items" : "N/A");
                 String currency = order.getCurrency() != null ? order.getCurrency() : "RM";
-                tvTotal.setText(String.format("%s%.2f", currency, order.getGrandTotal()));
+                tvTotal.setText(String.format("%s %.2f", currency, order.getGrandTotal()));
 
-                String userId = auth.getCurrentUser().getUid();
-                db.collection("users")
-                        .document(userId)
-                        .collection("addresses")
-                        .document(order.getAddressId())
-                        .get()
-                        .addOnSuccessListener(doc -> {
-                            if (doc.exists()) {
-                                Address address = doc.toObject(Address.class);
-                                String fullAddress = String.format("%s, %s, %s, %s, %s",
-                                                address.getStreetAddress() != null ? address.getStreetAddress() : "",
-                                                address.getCity() != null ? address.getCity() : "",
-                                                address.getState() != null ? address.getState() : "",
-                                                address.getPostalCode() != null ? address.getPostalCode() : "",
-                                                address.getCountry() != null ? address.getCountry() : "")
-                                        .replace(", ,", ",").trim();
-                                if (fullAddress.endsWith(",")) {
-                                    fullAddress = fullAddress.substring(0, fullAddress.length() - 1);
-                                }
-                                tvAddress.setText(fullAddress.length() > 30 ? fullAddress.substring(0, 30) + "..." : fullAddress);
-                            } else {
-                                tvAddress.setText("Address not available");
-                            }
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Failed to fetch address in bind: " + e.getMessage());
-                            tvAddress.setText("Address fetch failed");
-                        });
+                // Address
+                if (order.getAddress() != null) {
+                    Address address = order.getAddress();
+                    String fullAddress = String.format("%s, %s, %s, %s, %s",
+                                    address.getStreetAddress() != null ? address.getStreetAddress() : "",
+                                    address.getCity() != null ? address.getCity() : "",
+                                    address.getState() != null ? address.getState() : "",
+                                    address.getPostalCode() != null ? address.getPostalCode() : "",
+                                    address.getCountry() != null ? address.getCountry() : "")
+                            .replace(", ,", ",").trim();
+                    if (fullAddress.endsWith(",")) {
+                        fullAddress = fullAddress.substring(0, fullAddress.length() - 1);
+                    }
+                    tvAddress.setText(fullAddress.length() > 30 ? fullAddress.substring(0, 30) + "..." : fullAddress);
+                } else {
+                    tvAddress.setText("Address not available");
+                }
 
+                // Dynamic Estimated Delivery Date
                 SimpleDateFormat sdf = new SimpleDateFormat("EEEE, MMM dd", Locale.getDefault());
                 String dateLabel = "Product".equals(order.getOrderType()) ? "Delivery by " : "Visit on ";
-                tvDeliveryDate.setText(dateLabel + sdf.format(order.getCreatedAt().toDate()));
+                if (order.getEstimatedDays() != null && order.getCreatedAt() != null) {
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.setTime(order.getCreatedAt().toDate());
+                    calendar.add(Calendar.DAY_OF_YEAR, order.getEstimatedDays());
+                    Date estimatedDeliveryDate = calendar.getTime();
+                    tvDeliveryDate.setText(dateLabel + sdf.format(estimatedDeliveryDate));
+                } else {
+                    tvDeliveryDate.setText(dateLabel + "N/A");
+                }
 
+                // Product Image
                 String productId = order.getFirstProductId();
                 if (productId != null) {
                     String collection = "Product".equals(order.getOrderType()) ? "products" : "labTests";
@@ -300,6 +344,7 @@ public class InprogressOrdersFragment extends Fragment {
                     ivProductImage.setImageResource(R.drawable.default_product_image);
                 }
 
+                // Buttons
                 if ("Product".equals(order.getOrderType())) {
                     btnTracking.setVisibility(View.VISIBLE);
                     btnTracking.setOnClickListener(v -> {
@@ -310,7 +355,7 @@ public class InprogressOrdersFragment extends Fragment {
                         requireActivity().getSupportFragmentManager()
                                 .beginTransaction()
                                 .replace(R.id.fragment_container, trackingFragment)
-                                .addToBackStack("InprogressOrdersFragment") // Updated backstack name
+                                .addToBackStack("InprogressOrdersFragment")
                                 .commit();
                     });
                 } else {

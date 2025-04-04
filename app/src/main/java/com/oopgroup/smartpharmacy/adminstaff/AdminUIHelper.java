@@ -13,7 +13,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
@@ -27,35 +26,35 @@ import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.AdminItemAdapter;
 import com.oopgroup.smartpharmacy.models.Banner;
 import com.oopgroup.smartpharmacy.models.Category;
+import com.oopgroup.smartpharmacy.models.Coupon;
 import com.oopgroup.smartpharmacy.models.LabTest;
 import com.oopgroup.smartpharmacy.models.Product;
+import com.oopgroup.smartpharmacy.models.User;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@SuppressWarnings("unchecked")
 public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private static final String TAG = "AdminUIHelper";
     private static final int PICK_IMAGE_REQUEST = 1;
 
-    // UI Components
-    private CardView bannerSection, categoriesSection, labTestsSection, productsSection, usersSection, ordersSection, notificationsSection, scannerSection;
+    private CardView bannerSection, categoriesSection, labTestsSection, productsSection, usersSection, notificationsSection, scannerSection, couponsSection;
     private EditText bannerTitleInput, bannerDescriptionInput, bannerDiscountInput;
     private EditText categoryNameInput;
     private EditText labTestNameInput;
     private EditText productNameInput, productPriceInput, productRatingInput, productReviewCountInput, productQuantityInput, productDiscountPriceInput, productDescriptionInput, productBrandInput;
-    private EditText notificationTitleInput, notificationMessageInput, scannerInstructionsInput;
+    private EditText notificationTitleInput, notificationMessageInput;
+    private EditText scannerInstructionsInput;
+    private EditText couponCodeInput, couponDiscountInput;
     private MaterialButton uploadBannerImageButton, uploadCategoryImageButton, uploadLabTestImageButton, uploadProductImageButton;
-    private MaterialButton addBannerButton, addCategoryButton, addLabTestButton, addProductButton, sendNotificationButton, updateScannerSettingsButton;
-    private MaterialButton refreshUsersButton, refreshOrdersButton;
+    private MaterialButton addBannerButton, addCategoryButton, addLabTestButton, addProductButton, refreshUsersButton, sendNotificationButton, updateScannerSettingsButton, addCouponButton;
     private Spinner categorySpinner, notificationTargetSpinner;
     private RecyclerView adminRecyclerView;
     private TextView emptyView;
     private SwipeRefreshLayout swipeRefreshLayout;
 
-    // Data and Adapter
     private final AdminDataManager dataManager;
     private AdminItemAdapter adminAdapter;
     private List<Object> itemList;
@@ -65,157 +64,71 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private String currentTab = "banner";
     private Banner currentBanner;
 
-    // Activity Reference
     private final AppCompatActivity activity;
-
-    // Image Picker
+    private final View rootView;
     private final ActivityResultLauncher<String> imagePickerLauncher;
 
-    public AdminUIHelper(AppCompatActivity activity, AdminDataManager dataManager, SwipeRefreshLayout swipeRefreshLayout) {
+    public AdminUIHelper(AppCompatActivity activity, AdminDataManager dataManager, View rootView) {
         this.activity = activity;
         this.dataManager = dataManager;
-        this.swipeRefreshLayout = swipeRefreshLayout;
+        this.rootView = rootView;
+        this.swipeRefreshLayout = rootView.findViewById(R.id.swipeRefreshLayout);
         this.itemList = new ArrayList<>();
         this.categoryNames = new ArrayList<>();
         this.categoryIds = new ArrayList<>();
+        this.imagePickerLauncher = ((AdminMainActivity) activity).getImagePickerLauncher();
 
-        // Initialize Image Picker
-        imagePickerLauncher = activity.registerForActivityResult(
-                new ActivityResultContracts.GetContent(),
-                uri -> {
-                    if (uri != null) {
-                        imageUri = uri;
-                        Toast.makeText(activity, "Image selected", Toast.LENGTH_SHORT).show();
-                    }
-                }
-        );
+        adminRecyclerView = rootView.findViewById(R.id.adminRecyclerView);
+        setupRecyclerView();
     }
 
     public void initializeUI() {
-        findViews();
-        setupRecyclerView();
-        setupClickListeners();
-        fetchCategoriesForSpinner();
-        showSection("banner"); // Default section
-    }
+        bannerSection = rootView.findViewById(R.id.bannerSection);
+        categoriesSection = rootView.findViewById(R.id.categoriesSection);
+        labTestsSection = rootView.findViewById(R.id.labTestsSection);
+        productsSection = rootView.findViewById(R.id.productsSection);
+        usersSection = rootView.findViewById(R.id.usersSection);
+        notificationsSection = rootView.findViewById(R.id.notificationsSection);
+        scannerSection = rootView.findViewById(R.id.scannerSection);
+        couponsSection = rootView.findViewById(R.id.couponsSection);
 
-    public void refreshCurrentSection() {
-        Log.d(TAG, "Refreshing current section: " + currentTab);
-        swipeRefreshLayout.setRefreshing(true);
-        switch (currentTab) {
-            case "banner":
-                dataManager.fetchBanners(items -> {
-                    Log.d(TAG, "Fetched " + items.size() + " banners");
-                    updateRecyclerView(items);
-                    swipeRefreshLayout.setRefreshing(false);
-                }, error -> {
-                    showError(error);
-                    swipeRefreshLayout.setRefreshing(false);
-                });
-                break;
-            case "categories":
-                dataManager.fetchCategories(items -> {
-                    updateRecyclerView(items);
-                    swipeRefreshLayout.setRefreshing(false);
-                }, error -> {
-                    showError(error);
-                    swipeRefreshLayout.setRefreshing(false);
-                });
-                break;
-            case "labTests":
-                dataManager.fetchLabTests(items -> {
-                    updateRecyclerView(items);
-                    swipeRefreshLayout.setRefreshing(false);
-                }, error -> {
-                    showError(error);
-                    swipeRefreshLayout.setRefreshing(false);
-                });
-                break;
-            case "products":
-                dataManager.fetchProducts(items -> {
-                    updateRecyclerView(items);
-                    swipeRefreshLayout.setRefreshing(false);
-                }, error -> {
-                    showError(error);
-                    swipeRefreshLayout.setRefreshing(false);
-                });
-                break;
-            case "users":
-                dataManager.fetchUsers(items -> {
-                    updateRecyclerView(items);
-                    swipeRefreshLayout.setRefreshing(false);
-                }, error -> {
-                    showError(error);
-                    swipeRefreshLayout.setRefreshing(false);
-                });
-                break;
-            case "orders":
-                dataManager.fetchOrders(items -> {
-                    updateRecyclerView(items);
-                    swipeRefreshLayout.setRefreshing(false);
-                }, error -> {
-                    showError(error);
-                    swipeRefreshLayout.setRefreshing(false);
-                });
-                break;
-            default:
-                swipeRefreshLayout.setRefreshing(false);
-                break;
-        }
-    }
+        bannerTitleInput = rootView.findViewById(R.id.bannerTitleInput);
+        bannerDescriptionInput = rootView.findViewById(R.id.bannerDescriptionInput);
+        bannerDiscountInput = rootView.findViewById(R.id.bannerDiscountInput);
+        categoryNameInput = rootView.findViewById(R.id.categoryNameInput);
+        labTestNameInput = rootView.findViewById(R.id.labTestNameInput);
+        productNameInput = rootView.findViewById(R.id.productNameInput);
+        productPriceInput = rootView.findViewById(R.id.productPriceInput);
+        productRatingInput = rootView.findViewById(R.id.productRatingInput);
+        productReviewCountInput = rootView.findViewById(R.id.productReviewCountInput);
+        productQuantityInput = rootView.findViewById(R.id.productQuantityInput);
+        productDiscountPriceInput = rootView.findViewById(R.id.productDiscountPriceInput);
+        productDescriptionInput = rootView.findViewById(R.id.productDescriptionInput);
+        productBrandInput = rootView.findViewById(R.id.productBrandInput);
+        notificationTitleInput = rootView.findViewById(R.id.notificationTitleInput);
+        notificationMessageInput = rootView.findViewById(R.id.notificationMessageInput);
+        scannerInstructionsInput = rootView.findViewById(R.id.scannerInstructionsInput);
+        couponCodeInput = rootView.findViewById(R.id.couponCodeInput);
+        couponDiscountInput = rootView.findViewById(R.id.couponDiscountInput);
 
-    private void findViews() {
-        bannerSection = activity.findViewById(R.id.bannerSection);
-        categoriesSection = activity.findViewById(R.id.categoriesSection);
-        labTestsSection = activity.findViewById(R.id.labTestsSection);
-        productsSection = activity.findViewById(R.id.productsSection);
-        usersSection = activity.findViewById(R.id.usersSection);
-        ordersSection = activity.findViewById(R.id.ordersSection);
-        notificationsSection = activity.findViewById(R.id.notificationsSection);
-        scannerSection = activity.findViewById(R.id.scannerSection);
-        bannerTitleInput = activity.findViewById(R.id.bannerTitleInput);
-        bannerDescriptionInput = activity.findViewById(R.id.bannerDescriptionInput);
-        bannerDiscountInput = activity.findViewById(R.id.bannerDiscountInput);
-        categoryNameInput = activity.findViewById(R.id.categoryNameInput);
-        labTestNameInput = activity.findViewById(R.id.labTestNameInput);
-        productNameInput = activity.findViewById(R.id.productNameInput);
-        productPriceInput = activity.findViewById(R.id.productPriceInput);
-        productRatingInput = activity.findViewById(R.id.productRatingInput);
-        productReviewCountInput = activity.findViewById(R.id.productReviewCountInput);
-        productQuantityInput = activity.findViewById(R.id.productQuantityInput);
-        productDiscountPriceInput = activity.findViewById(R.id.productDiscountPriceInput); // Renamed
-        productDescriptionInput = activity.findViewById(R.id.productDescriptionInput);
-        productBrandInput = activity.findViewById(R.id.productBrandInput);
-        notificationTitleInput = activity.findViewById(R.id.notificationTitleInput);
-        notificationMessageInput = activity.findViewById(R.id.notificationMessageInput);
-        scannerInstructionsInput = activity.findViewById(R.id.scannerInstructionsInput);
-        uploadBannerImageButton = activity.findViewById(R.id.uploadBannerImageButton);
-        uploadCategoryImageButton = activity.findViewById(R.id.uploadCategoryImageButton);
-        uploadLabTestImageButton = activity.findViewById(R.id.uploadLabTestImageButton);
-        uploadProductImageButton = activity.findViewById(R.id.uploadProductImageButton);
-        addBannerButton = activity.findViewById(R.id.addBannerButton);
-        addCategoryButton = activity.findViewById(R.id.addCategoryButton);
-        addLabTestButton = activity.findViewById(R.id.addLabTestButton);
-        addProductButton = activity.findViewById(R.id.addProductButton);
-        refreshUsersButton = activity.findViewById(R.id.refreshUsersButton);
-        refreshOrdersButton = activity.findViewById(R.id.refreshOrdersButton);
-        sendNotificationButton = activity.findViewById(R.id.sendNotificationButton);
-        updateScannerSettingsButton = activity.findViewById(R.id.updateScannerSettingsButton);
-        categorySpinner = activity.findViewById(R.id.categorySpinner);
-        notificationTargetSpinner = activity.findViewById(R.id.notificationTargetSpinner);
-        adminRecyclerView = activity.findViewById(R.id.adminRecyclerView);
-        emptyView = activity.findViewById(R.id.emptyView);
-    }
+        uploadBannerImageButton = rootView.findViewById(R.id.uploadBannerImageButton);
+        uploadCategoryImageButton = rootView.findViewById(R.id.uploadCategoryImageButton);
+        uploadLabTestImageButton = rootView.findViewById(R.id.uploadLabTestImageButton);
+        uploadProductImageButton = rootView.findViewById(R.id.uploadProductImageButton);
+        addBannerButton = rootView.findViewById(R.id.addBannerButton);
+        addCategoryButton = rootView.findViewById(R.id.addCategoryButton);
+        addLabTestButton = rootView.findViewById(R.id.addLabTestButton);
+        addProductButton = rootView.findViewById(R.id.addProductButton);
+        refreshUsersButton = rootView.findViewById(R.id.refreshUsersButton);
+        sendNotificationButton = rootView.findViewById(R.id.sendNotificationButton);
+        updateScannerSettingsButton = rootView.findViewById(R.id.updateScannerSettingsButton);
+        addCouponButton = rootView.findViewById(R.id.addCouponButton);
 
-    private void setupRecyclerView() {
-        adminRecyclerView.setLayoutManager(new LinearLayoutManager(activity));
-        adminRecyclerView.setHasFixedSize(true);
-        adminAdapter = new AdminItemAdapter(itemList, this, this::onDeleteItem);
-        adminRecyclerView.setAdapter(adminAdapter);
-        Log.d(TAG, "RecyclerView setup completed");
-    }
+        categorySpinner = rootView.findViewById(R.id.categorySpinner);
+        notificationTargetSpinner = rootView.findViewById(R.id.notificationTargetSpinner);
 
-    private void setupClickListeners() {
+        emptyView = rootView.findViewById(R.id.emptyView);
+
         uploadBannerImageButton.setOnClickListener(v -> openImagePicker());
         uploadCategoryImageButton.setOnClickListener(v -> openImagePicker());
         uploadLabTestImageButton.setOnClickListener(v -> openImagePicker());
@@ -224,53 +137,191 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         addCategoryButton.setOnClickListener(v -> addCategory());
         addLabTestButton.setOnClickListener(v -> addLabTest());
         addProductButton.setOnClickListener(v -> addProduct());
-        refreshUsersButton.setOnClickListener(v -> dataManager.fetchUsers(this::updateRecyclerView, this::showError));
-        refreshOrdersButton.setOnClickListener(v -> dataManager.fetchOrders(this::updateRecyclerView, this::showError));
+        refreshUsersButton.setOnClickListener(v -> refreshUsers());
         sendNotificationButton.setOnClickListener(v -> sendNotification());
         updateScannerSettingsButton.setOnClickListener(v -> updateScannerSettings());
+        addCouponButton.setOnClickListener(v -> addCoupon());
+
+        fetchCategoriesForSpinner();
+        setupNotificationTargetSpinner();
+
+        swipeRefreshLayout.setOnRefreshListener(this::refreshCurrentSection);
+
+        showSection("banner");
+    }
+
+    public void refreshCurrentSection() {
+        Log.d(TAG, "Refreshing current section: " + currentTab);
+        swipeRefreshLayout.setRefreshing(true);
+        switch (currentTab) {
+            case "banner":
+                dataManager.fetchBanners(items -> updateRecyclerView(items, true), this::showError);
+                break;
+            case "categories":
+                dataManager.fetchCategories(items -> updateRecyclerView(items, true), this::showError);
+                break;
+            case "labTests":
+                dataManager.fetchLabTests(items -> updateRecyclerView(items, true), this::showError);
+                break;
+            case "products":
+                dataManager.fetchProducts(items -> updateRecyclerView(items, true), this::showError);
+                break;
+            case "users":
+                refreshUsers();
+                break;
+            case "coupons":
+                dataManager.fetchCoupons(items -> updateRecyclerView(items, true), this::showError);
+                break;
+            default:
+                swipeRefreshLayout.setRefreshing(false);
+                break;
+        }
+    }
+
+    private void setupRecyclerView() {
+        if (adminRecyclerView == null) {
+            Log.e(TAG, "adminRecyclerView is null.");
+            Toast.makeText(activity, "Error: RecyclerView not found", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        adminRecyclerView.setNestedScrollingEnabled(false);
+        adminRecyclerView.setLayoutManager(new LinearLayoutManager(activity));
+        adminRecyclerView.setHasFixedSize(true);
+        adminAdapter = new AdminItemAdapter(itemList, this, this::onDeleteItem);
+        adminRecyclerView.setAdapter(adminAdapter);
+        Log.d(TAG, "RecyclerView setup completed");
+    }
+
+    private void setupCategorySpinner() {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, categoryNames);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        categorySpinner.setAdapter(adapter);
+    }
+
+    private void setupNotificationTargetSpinner() {
+        List<String> targets = new ArrayList<>();
+        targets.add("All Users");
+        targets.add("Specific User");
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, targets);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        notificationTargetSpinner.setAdapter(adapter);
     }
 
     public void showSection(String section) {
         Log.d(TAG, "Showing section: " + section);
         currentTab = section;
-        bannerSection.setVisibility(section.equals("banner") ? View.VISIBLE : View.GONE);
-        categoriesSection.setVisibility(section.equals("categories") ? View.VISIBLE : View.GONE);
-        labTestsSection.setVisibility(section.equals("labTests") ? View.VISIBLE : View.GONE);
-        productsSection.setVisibility(section.equals("products") ? View.VISIBLE : View.GONE);
-        usersSection.setVisibility(section.equals("users") ? View.VISIBLE : View.GONE);
-        ordersSection.setVisibility(section.equals("orders") ? View.VISIBLE : View.GONE);
-        notificationsSection.setVisibility(section.equals("notifications") ? View.VISIBLE : View.GONE);
-        scannerSection.setVisibility(section.equals("scanner") ? View.VISIBLE : View.GONE);
-
         itemList.clear();
         adminAdapter.notifyDataSetChanged();
         adminRecyclerView.setVisibility(View.GONE);
         emptyView.setVisibility(View.VISIBLE);
 
+        bannerSection.setVisibility(View.GONE);
+        categoriesSection.setVisibility(View.GONE);
+        labTestsSection.setVisibility(View.GONE);
+        productsSection.setVisibility(View.GONE);
+        usersSection.setVisibility(View.GONE);
+        notificationsSection.setVisibility(View.GONE);
+        scannerSection.setVisibility(View.GONE);
+        couponsSection.setVisibility(View.GONE);
+
         switch (section) {
             case "banner":
+                bannerSection.setVisibility(View.VISIBLE);
                 resetBannerForm();
-                dataManager.fetchBanners(this::updateRecyclerView, this::showError);
+                dataManager.fetchBanners(items -> updateRecyclerView(items, true), this::showError);
                 break;
             case "categories":
-                dataManager.fetchCategories(this::updateRecyclerView, this::showError);
+                categoriesSection.setVisibility(View.VISIBLE);
+                categoryNameInput.setText("");
+                dataManager.fetchCategories(items -> updateRecyclerView(items, true), this::showError);
                 break;
             case "labTests":
-                dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
+                labTestsSection.setVisibility(View.VISIBLE);
+                labTestNameInput.setText("");
+                dataManager.fetchLabTests(items -> updateRecyclerView(items, true), this::showError);
                 break;
             case "products":
-                dataManager.fetchProducts(this::updateRecyclerView, this::showError);
+                productsSection.setVisibility(View.VISIBLE);
+                resetProductForm();
+                dataManager.fetchProducts(items -> updateRecyclerView(items, true), this::showError);
                 break;
             case "users":
-                dataManager.fetchUsers(this::updateRecyclerView, this::showError);
-                break;
-            case "orders":
-                dataManager.fetchOrders(this::updateRecyclerView, this::showError);
+                usersSection.setVisibility(View.VISIBLE);
+                refreshUsers();
                 break;
             case "notifications":
-            case "scanner":
-                updateRecyclerView(new ArrayList<>());
+                notificationsSection.setVisibility(View.VISIBLE);
+                notificationTitleInput.setText("");
+                notificationMessageInput.setText("");
                 break;
+            case "scanner":
+                scannerSection.setVisibility(View.VISIBLE);
+                fetchScannerInstructions();
+                break;
+            case "coupons":
+                couponsSection.setVisibility(View.VISIBLE);
+                couponCodeInput.setText("");
+                couponDiscountInput.setText("");
+                dataManager.fetchCoupons(items -> updateRecyclerView(items, true), this::showError);
+                break;
+        }
+    }
+
+    @Override
+    public void onItemClick(Object item) {
+        if (item instanceof Banner) {
+            editBanner((Banner) item);
+        } else if (item instanceof Category) {
+            editCategory((Category) item);
+        } else if (item instanceof LabTest) {
+            editLabTest((LabTest) item);
+        } else if (item instanceof Product) {
+            editProduct((Product) item);
+        } else if (item instanceof User) {
+            // Handle user edit if needed
+        } else if (item instanceof Coupon) {
+            editCoupon((Coupon) item);
+        }
+    }
+
+    private void onDeleteItem(Object item) {
+        if (item instanceof Banner) {
+            dataManager.deleteBanner((Banner) item,
+                    () -> {
+                        Toast.makeText(activity, "Banner deleted", Toast.LENGTH_SHORT).show();
+                        dataManager.fetchBanners(this::updateRecyclerView, this::showError);
+                    },
+                    this::showError);
+        } else if (item instanceof Category) {
+            dataManager.deleteCategory((Category) item,
+                    () -> {
+                        Toast.makeText(activity, "Category deleted", Toast.LENGTH_SHORT).show();
+                        dataManager.fetchCategories(this::updateRecyclerView, this::showError);
+                        fetchCategoriesForSpinner();
+                    },
+                    this::showError);
+        } else if (item instanceof LabTest) {
+            dataManager.deleteLabTest((LabTest) item,
+                    () -> {
+                        Toast.makeText(activity, "Lab Test deleted", Toast.LENGTH_SHORT).show();
+                        dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
+                    },
+                    this::showError);
+        } else if (item instanceof Product) {
+            dataManager.deleteProduct((Product) item,
+                    () -> {
+                        Toast.makeText(activity, "Product deleted", Toast.LENGTH_SHORT).show();
+                        dataManager.fetchProducts(this::updateRecyclerView, this::showError);
+                    },
+                    this::showError);
+        } else if (item instanceof Coupon) {
+            dataManager.deleteCoupon((Coupon) item,
+                    () -> {
+                        Toast.makeText(activity, "Coupon deleted", Toast.LENGTH_SHORT).show();
+                        dataManager.fetchCoupons(this::updateRecyclerView, this::showError);
+                    },
+                    this::showError);
         }
     }
 
@@ -345,7 +396,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
 
         dataManager.uploadImageAndExecute(imageUri, "categories",
                 imageUrl -> {
-                    Category category = new Category(null, name, 0, imageUrl); // ID will be set in saveCategory
+                    Category category = new Category(null, name, 0, imageUrl);
                     dataManager.saveCategory(category,
                             () -> {
                                 Toast.makeText(activity, "Category added", Toast.LENGTH_SHORT).show();
@@ -373,7 +424,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
 
         dataManager.uploadImageAndExecute(imageUri, "labTests",
                 imageUrl -> {
-                    LabTest labTest = new LabTest(null, name, imageUrl); // ID will be set in saveLabTest
+                    LabTest labTest = new LabTest(null, name, imageUrl);
                     dataManager.saveLabTest(labTest,
                             () -> {
                                 Toast.makeText(activity, "Lab Test added", Toast.LENGTH_SHORT).show();
@@ -390,7 +441,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         String name = productNameInput.getText().toString().trim();
         String quantity = productQuantityInput.getText().toString().trim();
         String priceStr = productPriceInput.getText().toString().trim();
-        String discountPriceStr = productDiscountPriceInput.getText().toString().trim(); // Renamed
+        String discountPriceStr = productDiscountPriceInput.getText().toString().trim();
         String ratingStr = productRatingInput.getText().toString().trim();
         String reviewCountStr = productReviewCountInput.getText().toString().trim();
         String description = productDescriptionInput.getText().toString().trim();
@@ -414,13 +465,13 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         }
 
         double price;
-        double discountPrice; // Renamed
+        double discountPrice;
         int rating;
         int reviewCount;
 
         try {
             price = Double.parseDouble(priceStr);
-            discountPrice = discountPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountPriceStr); // Renamed
+            discountPrice = discountPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountPriceStr);
             rating = Integer.parseInt(ratingStr);
             reviewCount = Integer.parseInt(reviewCountStr);
         } catch (NumberFormatException e) {
@@ -430,27 +481,15 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
 
         dataManager.uploadImageAndExecute(imageUri, "products",
                 imageUrl -> {
-                    // Calculate discount percentage
                     double discountPercentage = 0.0;
                     if (discountPrice > 0 && price > discountPrice) {
                         discountPercentage = ((price - discountPrice) / price) * 100;
-                        discountPercentage = Math.round(discountPercentage * 10) / 10.0; // Round to 1 decimal place
+                        discountPercentage = Math.round(discountPercentage * 10) / 10.0;
                     }
 
                     Product product = new Product(
-                            null, // ID will be set in saveProduct
-                            name,
-                            price,
-                            imageUrl,
-                            rating,
-                            reviewCount,
-                            quantity,
-                            price, // originalPrice
-                            discountPrice, // Renamed
-                            description,
-                            "", // deliveryDate
-                            "", // deliveryAddress
-                            categoryId
+                            null, name, price, imageUrl, rating, reviewCount, quantity,
+                            price, discountPrice, description, "", "", categoryId
                     );
                     product.setBrand(brand);
                     product.setNameLower(name.toLowerCase());
@@ -467,19 +506,30 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
+    private void refreshUsers() {
+        dataManager.fetchUsers(items -> {
+            updateRecyclerView(items, true);
+            swipeRefreshLayout.setRefreshing(false);
+        }, error -> {
+            showError(error);
+            swipeRefreshLayout.setRefreshing(false);
+        });
+    }
+
     private void sendNotification() {
         String title = notificationTitleInput.getText().toString().trim();
         String message = notificationMessageInput.getText().toString().trim();
-        String target = notificationTargetSpinner.getSelectedItem() != null ? notificationTargetSpinner.getSelectedItem().toString() : "";
+        int targetPosition = notificationTargetSpinner.getSelectedItemPosition();
 
         if (title.isEmpty() || message.isEmpty()) {
             Toast.makeText(activity, "Please fill all fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        String target = targetPosition == 0 ? "all" : "specific";
         dataManager.sendNotification(title, message, target,
                 () -> {
-                    Toast.makeText(activity, "Notification sent to " + target, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, "Notification sent", Toast.LENGTH_SHORT).show();
                     notificationTitleInput.setText("");
                     notificationMessageInput.setText("");
                 },
@@ -489,14 +539,45 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private void updateScannerSettings() {
         String instructions = scannerInstructionsInput.getText().toString().trim();
         if (instructions.isEmpty()) {
-            Toast.makeText(activity, "Please provide instructions", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, "Please enter scanner instructions", Toast.LENGTH_SHORT).show();
             return;
         }
 
         dataManager.updateScannerSettings(instructions,
+                () -> Toast.makeText(activity, "Scanner settings updated", Toast.LENGTH_SHORT).show(),
+                this::showError);
+    }
+
+    private void fetchScannerInstructions() {
+        dataManager.fetchScannerSettings(
+                instructions -> scannerInstructionsInput.setText(instructions),
+                this::showError);
+    }
+
+    private void addCoupon() {
+        String code = couponCodeInput.getText().toString().trim();
+        String discountStr = couponDiscountInput.getText().toString().trim();
+
+        if (code.isEmpty() || discountStr.isEmpty()) {
+            Toast.makeText(activity, "Please fill all fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        double discount;
+        try {
+            discount = Double.parseDouble(discountStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(activity, "Invalid discount format", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Coupon coupon = new Coupon(null, code, discount);
+        dataManager.saveCoupon(coupon,
                 () -> {
-                    Toast.makeText(activity, "Scanner settings updated", Toast.LENGTH_SHORT).show();
-                    scannerInstructionsInput.setText("");
+                    Toast.makeText(activity, "Coupon added", Toast.LENGTH_SHORT).show();
+                    couponCodeInput.setText("");
+                    couponDiscountInput.setText("");
+                    dataManager.fetchCoupons(this::updateRecyclerView, this::showError);
                 },
                 this::showError);
     }
@@ -514,7 +595,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         productNameInput.setText("");
         productQuantityInput.setText("");
         productPriceInput.setText("");
-        productDiscountPriceInput.setText(""); // Renamed
+        productDiscountPriceInput.setText("");
         productRatingInput.setText("");
         productReviewCountInput.setText("");
         productDescriptionInput.setText("");
@@ -523,6 +604,10 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     }
 
     private void updateRecyclerView(List<Object> items) {
+        updateRecyclerView(items, false);
+    }
+
+    private void updateRecyclerView(List<Object> items, boolean stopRefreshing) {
         Log.d(TAG, "Updating RecyclerView with " + items.size() + " items");
         itemList.clear();
         itemList.addAll(items);
@@ -534,100 +619,25 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
             adminRecyclerView.setVisibility(View.VISIBLE);
             emptyView.setVisibility(View.GONE);
         }
+        if (stopRefreshing) {
+            swipeRefreshLayout.setRefreshing(false);
+        }
     }
 
     private void showError(String message) {
         Log.e(TAG, "Error: " + message);
         Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+        swipeRefreshLayout.setRefreshing(false);
     }
 
     private void fetchCategoriesForSpinner() {
         dataManager.fetchCategoriesForSpinner(
                 names -> {
                     categoryNames = names;
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, categoryNames);
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    categorySpinner.setAdapter(adapter);
+                    setupCategorySpinner();
                 },
                 ids -> categoryIds = ids,
                 this::showError);
-
-        ArrayAdapter<CharSequence> notificationAdapter = ArrayAdapter.createFromResource(
-                activity, R.array.notification_targets, android.R.layout.simple_spinner_item);
-        notificationAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        notificationTargetSpinner.setAdapter(notificationAdapter);
-    }
-
-    @Override
-    public void onItemClick(Object item) {
-        if (item instanceof Banner) {
-            editBanner((Banner) item);
-        } else if (item instanceof Category) {
-            editCategory((Category) item);
-        } else if (item instanceof LabTest) {
-            editLabTest((LabTest) item);
-        } else if (item instanceof Product) {
-            editProduct((Product) item);
-        } else if (item instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) item;
-            if (map.containsKey("email")) {
-                Toast.makeText(activity, "Editing user: " + map.get("email"), Toast.LENGTH_SHORT).show();
-            } else if (map.containsKey("status")) {
-                Toast.makeText(activity, "Editing order: " + map.get("id"), Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    private void onDeleteItem(Object item) {
-        if (item instanceof Banner) {
-            dataManager.deleteBanner((Banner) item,
-                    () -> {
-                        Toast.makeText(activity, "Banner deleted", Toast.LENGTH_SHORT).show();
-                        dataManager.fetchBanners(this::updateRecyclerView, this::showError);
-                    },
-                    this::showError);
-        } else if (item instanceof Category) {
-            dataManager.deleteCategory((Category) item,
-                    () -> {
-                        Toast.makeText(activity, "Category deleted", Toast.LENGTH_SHORT).show();
-                        dataManager.fetchCategories(this::updateRecyclerView, this::showError);
-                        fetchCategoriesForSpinner();
-                    },
-                    this::showError);
-        } else if (item instanceof LabTest) {
-            dataManager.deleteLabTest((LabTest) item,
-                    () -> {
-                        Toast.makeText(activity, "Lab Test deleted", Toast.LENGTH_SHORT).show();
-                        dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
-                    },
-                    this::showError);
-        } else if (item instanceof Product) {
-            dataManager.deleteProduct((Product) item,
-                    () -> {
-                        Toast.makeText(activity, "Product deleted", Toast.LENGTH_SHORT).show();
-                        dataManager.fetchProducts(this::updateRecyclerView, this::showError);
-                    },
-                    this::showError);
-        } else if (item instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) item;
-            if (map.containsKey("email")) {
-                String userId = (String) map.get("id");
-                dataManager.deleteUser(userId,
-                        () -> {
-                            Toast.makeText(activity, "User deleted", Toast.LENGTH_SHORT).show();
-                            dataManager.fetchUsers(this::updateRecyclerView, this::showError);
-                        },
-                        this::showError);
-            } else if (map.containsKey("status")) {
-                String orderId = (String) map.get("id");
-                dataManager.deleteOrder(orderId,
-                        () -> {
-                            Toast.makeText(activity, "Order deleted", Toast.LENGTH_SHORT).show();
-                            dataManager.fetchOrders(this::updateRecyclerView, this::showError);
-                        },
-                        this::showError);
-            }
-        }
     }
 
     private void editBanner(Banner banner) {
@@ -636,6 +646,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         bannerDescriptionInput.setText(banner.getDescription());
         bannerDiscountInput.setText(banner.getDiscount());
         addBannerButton.setText("Update Banner");
+        imageUri = null;
     }
 
     private void editCategory(Category category) {
@@ -726,7 +737,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         productNameInput.setText(product.getName());
         productQuantityInput.setText(product.getQuantity());
         productPriceInput.setText(String.valueOf(product.getPrice()));
-        productDiscountPriceInput.setText(product.getDiscountedPrice() != 0.0 ? String.valueOf(product.getDiscountedPrice()) : ""); // Renamed
+        productDiscountPriceInput.setText(product.getDiscountedPrice() != 0.0 ? String.valueOf(product.getDiscountedPrice()) : "");
         productRatingInput.setText(String.valueOf(product.getRating()));
         productReviewCountInput.setText(String.valueOf(product.getReviewCount()));
         productDescriptionInput.setText(product.getDescription());
@@ -740,7 +751,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
             String name = productNameInput.getText().toString().trim();
             String quantity = productQuantityInput.getText().toString().trim();
             String priceStr = productPriceInput.getText().toString().trim();
-            String discountPriceStr = productDiscountPriceInput.getText().toString().trim(); // Renamed
+            String discountPriceStr = productDiscountPriceInput.getText().toString().trim();
             String ratingStr = productRatingInput.getText().toString().trim();
             String reviewCountStr = productReviewCountInput.getText().toString().trim();
             String description = productDescriptionInput.getText().toString().trim();
@@ -756,12 +767,12 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 return;
             }
             double price;
-            double discountPrice; // Renamed
+            double discountPrice;
             int rating;
             int reviewCount;
             try {
                 price = Double.parseDouble(priceStr);
-                discountPrice = discountPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountPriceStr); // Renamed
+                discountPrice = discountPriceStr.isEmpty() ? 0.0 : Double.parseDouble(discountPriceStr);
                 rating = Integer.parseInt(ratingStr);
                 reviewCount = Integer.parseInt(reviewCountStr);
             } catch (NumberFormatException e) {
@@ -772,7 +783,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
             if (imageUri != null) {
                 dataManager.uploadImageAndExecute(imageUri, "products",
                         imageUrl -> {
-                            // Calculate discount percentage
                             double discountPercentage = 0.0;
                             if (discountPrice > 0 && price > discountPrice) {
                                 discountPercentage = ((price - discountPrice) / price) * 100;
@@ -780,19 +790,8 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                             }
 
                             Product updatedProduct = new Product(
-                                    product.getId(),
-                                    name,
-                                    price,
-                                    imageUrl,
-                                    rating,
-                                    reviewCount,
-                                    quantity,
-                                    price, // originalPrice
-                                    discountPrice, // Renamed
-                                    description,
-                                    "", // deliveryDate
-                                    "", // deliveryAddress
-                                    newCategoryId
+                                    product.getId(), name, price, imageUrl, rating, reviewCount, quantity,
+                                    price, discountPrice, description, "", "", newCategoryId
                             );
                             updatedProduct.setBrand(brand);
                             updatedProduct.setNameLower(name.toLowerCase());
@@ -810,7 +809,6 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                         },
                         this::showError);
             } else {
-                // Calculate discount percentage
                 double discountPercentage = 0.0;
                 if (discountPrice > 0 && price > discountPrice) {
                     discountPercentage = ((price - discountPrice) / price) * 100;
@@ -818,19 +816,8 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 }
 
                 Product updatedProduct = new Product(
-                        product.getId(),
-                        name,
-                        price,
-                        product.getImageUrl(),
-                        rating,
-                        reviewCount,
-                        quantity,
-                        price, // originalPrice
-                        discountPrice, // Renamed
-                        description,
-                        "", // deliveryDate
-                        "", // deliveryAddress
-                        newCategoryId
+                        product.getId(), name, price, product.getImageUrl(), rating, reviewCount, quantity,
+                        price, discountPrice, description, "", "", newCategoryId
                 );
                 updatedProduct.setBrand(brand);
                 updatedProduct.setNameLower(name.toLowerCase());
@@ -847,5 +834,47 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                         this::showError);
             }
         });
+    }
+
+    private void editCoupon(Coupon coupon) {
+        couponCodeInput.setText(coupon.getCode());
+        couponDiscountInput.setText(String.valueOf(coupon.getDiscount()));
+        addCouponButton.setText("Update Coupon");
+        addCouponButton.setOnClickListener(v -> {
+            String code = couponCodeInput.getText().toString().trim();
+            String discountStr = couponDiscountInput.getText().toString().trim();
+
+            if (code.isEmpty() || discountStr.isEmpty()) {
+                Toast.makeText(activity, "Please fill all fields", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            double discount;
+            try {
+                discount = Double.parseDouble(discountStr);
+            } catch (NumberFormatException e) {
+                Toast.makeText(activity, "Invalid discount format", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Coupon updatedCoupon = new Coupon(coupon.getId(), code, discount);
+            dataManager.updateCoupon(updatedCoupon,
+                    () -> {
+                        Toast.makeText(activity, "Coupon updated", Toast.LENGTH_SHORT).show();
+                        couponCodeInput.setText("");
+                        couponDiscountInput.setText("");
+                        addCouponButton.setText("Add Coupon");
+                        addCouponButton.setOnClickListener(v1 -> addCoupon());
+                        dataManager.fetchCoupons(this::updateRecyclerView, this::showError);
+                    },
+                    this::showError);
+        });
+    }
+
+    public void handleImageResult(Uri imageUri) {
+        if (imageUri != null) {
+            this.imageUri = imageUri;
+            Toast.makeText(activity, "Image selected", Toast.LENGTH_SHORT).show();
+        }
     }
 }

@@ -5,7 +5,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.TextView;
@@ -19,8 +18,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.bumptech.glide.Glide;
+import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.oopgroup.smartpharmacy.R;
@@ -45,6 +46,7 @@ public class CompletedOrdersFragment extends Fragment {
     private List<Order> orderList;
     private FirebaseFirestore db;
     private FirebaseAuth auth;
+    private ListenerRegistration ordersListener;
 
     @Nullable
     @Override
@@ -59,11 +61,17 @@ public class CompletedOrdersFragment extends Fragment {
         db = FirebaseFirestore.getInstance();
         auth = FirebaseAuth.getInstance();
 
+        if (auth.getCurrentUser() == null) {
+            Toast.makeText(getContext(), "Please log in to view orders", Toast.LENGTH_SHORT).show();
+            requireActivity().getSupportFragmentManager().popBackStack();
+            return;
+        }
+
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
         rvOrders = view.findViewById(R.id.rv_orders);
 
         orderList = new ArrayList<>();
-        orderAdapter = new OrderAdapter(false);
+        orderAdapter = new OrderAdapter();
         rvOrders.setLayoutManager(new LinearLayoutManager(getContext()));
         rvOrders.setAdapter(orderAdapter);
 
@@ -75,24 +83,52 @@ public class CompletedOrdersFragment extends Fragment {
         });
     }
 
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (ordersListener != null) {
+            ordersListener.remove();
+            ordersListener = null;
+        }
+    }
+
     private void fetchOrders() {
+        if (ordersListener != null) {
+            ordersListener.remove();
+        }
+
+        orderList.clear();
+        orderAdapter.notifyDataSetChanged();
+        swipeRefreshLayout.setRefreshing(true);
+
         String userId = auth.getCurrentUser().getUid();
-        db.collection("orders")
+        ordersListener = db.collection("orders")
                 .whereEqualTo("userId", userId)
-                .whereEqualTo("status", "Delivered")
+                .whereIn("status", List.of("Delivered", "Cancelled")) // Include both statuses
                 .orderBy("createdAt", Query.Direction.DESCENDING)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    orderList.clear();
-                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        Order order = doc.toObject(Order.class);
-                        order.setId(doc.getId());
-                        fetchAddressForOrder(order);
+                .addSnapshotListener((queryDocumentSnapshots, e) -> {
+                    swipeRefreshLayout.setRefreshing(false);
+                    if (e != null) {
+                        Log.e(TAG, "Failed to fetch orders: " + e.getMessage());
+                        Toast.makeText(getContext(), "Failed to fetch orders: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to fetch orders: " + e.getMessage());
-                    Toast.makeText(getContext(), "Failed to fetch orders: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    orderList.clear();
+                    if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            Order order = doc.toObject(Order.class);
+                            order.setId(doc.getId());
+                            if (!orderList.contains(order)) { // Prevent duplicates
+                                orderList.add(order);
+                                fetchAddressForOrder(order);
+                            }
+                        }
+                        Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
+                        orderAdapter.notifyDataSetChanged();
+                    } else {
+                        orderAdapter.notifyDataSetChanged();
+                        Toast.makeText(getContext(), "No completed or cancelled orders found", Toast.LENGTH_SHORT).show();
+                    }
                 });
     }
 
@@ -106,21 +142,17 @@ public class CompletedOrdersFragment extends Fragment {
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
                         Address address = doc.toObject(Address.class);
-                        orderList.add(order);
-                        Collections.sort(orderList, (o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()));
+                        // Address fetched, but we don’t add to orderList here (already added in fetchOrders)
                         orderAdapter.notifyDataSetChanged();
                     }
                 })
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to fetch address for order " + order.getId() + ": " + e.getMessage()));
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch address for order " + order.getId() + ": " + e.getMessage());
+                    orderAdapter.notifyDataSetChanged();
+                });
     }
 
     private class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHolder> {
-
-        private final boolean isUpcoming;
-
-        public OrderAdapter(boolean isUpcoming) {
-            this.isUpcoming = isUpcoming;
-        }
 
         @NonNull
         @Override
@@ -146,7 +178,7 @@ public class CompletedOrdersFragment extends Fragment {
             private ImageView ivProductImage;
             private TextView tvOrderNumber, tvStatus, tvAddress, tvItemCount, tvDeliveryDate, tvTotal;
             private RatingBar ratingBar;
-            private Button btnReorder;
+            private MaterialButton btnReorder;
 
             public OrderViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -159,12 +191,6 @@ public class CompletedOrdersFragment extends Fragment {
                 tvTotal = itemView.findViewById(R.id.tv_total);
                 ratingBar = itemView.findViewById(R.id.rating_bar);
                 btnReorder = itemView.findViewById(R.id.btn_reorder);
-
-                if (ratingBar != null) {
-                    ratingBar.setNumStars(5);
-                    ratingBar.setMax(5);
-                    ratingBar.setStepSize(1.0f);
-                }
             }
 
             public void bind(Order order) {
@@ -174,7 +200,18 @@ public class CompletedOrdersFragment extends Fragment {
                 tvStatus.setText(order.getStatus());
                 tvItemCount.setText(order.getItems().size() + " Items");
                 String currency = order.getCurrency() != null ? order.getCurrency() : "RM";
-                tvTotal.setText(String.format("%s%.2f", currency, order.getGrandTotal()));
+                tvTotal.setText(String.format("%s %.2f", currency, order.getGrandTotal()));
+
+                // Status-specific styling
+                if ("Delivered".equals(order.getStatus())) {
+                    tvStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                    ratingBar.setVisibility(View.VISIBLE);
+                    btnReorder.setVisibility(View.VISIBLE);
+                } else if ("Cancelled".equals(order.getStatus())) {
+                    tvStatus.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                    ratingBar.setVisibility(View.GONE);
+                    btnReorder.setVisibility(View.GONE);
+                }
 
                 String userId = auth.getCurrentUser().getUid();
                 db.collection("users")
@@ -195,48 +232,44 @@ public class CompletedOrdersFragment extends Fragment {
                                 if (fullAddress.endsWith(",")) {
                                     fullAddress = fullAddress.substring(0, fullAddress.length() - 1);
                                 }
-                                tvAddress.setText(fullAddress.length() > 30 ? fullAddress.substring(0, 30) + "..." : fullAddress);
+                                tvAddress.setText(fullAddress);
+                            } else {
+                                tvAddress.setText("Address not available");
                             }
-                        });
+                        })
+                        .addOnFailureListener(e -> tvAddress.setText("Address fetch failed"));
 
                 SimpleDateFormat sdf = new SimpleDateFormat("EEEE, MMM dd", Locale.getDefault());
-                String dateLabel = order.getOrderType().equals("LabTest") ? "Completed on " : "Delivered on ";
+                String dateLabel = "Delivered".equals(order.getStatus()) ? "Delivered on " : "Cancelled on ";
                 tvDeliveryDate.setText(dateLabel + sdf.format(order.getCreatedAt().toDate()));
 
                 String productId = order.getFirstProductId();
                 if (productId != null) {
-                    db.collection(order.getOrderType().equals("LabTest") ? "labTests" : "products")
+                    String collection = "LabTest".equals(order.getOrderType()) ? "labTests" : "products";
+                    db.collection(collection)
                             .document(productId)
                             .get()
                             .addOnSuccessListener(documentSnapshot -> {
                                 if (documentSnapshot.exists()) {
                                     String imageUrl = documentSnapshot.getString("imageUrl");
-                                    if (imageUrl != null) {
-                                        Glide.with(itemView.getContext())
-                                                .load(imageUrl)
-                                                .placeholder(R.drawable.placeholder_image)
-                                                .error(R.drawable.default_product_image)
-                                                .into(ivProductImage);
-                                    } else {
-                                        ivProductImage.setImageResource(R.drawable.default_product_image);
-                                    }
+                                    Glide.with(itemView.getContext())
+                                            .load(imageUrl)
+                                            .placeholder(R.drawable.placeholder_image)
+                                            .error(R.drawable.default_product_image)
+                                            .into(ivProductImage);
                                 } else {
                                     ivProductImage.setImageResource(R.drawable.default_product_image);
                                 }
                             })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to fetch image: " + e.getMessage());
-                                ivProductImage.setImageResource(R.drawable.default_product_image);
-                            });
+                            .addOnFailureListener(e -> ivProductImage.setImageResource(R.drawable.default_product_image));
                 } else {
                     ivProductImage.setImageResource(R.drawable.default_product_image);
                 }
 
                 float normalizedRating = (float) order.getRating();
                 ratingBar.setRating(normalizedRating);
-
                 ratingBar.setOnRatingBarChangeListener((ratingBar, rating, fromUser) -> {
-                    if (fromUser) {
+                    if (fromUser && "Delivered".equals(order.getStatus())) {
                         int newRating = Math.round(rating);
                         db.collection("orders")
                                 .document(order.getId())
@@ -257,6 +290,11 @@ public class CompletedOrdersFragment extends Fragment {
             }
 
             private void reorder(Order pastOrder) {
+                if (!"Delivered".equals(pastOrder.getStatus())) {
+                    Toast.makeText(getContext(), "Cannot reorder a cancelled order", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 Bundle args = new Bundle();
                 args.putString("selected_address_id", pastOrder.getAddressId());
                 args.putDouble("grand_total", pastOrder.getGrandTotal());
@@ -271,7 +309,6 @@ public class CompletedOrdersFragment extends Fragment {
                     }
                 }
                 args.putSerializable("reorder_items", serializableItems);
-
                 args.putString("reorder_payment_method", pastOrder.getPaymentMethod());
 
                 CheckoutFragment checkoutFragment = new CheckoutFragment();

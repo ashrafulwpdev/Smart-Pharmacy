@@ -51,10 +51,9 @@ public class CheckoutFragment extends Fragment {
     private double deliveryFee;
     private List<Map<String, Object>> reorderItems;
     private String reorderPaymentMethod;
+    private String assignedDeliveryManId;
 
-    public CheckoutFragment() {
-        // Required empty public constructor
-    }
+    public CheckoutFragment() {}
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -101,6 +100,7 @@ public class CheckoutFragment extends Fragment {
         }
 
         fetchAndSetDeliveryAddress();
+        assignDeliveryMan();
         tvGrandTotal.setText(String.format("Grand Total: %s %.2f", CURRENCY, grandTotal));
 
         if (reorderPaymentMethod != null) {
@@ -147,6 +147,7 @@ public class CheckoutFragment extends Fragment {
             dialog.setOnAddressSelectedListener((addressId, address) -> {
                 selectedAddressId = addressId;
                 fetchAndSetDeliveryAddress();
+                assignDeliveryMan();
             });
             dialog.show(getChildFragmentManager(), "AddressDialogFragment");
         });
@@ -185,6 +186,7 @@ public class CheckoutFragment extends Fragment {
         order.put("currency", CURRENCY);
         order.put("isReorder", reorderItems != null && !reorderItems.isEmpty());
         order.put("orderType", "Product");
+        order.put("deliveryManId", assignedDeliveryManId != null ? assignedDeliveryManId : "");
 
         Map<String, Object> totalBreakdown = new HashMap<>();
         totalBreakdown.put("itemTotal", grandTotal - deliveryFee + discount);
@@ -240,7 +242,6 @@ public class CheckoutFragment extends Fragment {
                     dialog.setArguments(args);
                     dialog.show(getChildFragmentManager(), "OrderSuccessDialog");
 
-                    // Navigate to InprogressOrdersFragment to ensure visibility
                     requireActivity().getSupportFragmentManager()
                             .beginTransaction()
                             .replace(R.id.fragment_container, new InprogressOrdersFragment())
@@ -263,9 +264,7 @@ public class CheckoutFragment extends Fragment {
                 .document(orderId)
                 .collection("tracking")
                 .add(tracking)
-                .addOnSuccessListener(documentReference -> {
-                    Log.d(TAG, "Tracking entry created with ID: " + documentReference.getId());
-                })
+                .addOnSuccessListener(documentReference -> Log.d(TAG, "Tracking entry created with ID: " + documentReference.getId()))
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to create tracking entry: " + e.getMessage());
                     Toast.makeText(requireContext(), "Failed to initialize tracking: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -283,9 +282,7 @@ public class CheckoutFragment extends Fragment {
 
         db.collection("notifications")
                 .add(notification)
-                .addOnSuccessListener(documentReference -> {
-                    Log.d(TAG, "Notification added with ID: " + documentReference.getId());
-                })
+                .addOnSuccessListener(documentReference -> Log.d(TAG, "Notification added with ID: " + documentReference.getId()))
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to add notification: " + e.getMessage());
                     Toast.makeText(requireContext(), "Failed to send notification: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -389,6 +386,45 @@ public class CheckoutFragment extends Fragment {
         addressDetails.setText(fullAddress);
         addressEmail.setText("Email: " + (email != null ? email : "Not provided"));
         addressMobile.setText("Mobile: " + (mobile != null ? mobile : "Not provided"));
+    }
+
+    private void assignDeliveryMan() {
+        if (selectedAddressId == null) {
+            assignedDeliveryManId = null;
+            return;
+        }
+
+        String userId = auth.getCurrentUser().getUid();
+        db.collection("users")
+                .document(userId)
+                .collection("addresses")
+                .document(selectedAddressId)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        String postalCode = doc.getString("postalCode");
+                        if (postalCode != null) {
+                            db.collection("delivery_men")
+                                    .whereArrayContains("assignedPostalCodes", postalCode)
+                                    .limit(1)
+                                    .get()
+                                    .addOnSuccessListener(queryDocumentSnapshots -> {
+                                        if (!queryDocumentSnapshots.isEmpty()) {
+                                            QueryDocumentSnapshot deliveryManDoc = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments().get(0);
+                                            assignedDeliveryManId = deliveryManDoc.getId();
+                                            Log.d(TAG, "Assigned delivery man: " + assignedDeliveryManId);
+                                        } else {
+                                            assignedDeliveryManId = null;
+                                            Log.w(TAG, "No delivery man available for postal code: " + postalCode);
+                                        }
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        assignedDeliveryManId = null;
+                                        Log.e(TAG, "Failed to assign delivery man: " + e.getMessage());
+                                    });
+                        }
+                    }
+                });
     }
 
     private void clearCartItems() {

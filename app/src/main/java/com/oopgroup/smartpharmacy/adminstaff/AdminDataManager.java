@@ -14,8 +14,10 @@ import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 import com.oopgroup.smartpharmacy.models.Banner;
 import com.oopgroup.smartpharmacy.models.Category;
+import com.oopgroup.smartpharmacy.models.Coupon;
 import com.oopgroup.smartpharmacy.models.LabTest;
 import com.oopgroup.smartpharmacy.models.Product;
+import com.oopgroup.smartpharmacy.models.User;
 import com.oopgroup.smartpharmacy.utils.LoadingSpinnerUtil;
 
 import java.io.IOException;
@@ -30,23 +32,24 @@ public class AdminDataManager {
     private static final String TAG = "AdminDataManager";
     private static final int MAX_IMAGE_SIZE_MB = 5;
 
-    // Firebase References
     private final FirebaseFirestore db;
     private final StorageReference storageRef;
-
-    // Dependencies
     private final AppCompatActivity activity;
     private final FirebaseUser currentUser;
-    private final LoadingSpinnerUtil loadingSpinnerUtil;
+    private final LoadingSpinnerUtil loadingSpinnerUtil; // Nullable field
 
+    // Updated constructor to make LoadingSpinnerUtil optional
     public AdminDataManager(AppCompatActivity activity, FirebaseUser currentUser, LoadingSpinnerUtil loadingSpinnerUtil) {
         this.activity = activity;
         this.currentUser = currentUser;
-        this.loadingSpinnerUtil = loadingSpinnerUtil;
-
-        // Initialize Firebase References
+        this.loadingSpinnerUtil = loadingSpinnerUtil; // Can be null
         db = FirebaseFirestore.getInstance();
         storageRef = FirebaseStorage.getInstance().getReference();
+    }
+
+    // Overloaded constructor without LoadingSpinnerUtil
+    public AdminDataManager(AppCompatActivity activity, FirebaseUser currentUser) {
+        this(activity, currentUser, null);
     }
 
     public void checkUserRole(Consumer<String> onSuccess, Consumer<String> onFailure) {
@@ -127,7 +130,7 @@ public class AdminDataManager {
     public void saveCategory(Category category, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         String id = category.getId() != null ? category.getId() : db.collection("categories").document().getId();
-        category.setId(id); // Set the ID if it was null
+        category.setId(id);
         db.collection("categories").document(id).set(category)
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
@@ -143,7 +146,7 @@ public class AdminDataManager {
     public void saveLabTest(LabTest labTest, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         String id = labTest.getId() != null ? labTest.getId() : db.collection("labTests").document().getId();
-        labTest.setId(id); // Set the ID if it was null
+        labTest.setId(id);
         db.collection("labTests").document(id).set(labTest)
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
@@ -159,7 +162,7 @@ public class AdminDataManager {
     public void saveProduct(String categoryId, Product product, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         String id = product.getId() != null ? product.getId() : db.collection("products").document().getId();
-        product.setId(id); // Set the ID if it was null
+        product.setId(id);
         db.collection("products").document(id).set(product)
                 .addOnSuccessListener(aVoid -> {
                     updateProductCount(categoryId, 1);
@@ -272,10 +275,8 @@ public class AdminDataManager {
         db.collection("users").whereNotEqualTo("role", "admin").get()
                 .addOnSuccessListener(querySnapshot -> {
                     for (QueryDocumentSnapshot doc : querySnapshot) {
-                        Map<String, Object> user = new HashMap<>();
-                        user.put("id", doc.getId());
-                        user.put("name", doc.getString("name"));
-                        user.put("email", doc.getString("email"));
+                        User user = doc.toObject(User.class);
+                        user.setId(doc.getId());
                         itemList.add(user);
                     }
                     onSuccess.accept(itemList);
@@ -284,27 +285,6 @@ public class AdminDataManager {
                 .addOnFailureListener(e -> {
                     showLoading(false);
                     onFailure.accept("Failed to fetch users: " + e.getMessage());
-                });
-    }
-
-    public void fetchOrders(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
-        showLoading(true);
-        List<Object> itemList = new ArrayList<>();
-        db.collection("orders").get()
-                .addOnSuccessListener(querySnapshot -> {
-                    for (QueryDocumentSnapshot doc : querySnapshot) {
-                        Map<String, Object> order = new HashMap<>();
-                        order.put("id", doc.getId());
-                        order.put("userId", doc.getString("userId"));
-                        order.put("status", doc.getString("status"));
-                        itemList.add(order);
-                    }
-                    onSuccess.accept(itemList);
-                    showLoading(false);
-                })
-                .addOnFailureListener(e -> {
-                    showLoading(false);
-                    onFailure.accept("Failed to fetch orders: " + e.getMessage());
                 });
     }
 
@@ -342,6 +322,20 @@ public class AdminDataManager {
                     showLoading(false);
                     Log.e(TAG, "Failed to update scanner settings: " + e.getMessage());
                     onFailure.accept("Failed: " + e.getMessage());
+                });
+    }
+
+    public void fetchScannerSettings(Consumer<String> onSuccess, Consumer<String> onFailure) {
+        showLoading(true);
+        db.collection("scannerSettings").document("settings").get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    String instructions = documentSnapshot.getString("instructions");
+                    onSuccess.accept(instructions != null ? instructions : "");
+                    showLoading(false);
+                })
+                .addOnFailureListener(e -> {
+                    showLoading(false);
+                    onFailure.accept("Failed to fetch scanner settings: " + e.getMessage());
                 });
     }
 
@@ -412,7 +406,7 @@ public class AdminDataManager {
         showLoading(true);
         db.collection("products").document(product.getId()).delete()
                 .addOnSuccessListener(aVoid -> {
-                    updateProductCount(product.getCategoryId(), -1); // Decrease count
+                    updateProductCount(product.getCategoryId(), -1);
                     showLoading(false);
                     onSuccess.run();
                 })
@@ -426,20 +420,6 @@ public class AdminDataManager {
     public void deleteUser(String userId, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
         db.collection("users").document(userId).delete()
-                .addOnSuccessListener(aVoid -> {
-                    showLoading(false);
-                    onSuccess.run();
-                })
-                .addOnFailureListener(e -> {
-                    showLoading(false);
-                    Log.e(TAG, "Delete failed: " + e.getMessage());
-                    onFailure.accept("Delete failed: " + e.getMessage());
-                });
-    }
-
-    public void deleteOrder(String orderId, Runnable onSuccess, Consumer<String> onFailure) {
-        showLoading(true);
-        db.collection("orders").document(orderId).delete()
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
                     onSuccess.run();
@@ -483,10 +463,9 @@ public class AdminDataManager {
         showLoading(true);
         db.collection("products").document(updatedProduct.getId()).set(updatedProduct)
                 .addOnSuccessListener(aVoid -> {
-                    // Handle category change
                     if (!originalProduct.getCategoryId().equals(newCategoryId)) {
-                        updateProductCount(originalProduct.getCategoryId(), -1); // Decrease old category count
-                        updateProductCount(newCategoryId, 1); // Increase new category count
+                        updateProductCount(originalProduct.getCategoryId(), -1);
+                        updateProductCount(newCategoryId, 1);
                     }
                     showLoading(false);
                     onSuccess.run();
@@ -498,8 +477,74 @@ public class AdminDataManager {
                 });
     }
 
-    private void showLoading(boolean isLoading) {
-        Log.d(TAG, "Loading state: " + isLoading);
-        loadingSpinnerUtil.toggleLoadingSpinner(isLoading);
+    public void saveCoupon(Coupon coupon, Runnable onSuccess, Consumer<String> onFailure) {
+        showLoading(true);
+        String id = coupon.getId() != null ? coupon.getId() : db.collection("coupons").document().getId();
+        coupon.setId(id);
+        db.collection("coupons").document(id).set(coupon)
+                .addOnSuccessListener(aVoid -> {
+                    showLoading(false);
+                    onSuccess.run();
+                })
+                .addOnFailureListener(e -> {
+                    showLoading(false);
+                    Log.e(TAG, "Failed to save coupon: " + e.getMessage());
+                    onFailure.accept("Failed to save coupon: " + e.getMessage());
+                });
+    }
+
+    public void fetchCoupons(Consumer<List<Object>> onSuccess, Consumer<String> onFailure) {
+        showLoading(true);
+        List<Object> itemList = new ArrayList<>();
+        db.collection("coupons").get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        Coupon coupon = doc.toObject(Coupon.class);
+                        coupon.setId(doc.getId());
+                        itemList.add(coupon);
+                    }
+                    onSuccess.accept(itemList);
+                    showLoading(false);
+                })
+                .addOnFailureListener(e -> {
+                    showLoading(false);
+                    onFailure.accept("Failed to fetch coupons: " + e.getMessage());
+                });
+    }
+
+    public void updateCoupon(Coupon coupon, Runnable onSuccess, Consumer<String> onFailure) {
+        showLoading(true);
+        db.collection("coupons").document(coupon.getId()).set(coupon)
+                .addOnSuccessListener(aVoid -> {
+                    showLoading(false);
+                    onSuccess.run();
+                })
+                .addOnFailureListener(e -> {
+                    showLoading(false);
+                    Log.e(TAG, "Failed to update coupon: " + e.getMessage());
+                    onFailure.accept("Failed: " + e.getMessage());
+                });
+    }
+
+    public void deleteCoupon(Coupon coupon, Runnable onSuccess, Consumer<String> onFailure) {
+        showLoading(true);
+        db.collection("coupons").document(coupon.getId()).delete()
+                .addOnSuccessListener(aVoid -> {
+                    showLoading(false);
+                    onSuccess.run();
+                })
+                .addOnFailureListener(e -> {
+                    showLoading(false);
+                    Log.e(TAG, "Delete failed: " + e.getMessage());
+                    onFailure.accept("Delete failed: " + e.getMessage());
+                });
+    }
+
+    private void showLoading(boolean show) {
+        if (loadingSpinnerUtil != null) {
+            loadingSpinnerUtil.toggleLoadingSpinner(show);
+        } else {
+            Log.w(TAG, "Loading spinner utility is null, skipping visibility toggle");
+        }
     }
 }

@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Fixed Tab Layout -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:tabMode="scrollable"
+        app:tabGravity="fill"
+        app:tabIndicatorColor="@color/accent_blue"
+        app:tabTextColor="@color/text_secondary"
+        app:tabSelectedTextColor="@color/text_primary">
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Delivery Personnel" />
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Delivery Fees" />
+    </com.google.android.material.tabs.TabLayout>
+
+    <!-- Scrollable Content with Swipe-to-Refresh -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Delivery Personnel Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/personnelSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="visible"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Manage Delivery Personnel"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_personnel_name"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Name"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_personnel_contact"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Contact Details"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="phone" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_personnel_postal_codes"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Assigned Postal Codes (comma-separated)"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_add_personnel"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="Add Personnel"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Delivery Fees Section -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/feesSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/card_background"
+                    app:cardElevation="4dp"
+                    app:cardCornerRadius="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Manage Delivery Fees"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_fee_city"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="City"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_fee_postal_code"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Postal Code"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_fee_amount"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Delivery Fee (RM)"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="numberDecimal" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_fee_discount"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Discount (RM, optional)"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="numberDecimal" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="Free Delivery?"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_primary" />
+
+                        <RadioGroup
+                            android:id="@+id/rg_free_delivery"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+                            <RadioButton
+                                android:id="@+id/rb_free_yes"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Yes"
+                                android:textColor="@color/accent_blue" />
+                            <RadioButton
+                                android:id="@+id/rb_free_no"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="No"
+                                android:textColor="@color/accent_blue"
+                                android:layout_marginStart="16dp" />
+                        </RadioGroup>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_fee_estimated_days"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Estimated Days"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="number" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_add_fee"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:text="Add Fee"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@color/accent_blue"
+                            app:cornerRadius="8dp"
+                            style="@style/Widget.MaterialComponents.Button" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- RecyclerView and Empty View -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="16dp"
+                    android:minHeight="200dp">
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/deliveryRecyclerView"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="16dp"
+                        android:background="@android:color/transparent"
+                        android:nestedScrollingEnabled="false" />
+                    <TextView
+                        android:id="@+id/emptyView"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="No items available"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="18sp"
+                        android:background="@android:color/transparent" />
+                </FrameLayout>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+</LinearLayout>

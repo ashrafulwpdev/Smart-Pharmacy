@@ -10,7 +10,7 @@ public class Address {
     private String country;
     private String email;
     private String phoneNumber;
-    private Boolean isDefault;  // ✅ Use Boolean instead of boolean
+    private Boolean isDefault;
     private String landmark;
 
     // 🔹 Empty constructor for Firestore

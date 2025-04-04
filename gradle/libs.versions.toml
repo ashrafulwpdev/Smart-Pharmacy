@@ -9,6 +9,8 @@ activity = "1.10.0"
 constraintlayout = "2.2.0"
 sltloader = "v1.0.1"
 playServicesNearby = "19.3.0"
+navigationFragment = "2.8.9"
+navigationUi = "2.8.9"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -20,6 +22,8 @@ activity = { group = "androidx.activity", name = "activity", version.ref = "acti
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 sltloader = { module = "com.github.ashrafulwpdev:SLTLoader", version.ref = "sltloader" }
 play-services-nearby = { group = "com.google.android.gms", name = "play-services-nearby", version.ref = "playServicesNearby" }
+navigation-fragment = { group = "androidx.navigation", name = "navigation-fragment", version.ref = "navigationFragment" }
+navigation-ui = { group = "androidx.navigation", name = "navigation-ui", version.ref = "navigationUi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

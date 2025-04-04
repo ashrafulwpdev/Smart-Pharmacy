@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -35,6 +36,7 @@ import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.CartAdapter;
 import com.oopgroup.smartpharmacy.models.CartItem;
+import com.oopgroup.smartpharmacy.models.Coupon;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,7 +45,7 @@ import java.util.Map;
 
 public class CartFragment extends Fragment implements CartAdapter.OnQuantityChangeListener, AddressDialogFragment.OnAddressSelectedListener {
     private static final String TAG = "CartFragment";
-    private static final String CURRENCY = "RM"; // Currency symbol
+    private static final String CURRENCY = "RM";
 
     private RecyclerView rvCartItems;
     private SwipeRefreshLayout swipeRefreshLayout;
@@ -70,7 +72,8 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
     private double deliveryFee = 0.0;
     private double grandTotal = 0.0;
 
-    private String selectedAddressId; // Store the Firestore document ID of the selected address
+    private String selectedAddressId;
+    private String appliedCouponCode;
 
     @Nullable
     @Override
@@ -83,7 +86,6 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
         super.onViewCreated(view, savedInstanceState);
         Log.d(TAG, "onViewCreated called");
 
-        // Initialize views
         toolbar = view.findViewById(R.id.toolbar);
         rvCartItems = view.findViewById(R.id.rv_cart_items);
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
@@ -101,11 +103,9 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
         mainContentLayout = view.findViewById(R.id.main_content_layout);
         btnGoShopping = view.findViewById(R.id.btn_go_shopping);
 
-        // Initialize Firestore and Auth
         db = FirebaseFirestore.getInstance();
         mAuth = FirebaseAuth.getInstance();
 
-        // Check if user is logged in
         if (mAuth.getCurrentUser() == null) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
@@ -114,34 +114,31 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
             return;
         }
 
-        // Setup Toolbar
         setupToolbar();
 
-        // Initialize cart items list and adapter
         cartItems = new ArrayList<>();
         cartAdapter = new CartAdapter(getContext(), cartItems, this);
         rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
         rvCartItems.setAdapter(cartAdapter);
 
-        // Fetch cart items and initial address
         fetchCartItems();
         fetchInitialAddress();
 
-        // Apply coupon button click listener
         btnApplyCoupon.setOnClickListener(v -> {
             String couponCode = etCoupon.getText().toString().trim();
             if (!couponCode.isEmpty()) {
                 applyCoupon(couponCode);
+            } else {
+                Toast.makeText(getContext(), "Please enter a coupon code", Toast.LENGTH_SHORT).show();
             }
         });
 
-        // Set click listener for Change Address button
         btnChangeAddress.setOnClickListener(v -> showAddressDialog());
 
-        // Set click listener for Select Address button
         btnSelectAddress.setOnClickListener(v -> {
             if (cartItems.isEmpty()) {
                 Log.w(TAG, "Cart is empty, cannot proceed to checkout");
+                Toast.makeText(getContext(), "Your cart is empty", Toast.LENGTH_SHORT).show();
                 return;
             }
             if (selectedAddressId == null) {
@@ -152,8 +149,9 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                 Bundle args = new Bundle();
                 args.putString("selected_address_id", selectedAddressId);
                 args.putDouble("grand_total", grandTotal);
-                args.putDouble("discount", discount); // Pass discount
-                args.putDouble("delivery_fee", deliveryFee); // Pass delivery fee
+                args.putDouble("discount", discount);
+                args.putDouble("delivery_fee", deliveryFee);
+                args.putString("coupon_code", appliedCouponCode);
                 checkoutFragment.setArguments(args);
                 requireActivity().getSupportFragmentManager()
                         .beginTransaction()
@@ -163,23 +161,16 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
             }
         });
 
-        // Setup Swipe-to-Refresh
         swipeRefreshLayout.setOnRefreshListener(() -> {
             fetchCartItems();
             fetchInitialAddress();
             swipeRefreshLayout.setRefreshing(false);
         });
 
-        // Swipe-to-delete with premium icon and animation
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
-            private final Drawable backgroundDrawable;
-            private final Drawable deleteIcon;
+            private final Drawable backgroundDrawable = ContextCompat.getDrawable(getContext(), R.drawable.swipe_background);
+            private final Drawable deleteIcon = ContextCompat.getDrawable(getContext(), R.drawable.premium_delete_icon);
             private final int iconMargin = (int) (12 * getResources().getDisplayMetrics().density);
-
-            {
-                backgroundDrawable = ContextCompat.getDrawable(getContext(), R.drawable.swipe_background);
-                deleteIcon = ContextCompat.getDrawable(getContext(), R.drawable.premium_delete_icon);
-            }
 
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
@@ -209,7 +200,7 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                 db.collection("cart")
                         .document(userId)
                         .collection("items")
-                        .document(itemToDelete.getProductId()) // Use productId as document ID
+                        .document(itemToDelete.getProductId())
                         .delete()
                         .addOnSuccessListener(aVoid -> {
                             requireActivity().runOnUiThread(() -> {
@@ -221,6 +212,7 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                         })
                         .addOnFailureListener(e -> {
                             requireActivity().runOnUiThread(() -> cartAdapter.notifyItemChanged(position));
+                            Log.e(TAG, "Failed to delete item: " + e.getMessage());
                         });
             }
 
@@ -256,7 +248,6 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
         });
         itemTouchHelper.attachToRecyclerView(rvCartItems);
 
-        // Go Shopping button listener
         btnGoShopping.setOnClickListener(v -> {
             if (requireActivity() instanceof MainActivity) {
                 ((MainActivity) requireActivity()).navigateToHome();
@@ -265,7 +256,6 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
             }
         });
 
-        // Hide bottom navigation bar
         hideBottomNavigation();
     }
 
@@ -319,7 +309,7 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
             }
         });
 
-        toolbar.getMenu().findItem(R.id.action_search).setOnActionExpandListener(new android.view.MenuItem.OnActionExpandListener() {
+        toolbar.getMenu().findItem(R.id.action_search).setOnActionExpandListener(new androidx.appcompat.view.menu.MenuItemImpl.OnActionExpandListener() {
             @Override
             public boolean onMenuItemActionExpand(android.view.MenuItem item) {
                 return true;
@@ -339,7 +329,6 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                 .collection("items")
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
-                    // Group items by productId to merge duplicates
                     Map<String, CartItem> mergedItems = new HashMap<>();
                     List<DocumentReference> docsToDelete = new ArrayList<>();
 
@@ -349,7 +338,6 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                         String productId = cartItem.getProductId();
 
                         if (mergedItems.containsKey(productId)) {
-                            // Merge with existing item
                             CartItem existingItem = mergedItems.get(productId);
                             int newQuantity = existingItem.getQuantity() + cartItem.getQuantity();
                             double newTotal = existingItem.getTotal() + cartItem.getTotal();
@@ -361,22 +349,19 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                         } else {
                             mergedItems.put(productId, cartItem);
                             if (!doc.getId().equals(productId)) {
-                                // If the document ID doesn't match the productId, we'll need to update it
                                 docsToDelete.add(db.collection("cart").document(userId).collection("items").document(doc.getId()));
                             }
                         }
                     }
 
-                    // Delete duplicate or incorrectly ID'd documents
                     for (DocumentReference docRef : docsToDelete) {
                         docRef.delete();
                     }
 
-                    // Update merged items in Firestore with correct document ID (productId)
                     for (CartItem item : mergedItems.values()) {
                         db.collection("cart").document(userId)
                                 .collection("items")
-                                .document(item.getProductId()) // Use productId as document ID
+                                .document(item.getProductId())
                                 .set(item);
                     }
 
@@ -389,16 +374,15 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
 
     private void fetchInitialAddress() {
         String userId = mAuth.getCurrentUser().getUid();
-        // First, try to load the last selected address
         db.collection("users")
                 .document(userId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists() && documentSnapshot.contains("lastSelectedAddressId")) {
                         selectedAddressId = documentSnapshot.getString("lastSelectedAddressId");
+                        fetchDeliveryFeeForAddress(selectedAddressId);
                         updateButtonState();
                     } else {
-                        // Fallback to default address
                         db.collection("users")
                                 .document(userId)
                                 .collection("addresses")
@@ -409,14 +393,83 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                                     if (!queryDocumentSnapshots.isEmpty()) {
                                         QueryDocumentSnapshot doc = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments().get(0);
                                         selectedAddressId = doc.getId();
+                                        fetchDeliveryFeeForAddress(selectedAddressId);
                                         saveSelectedAddress(selectedAddressId);
                                         updateButtonState();
                                     } else {
                                         selectedAddressId = null;
+                                        deliveryFee = 0.0;
                                         updateButtonState();
+                                        updateSummary();
                                     }
+                                })
+                                .addOnFailureListener(e -> {
+                                    selectedAddressId = null;
+                                    deliveryFee = 0.0;
+                                    updateButtonState();
+                                    updateSummary();
+                                    Log.e(TAG, "Failed to fetch default address: " + e.getMessage());
                                 });
                     }
+                })
+                .addOnFailureListener(e -> {
+                    selectedAddressId = null;
+                    deliveryFee = 0.0;
+                    updateButtonState();
+                    updateSummary();
+                    Log.e(TAG, "Failed to fetch user document: " + e.getMessage());
+                });
+    }
+
+    private void fetchDeliveryFeeForAddress(String addressId) {
+        if (addressId == null) {
+            deliveryFee = 0.0;
+            updateSummary();
+            return;
+        }
+
+        String userId = mAuth.getCurrentUser().getUid();
+        db.collection("users")
+                .document(userId)
+                .collection("addresses")
+                .document(addressId)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        String postalCode = doc.getString("postalCode");
+                        if (postalCode != null) {
+                            db.collection("delivery_fees")
+                                    .document(postalCode)
+                                    .get()
+                                    .addOnSuccessListener(feeDoc -> {
+                                        if (feeDoc.exists()) {
+                                            double baseFee = feeDoc.getDouble("fee") != null ? feeDoc.getDouble("fee") : 0.0;
+                                            double discount = feeDoc.getDouble("discount") != null ? feeDoc.getDouble("discount") : 0.0;
+                                            boolean freeDelivery = feeDoc.getBoolean("freeDelivery") != null && feeDoc.getBoolean("freeDelivery");
+                                            deliveryFee = freeDelivery ? 0.0 : Math.max(baseFee - discount, 0.0);
+                                        } else {
+                                            deliveryFee = 0.0;
+                                        }
+                                        updateSummary();
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        deliveryFee = 0.0;
+                                        updateSummary();
+                                        Log.e(TAG, "Failed to fetch delivery fee: " + e.getMessage());
+                                    });
+                        } else {
+                            deliveryFee = 0.0;
+                            updateSummary();
+                        }
+                    } else {
+                        deliveryFee = 0.0;
+                        updateSummary();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    deliveryFee = 0.0;
+                    updateSummary();
+                    Log.e(TAG, "Failed to fetch address: " + e.getMessage());
                 });
     }
 
@@ -430,8 +483,33 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
     }
 
     private void applyCoupon(String couponCode) {
-        discount = 2.00; // Example discount, replace with actual logic
-        updateSummary();
+        db.collection("coupons")
+                .whereEqualTo("code", couponCode)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (!queryDocumentSnapshots.isEmpty()) {
+                        QueryDocumentSnapshot doc = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments().get(0);
+                        Coupon coupon = doc.toObject(Coupon.class);
+                        coupon.setId(doc.getId());
+                        discount = coupon.getDiscount();
+                        appliedCouponCode = couponCode;
+                        Toast.makeText(getContext(), "Coupon applied! Discount: " + CURRENCY + " " + String.format("%.2f", discount), Toast.LENGTH_SHORT).show();
+                        updateSummary();
+                    } else {
+                        discount = 0.0;
+                        appliedCouponCode = null;
+                        Toast.makeText(getContext(), "Invalid or expired coupon code", Toast.LENGTH_SHORT).show();
+                        updateSummary();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    discount = 0.0;
+                    appliedCouponCode = null;
+                    Toast.makeText(getContext(), "Error applying coupon: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to fetch coupon: " + e.getMessage());
+                    updateSummary();
+                });
     }
 
     private void updateSummary() {
@@ -461,13 +539,13 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
         lastUpdateTime = currentTime;
 
         String userId = mAuth.getCurrentUser().getUid();
-        double price = cartItem.getDiscountedPrice() != 0 ? cartItem.getDiscountedPrice() : cartItem.getOriginalPrice(); // Fixed typo: item -> cartItem
+        double price = cartItem.getDiscountedPrice() != 0 ? cartItem.getDiscountedPrice() : cartItem.getOriginalPrice();
         double newTotal = price * newQuantity;
 
         DocumentReference cartItemRef = db.collection("cart")
                 .document(userId)
                 .collection("items")
-                .document(cartItem.getProductId()); // Use productId as document ID
+                .document(cartItem.getProductId());
 
         if (newQuantity > 0) {
             cartItemRef.update(
@@ -479,14 +557,14 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
                 cartItem.setQuantity(newQuantity);
                 updateSummary();
                 updateCartVisibility();
-            });
+            }).addOnFailureListener(e -> Log.e(TAG, "Failed to update quantity: " + e.getMessage()));
         } else {
             cartItemRef.delete().addOnSuccessListener(aVoid -> {
                 cartItems.remove(cartItem);
                 cartAdapter.notifyDataSetChanged();
                 updateSummary();
                 updateCartVisibility();
-            });
+            }).addOnFailureListener(e -> Log.e(TAG, "Failed to delete item: " + e.getMessage()));
         }
     }
 
@@ -494,6 +572,7 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
     public void onAddressSelected(String addressId, String address) {
         selectedAddressId = addressId;
         saveSelectedAddress(addressId);
+        fetchDeliveryFeeForAddress(addressId);
         updateButtonState();
     }
 
@@ -515,6 +594,7 @@ public class CartFragment extends Fragment implements CartAdapter.OnQuantityChan
             btnSelectAddress.setBackgroundResource(R.drawable.btn_interactive_white);
             btnChangeAddress.setVisibility(View.VISIBLE);
         }
+        updateSummary();
     }
 
     private void updateCartVisibility() {

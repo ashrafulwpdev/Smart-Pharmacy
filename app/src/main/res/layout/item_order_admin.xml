@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="6dp"
+    app:cardBackgroundColor="@android:color/white">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:background="@drawable/gradient_background">
+
+        <!-- Header with Image and Status -->
+        <ImageView
+            android:id="@+id/iv_product_image"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/default_product_image"
+            android:contentDescription="@string/product_image_description"
+            android:background="@drawable/image_background"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tv_order_number"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:text="#12345"
+            android:layout_marginStart="12dp"
+            app:layout_constraintStart_toEndOf="@id/iv_product_image"
+            app:layout_constraintTop_toTopOf="@id/iv_product_image"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:text="Order Confirmed"
+            app:layout_constraintStart_toStartOf="@id/tv_order_number"
+            app:layout_constraintTop_toBottomOf="@id/tv_order_number"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Details -->
+        <TextView
+            android:id="@+id/tv_address"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:text="123 Main St, City, State, 12345, Country"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/iv_product_image" />
+
+        <TextView
+            android:id="@+id/tv_item_count"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:text="3 Items"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_address"
+            app:layout_constraintEnd_toStartOf="@id/tv_total" />
+
+        <TextView
+            android:id="@+id/tv_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/accent_blue"
+            android:text="RM 150.00"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/tv_item_count"
+            app:layout_constraintBottom_toBottomOf="@id/tv_item_count" />
+
+        <TextView
+            android:id="@+id/tv_prescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:text="Prescription: Uploaded"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_item_count" />
+
+        <!-- Action Buttons -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_update_status"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/update_status"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:cornerRadius="8dp"
+            app:strokeColor="@color/accent_blue"
+            app:strokeWidth="1dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_prescription"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_approve_prescription"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:text="@string/approve_prescription"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:cornerRadius="8dp"
+            app:backgroundTint="@color/accent_blue"
+            style="@style/Widget.MaterialComponents.Button"
+            app:layout_constraintStart_toEndOf="@id/btn_update_status"
+            app:layout_constraintTop_toTopOf="@id/btn_update_status" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_reject_prescription"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:text="@string/reject_prescription"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:cornerRadius="8dp"
+            app:strokeColor="@color/accent_blue"
+            app:strokeWidth="1dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:layout_constraintStart_toEndOf="@id/btn_approve_prescription"
+            app:layout_constraintTop_toTopOf="@id/btn_update_status" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_cancel_order"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:text="@string/cancel_order"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:textColor="@color/errorLight"
+            app:cornerRadius="8dp"
+            app:backgroundTint="@android:color/transparent"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/btn_update_status" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.cardview.widget.CardView>

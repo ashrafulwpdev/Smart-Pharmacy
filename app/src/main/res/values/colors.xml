@@ -3,7 +3,7 @@
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="blue">#2196F3</color>
-    <color name="dark_blue">#1976D2</color> <!-- Removed primary_blue as it duplicated this -->
+    <color name="dark_blue">#1976D2</color>
     <color name="green">#16B364</color>
     <color name="orange">#FFA500</color>
     <color name="red">#D32F2F</color> <!-- Removed error_red as it duplicated this -->

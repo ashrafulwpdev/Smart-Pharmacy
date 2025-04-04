@@ -65,6 +65,7 @@
         <activity android:name=".ChangePasswordActivity" android:exported="false" />
         <activity android:name=".adminstaff.AdminActivity" android:exported="false" />
         <activity android:name=".ManageAddressActivity" />
+        <activity android:name=".adminstaff.AdminMainActivity" />
 
         <!-- Facebook SDK -->
         <meta-data

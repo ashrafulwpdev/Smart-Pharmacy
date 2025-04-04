@@ -2,6 +2,7 @@ package com.oopgroup.smartpharmacy.models;
 
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.PropertyName;
+
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,8 @@ public class Order implements Serializable {
     private String orderId;
     private String userId;
     private String addressId;
+    private Address address; // New field to store address object
+    private Integer estimatedDays; // New field for estimated days
     private String paymentMethod;
     private double grandTotal;
     private String status;
@@ -23,10 +26,12 @@ public class Order implements Serializable {
     private String orderType; // "LabTest" or "Product"
     private String deliveryBoyName; // For product orders
     private String deliveryBoyPhone; // For product orders
+    private String prescriptionUrl; // URL to uploaded prescription, if any
+    private Boolean prescriptionApproved; // Approval status of prescription
 
     public Order() {
-        // Set a default value for orderType
         this.orderType = "LabTest"; // Default to "LabTest" if not specified
+        this.prescriptionApproved = null; // Null means not applicable or not yet reviewed
     }
 
     // Getters and setters
@@ -41,6 +46,12 @@ public class Order implements Serializable {
 
     public String getAddressId() { return addressId; }
     public void setAddressId(String addressId) { this.addressId = addressId; }
+
+    public Address getAddress() { return address; }
+    public void setAddress(Address address) { this.address = address; }
+
+    public Integer getEstimatedDays() { return estimatedDays; }
+    public void setEstimatedDays(Integer estimatedDays) { this.estimatedDays = estimatedDays; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
@@ -80,6 +91,12 @@ public class Order implements Serializable {
 
     public String getDeliveryBoyPhone() { return deliveryBoyPhone; }
     public void setDeliveryBoyPhone(String deliveryBoyPhone) { this.deliveryBoyPhone = deliveryBoyPhone; }
+
+    public String getPrescriptionUrl() { return prescriptionUrl; }
+    public void setPrescriptionUrl(String prescriptionUrl) { this.prescriptionUrl = prescriptionUrl; }
+
+    public Boolean getPrescriptionApproved() { return prescriptionApproved; }
+    public void setPrescriptionApproved(Boolean prescriptionApproved) { this.prescriptionApproved = prescriptionApproved; }
 
     public String getFirstProductId() {
         return (items != null && !items.isEmpty()) ? (String) items.get(0).get("productId") : null;

@@ -15,11 +15,12 @@ import com.bumptech.glide.Glide;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.models.Banner;
 import com.oopgroup.smartpharmacy.models.Category;
+import com.oopgroup.smartpharmacy.models.Coupon;
 import com.oopgroup.smartpharmacy.models.LabTest;
 import com.oopgroup.smartpharmacy.models.Product;
+import com.oopgroup.smartpharmacy.models.User;
 
 import java.util.List;
-import java.util.Map;
 
 public class AdminItemAdapter extends RecyclerView.Adapter<AdminItemAdapter.ViewHolder> {
     private static final String TAG = "AdminItemAdapter";
@@ -50,7 +51,7 @@ public class AdminItemAdapter extends RecyclerView.Adapter<AdminItemAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Object item = items.get(position);
 
-        holder.imageView.setVisibility(View.VISIBLE); // Ensure ImageView is visible by default
+        holder.imageView.setVisibility(View.VISIBLE);
 
         if (item instanceof Banner) {
             Banner banner = (Banner) item;
@@ -96,19 +97,23 @@ public class AdminItemAdapter extends RecyclerView.Adapter<AdminItemAdapter.View
                     .placeholder(R.drawable.placeholder_image)
                     .error(R.drawable.placeholder_image)
                     .into(holder.imageView);
-        } else if (item instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) item;
-            if (map.containsKey("email")) {
-                holder.titleTextView.setText((String) map.get("name"));
-                holder.descriptionTextView.setText((String) map.get("email"));
-                holder.additionalInfoTextView.setText("");
-                holder.imageView.setVisibility(View.GONE);
-            } else if (map.containsKey("status")) {
-                holder.titleTextView.setText("Order ID: " + map.get("id"));
-                holder.descriptionTextView.setText("User ID: " + map.get("userId"));
-                holder.additionalInfoTextView.setText("Status: " + map.get("status"));
-                holder.imageView.setVisibility(View.GONE);
-            }
+        } else if (item instanceof User) {
+            User user = (User) item;
+            holder.titleTextView.setText(user.getName());
+            holder.descriptionTextView.setText(user.getEmail());
+            holder.additionalInfoTextView.setText("Role: " + user.getRole());
+            holder.imageView.setVisibility(View.GONE);
+        } else if (item instanceof Coupon) {
+            Coupon coupon = (Coupon) item;
+            holder.titleTextView.setText("Code: " + coupon.getCode());
+            holder.descriptionTextView.setText("Discount: " + coupon.getDiscount() + "%");
+            holder.additionalInfoTextView.setText("");
+            holder.imageView.setVisibility(View.GONE);
+        } else {
+            holder.titleTextView.setText("Unknown Item");
+            holder.descriptionTextView.setText("");
+            holder.additionalInfoTextView.setText("");
+            holder.imageView.setVisibility(View.GONE);
         }
 
         holder.editButton.setOnClickListener(v -> {

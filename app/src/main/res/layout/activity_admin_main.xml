@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_light">
+
+    <!-- Toolbar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/background_light"
+        app:title="@string/admin_dashboard_title"
+        app:titleTextColor="@color/text_primary"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+
+    <!-- Fragment Container -->
+    <FrameLayout
+        android:id="@+id/fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/toolbar"
+        android:layout_above="@id/bottomNav" />
+
+    <!-- Custom Bottom Navigation -->
+    <RelativeLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/navbg"
+        android:elevation="10dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <!-- Dashboard -->
+            <LinearLayout
+                android:id="@+id/navDashboard"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/dashboardIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_dashboard"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/dashboard" />
+                <TextView
+                    android:id="@+id/dashboardText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Dashboard"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Orders -->
+            <LinearLayout
+                android:id="@+id/navOrders"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/ordersIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_orders"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/ic_ad_orders" />
+                <TextView
+                    android:id="@+id/ordersText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Orders"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Home -->
+            <LinearLayout
+                android:id="@+id/navHome"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/homeIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_home"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/home" />
+                <TextView
+                    android:id="@+id/homeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Home"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Delivery -->
+            <LinearLayout
+                android:id="@+id/navDelivery"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/deliveryIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_delivery"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/ic_delivery" />
+                <TextView
+                    android:id="@+id/deliveryText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Delivery"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Management -->
+            <LinearLayout
+                android:id="@+id/navManagement"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="2dp">
+                <View
+                    android:id="@+id/managementIndicator"
+                    android:layout_width="25dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/transparent" />
+                <ImageView
+                    android:id="@+id/ic_management"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="4dp"
+                    android:src="@drawable/manage" />
+                <TextView
+                    android:id="@+id/managementText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Manage"
+                    android:textColor="@color/nav_inactive"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </RelativeLayout>
+
+</RelativeLayout>

@@ -55,6 +55,7 @@ import com.oopgroup.smartpharmacy.LoginActivity;
 import com.oopgroup.smartpharmacy.ProfileAuthHelper;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
+import com.oopgroup.smartpharmacy.adminstaff.AdminMainActivity;
 import com.oopgroup.smartpharmacy.utils.LogoutConfirmationDialog;
 import com.softourtech.slt.SLTLoader;
 
@@ -337,7 +338,7 @@ public class ProfileFragment extends Fragment {
                         hideLoader(); // Hide when data is loaded
                         String role = documentSnapshot.getString("role");
                         if ("admin".equals(role)) {
-                            startActivity(new Intent(requireContext(), AdminActivity.class));
+                            startActivity(new Intent(requireContext(), AdminMainActivity.class));
                         } else {
                             showCustomToast("Access denied. Admins only.", false);
                         }
