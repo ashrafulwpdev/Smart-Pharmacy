@@ -123,13 +123,15 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
                     String id = doc.getId();
                     String name = doc.getString("name");
                     String imageUrl = doc.getString("imageUrl");
+                    String tests = doc.getString("tests");
+                    Double price = doc.getDouble("price");
 
                     if (name != null && imageUrl != null) {
-                        LabTest labTest = new LabTest(id, name, imageUrl);
+                        LabTest labTest = new LabTest(id, name, imageUrl, tests, price != null ? price : 0.0);
                         labTestList.add(labTest);
                     }
                 }
-                labTestAdapter.notifyDataSetChanged();
+                labTestAdapter.updateLabTests(labTestList); // Use the update method from the adapter
             }
         });
     }
@@ -144,12 +146,19 @@ public class LabTestFragment extends Fragment implements LabTestGridAdapter.OnLa
                 .replace(R.id.fragment_container, cartFragment)
                 .addToBackStack(null) // Allows returning to LabTestFragment
                 .commit();
-
     }
 
     @Override
     public void onLabTestClick(LabTest labTest) {
         if (!isAdded()) return;
+
+        // Navigate to LabTestDetailsFragment
+        LabTestDetailsFragment detailsFragment = LabTestDetailsFragment.newInstance(labTest.getId());
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, detailsFragment)
+                .addToBackStack(null) // Allows returning to LabTestFragment
+                .commit();
     }
 
     @Override

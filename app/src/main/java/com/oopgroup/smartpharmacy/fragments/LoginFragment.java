@@ -3,6 +3,7 @@ package com.oopgroup.smartpharmacy.fragments;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -19,12 +20,13 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -35,20 +37,20 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.hbb20.CountryCodePicker;
-import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
-import com.oopgroup.smartpharmacy.utils.AuthUtils;
 import com.oopgroup.smartpharmacy.ForgotPassActivity;
 import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.SignupActivity;
+import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
+import com.oopgroup.smartpharmacy.utils.AuthUtils;
+import com.softourtech.slt.SLTLoader;
 
 public class LoginFragment extends Fragment {
 
     private static final int RC_GOOGLE_SIGN_IN = 9001;
-    private static final int PHONE_STATE_PERMISSION_REQUEST_CODE = 1001;
     private static final String TAG = "LoginFragment";
+
     private EditText credInput, passwordInput;
-    private LottieAnimationView loadingSpinner;
     private TextView signupText, forgotText;
     private ImageView passwordToggle, googleLogin, emailIcon, phoneIcon;
     private CountryCodePicker ccp;
@@ -56,10 +58,19 @@ public class LoginFragment extends Fragment {
     private GoogleSignInClient mGoogleSignInClient;
     private FirebaseFirestore firestore;
     private boolean isPasswordVisible = false;
+    private SLTLoader sltLoader;
 
-    public LoginFragment() {
-        // Required empty public constructor
-    }
+    private final ActivityResultLauncher<String> requestPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+                if (isGranted) {
+                    AuthUtils.fetchSimNumber(requireActivity(), credInput);
+                } else {
+                    Log.w(TAG, "Phone state permission denied");
+                    showCustomToast("Permission denied. SIM number detection unavailable.", false);
+                }
+            });
+
+    public LoginFragment() {}
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -70,21 +81,26 @@ public class LoginFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize Firebase
+        // Initialize SLTLoader with the activity's root view (full screen)
+        View activityRoot = requireActivity().findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e(TAG, "Activity root view not found or not a ViewGroup");
+            sltLoader = new SLTLoader(requireContext(), (ViewGroup) view); // Fallback to fragment root
+        } else {
+            sltLoader = new SLTLoader(requireContext(), (ViewGroup) activityRoot);
+        }
+
         mAuth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
 
-        // Initialize Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
 
-        // Initialize UI
         credInput = view.findViewById(R.id.credInput);
         passwordInput = view.findViewById(R.id.passwordInput);
-        loadingSpinner = view.findViewById(R.id.loadingSpinner);
         signupText = view.findViewById(R.id.signupText);
         forgotText = view.findViewById(R.id.forgotText);
         passwordToggle = view.findViewById(R.id.passwordToggle);
@@ -94,11 +110,7 @@ public class LoginFragment extends Fragment {
         ccp = view.findViewById(R.id.ccp);
         Button loginBtn = view.findViewById(R.id.loginBtn);
 
-        // Configure CCP
-        ccp.setCustomMasterCountries("BD,MY,SG");
-        ccp.setCountryForNameCode("BD");
-
-        // Setup listeners and permissions
+        setupCCP();
         requestPhoneStatePermission();
         setupDynamicInput();
         setupInputValidation();
@@ -110,18 +122,22 @@ public class LoginFragment extends Fragment {
         googleLogin.setOnClickListener(v -> signInWithGoogle());
     }
 
-    private void requestPhoneStatePermission() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, PHONE_STATE_PERMISSION_REQUEST_CODE);
+    private void setupCCP() {
+        if (ccp != null && credInput != null) {
+            ccp.registerCarrierNumberEditText(credInput);
+            ccp.setCustomMasterCountries("BD,MY,SG");
+            ccp.setCountryForNameCode("BD");
+            ccp.setNumberAutoFormattingEnabled(false);
+            Log.d(TAG, "CCP registered with credInput");
         } else {
-            AuthUtils.fetchSimNumber(requireActivity(), credInput);
+            Log.e(TAG, "CCP or credInput is null");
         }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PHONE_STATE_PERMISSION_REQUEST_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+    private void requestPhoneStatePermission() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE);
+        } else {
             AuthUtils.fetchSimNumber(requireActivity(), credInput);
         }
     }
@@ -133,43 +149,35 @@ public class LoginFragment extends Fragment {
 
     private void setupInputValidation() {
         credInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 resetInputBorders();
                 adjustCredInputPadding();
             }
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void afterTextChanged(Editable s) {}
         });
 
         passwordInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 resetInputBorders();
-                if (s.length() < 6 && s.length() > 0) {
-                    passwordInput.setError("Password must be at least 6 characters");
-                }
+                if (s.length() < 6 && s.length() > 0) passwordInput.setError("Password must be at least 6 characters");
             }
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void afterTextChanged(Editable s) {}
         });
     }
 
     private void adjustCredInputPadding() {
-        ccp.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            if (ccp.getVisibility() == View.VISIBLE) {
-                int ccpWidth = ccp.getWidth();
-                int paddingStart = ccpWidth + (int) (10 * getResources().getDisplayMetrics().density);
-                credInput.setPadding(paddingStart, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
-            } else {
-                int defaultPadding = (int) (10 * getResources().getDisplayMetrics().density);
-                credInput.setPadding(defaultPadding, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
-            }
-        });
+        if (ccp != null) {
+            ccp.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                if (isAdded()) {
+                    int paddingStart = ccp.getVisibility() == View.VISIBLE ?
+                            ccp.getWidth() + (int) (10 * getResources().getDisplayMetrics().density) :
+                            (int) (10 * getResources().getDisplayMetrics().density);
+                    credInput.setPadding(paddingStart, credInput.getPaddingTop(), credInput.getPaddingEnd(), credInput.getPaddingBottom());
+                }
+            });
+        }
     }
 
     private void handleLogin() {
@@ -187,62 +195,89 @@ public class LoginFragment extends Fragment {
         String emailOrPhone = AuthUtils.isValidEmail(credentials) ? credentials : AuthUtils.normalizePhoneNumberForBackend(credentials, ccp, AuthUtils.getSimCountry(requireActivity()));
         final String loginEmail = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
 
-        loadingSpinner.setVisibility(View.VISIBLE);
+        // Show centered loader
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000")); // Match ProfileFragment
+               config.setChangeJsonColor(false);
+
+        sltLoader.showCustomLoader(config);
         setUiEnabled(false);
 
         mAuth.signInWithEmailAndPassword(loginEmail, password)
                 .addOnCompleteListener(requireActivity(), task -> {
-                    loadingSpinner.setVisibility(View.GONE);
+                    sltLoader.hideLoader();
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null && isAdded()) {
-                            Log.d(TAG, "Email/Password login successful, UID: " + user.getUid());
                             checkUserRole(user);
                         }
                     } else if (isAdded()) {
-                        Log.e(TAG, "Email/Password login failed: " + task.getException().getMessage(), task.getException());
                         showCustomToast("Login failed: " + task.getException().getMessage(), false);
                     }
                 });
     }
 
     private void checkUserRole(FirebaseUser user) {
-        if (!isAdded() || getActivity() == null) return;
+        if (!isAdded()) return;
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(R.raw.loading_spinner)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"));
+        sltLoader.showCustomLoader(config);
+
         firestore.collection("users").document(user.getUid())
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (!isAdded()) return;
+                    sltLoader.hideLoader();
                     String role = documentSnapshot.getString("role");
                     if (role == null) {
+                        sltLoader.showCustomLoader(config);
                         firestore.collection("users").document(user.getUid())
-                                .set(new UserRole("user"), com.google.firebase.firestore.SetOptions.merge())
+                                .set(new UserRole("customer"), com.google.firebase.firestore.SetOptions.merge())
                                 .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "Default role 'user' set for UID: " + user.getUid());
-                                    proceedWithRole(user, "user");
+                                    sltLoader.hideLoader();
+                                    proceedWithRole(user, "customer");
                                 })
                                 .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Error setting default role: " + e.getMessage(), e);
-                                    showCustomToast("Error setting role, defaulting to user", false);
-                                    proceedWithRole(user, "user");
+                                    sltLoader.hideLoader();
+                                    proceedWithRole(user, "customer");
                                 });
                     } else {
-                        Log.d(TAG, "Role fetched: " + role + " for UID: " + user.getUid());
                         proceedWithRole(user, role);
                     }
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
-                    Log.e(TAG, "Firestore fetch failed, falling back to 'user' role: " + e.getMessage(), e);
-                    showCustomToast("Database error, defaulting to user role", false);
-                    proceedWithRole(user, "user");
+                    sltLoader.hideLoader();
+                    proceedWithRole(user, "customer");
                 });
     }
 
     private void proceedWithRole(FirebaseUser user, String role) {
-        Intent intent = "admin".equals(role) ?
-                new Intent(requireContext(), AdminActivity.class) :
-                new Intent(requireContext(), MainActivity.class);
+        Intent intent;
+        switch (role) {
+            case "admin":
+                intent = new Intent(requireContext(), AdminActivity.class);
+                break;
+            case "pharmacist":
+                intent = new Intent(requireContext(), MainActivity.class);
+                Log.w(TAG, "Pharmacist role detected, redirecting to MainActivity (placeholder)");
+                break;
+            case "delivery_staff":
+                intent = new Intent(requireContext(), MainActivity.class);
+                Log.w(TAG, "Delivery Staff role detected, redirecting to MainActivity (placeholder)");
+                break;
+            case "customer":
+            default:
+                intent = new Intent(requireContext(), MainActivity.class);
+                break;
+        }
         showCustomToast("Login successful as " + role + "!", true);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
@@ -254,7 +289,6 @@ public class LoginFragment extends Fragment {
     }
 
     private void signInWithGoogle() {
-        Log.d(TAG, "Initiating Google Sign-In");
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
     }
@@ -266,33 +300,34 @@ public class LoginFragment extends Fragment {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
-                Log.d(TAG, "Google Sign-In successful, email: " + account.getEmail() + ", ID token: " + account.getIdToken());
-                loadingSpinner.setVisibility(View.VISIBLE);
+                SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(R.raw.loading_spinner)
+                        .setWidthDp(40)
+                        .setHeightDp(40)
+                        .setUseRoundedBox(true)
+                        .setOverlayColor(Color.parseColor("#80000000"));
+                sltLoader.showCustomLoader(config);
                 setUiEnabled(false);
                 AuthUtils.firebaseLoginWithGoogle(requireActivity(), account.getIdToken(), new AuthUtils.AuthCallback() {
                     @Override
                     public void onSuccess(FirebaseUser user) {
-                        loadingSpinner.setVisibility(View.GONE);
+                        sltLoader.hideLoader();
                         setUiEnabled(true);
                         if (isAdded()) {
-                            Log.d(TAG, "Google login callback success, UID: " + user.getUid());
                             checkUserRole(user);
                         }
                     }
 
                     @Override
                     public void onFailure(String errorMessage) {
-                        loadingSpinner.setVisibility(View.GONE);
+                        sltLoader.hideLoader();
                         setUiEnabled(true);
                         if (isAdded()) {
-                            Log.e(TAG, "Google login callback failed: " + errorMessage);
                             showCustomToast("Google login failed: " + errorMessage, false);
                         }
                     }
                 });
             } catch (ApiException e) {
-                Log.e(TAG, "Google Sign-In failed, status code: " + e.getStatusCode() + ", message: " + e.getMessage(), e);
-                loadingSpinner.setVisibility(View.GONE);
+                sltLoader.hideLoader();
                 setUiEnabled(true);
                 if (isAdded()) {
                     showCustomToast("Google Sign-In failed: " + e.getMessage(), false);
@@ -302,13 +337,8 @@ public class LoginFragment extends Fragment {
     }
 
     private void togglePasswordVisibility() {
-        if (isPasswordVisible) {
-            passwordInput.setTransformationMethod(PasswordTransformationMethod.getInstance());
-            passwordToggle.setImageResource(R.drawable.ic_eye_off);
-        } else {
-            passwordInput.setTransformationMethod(SingleLineTransformationMethod.getInstance());
-            passwordToggle.setImageResource(R.drawable.ic_eye_on);
-        }
+        passwordInput.setTransformationMethod(isPasswordVisible ? PasswordTransformationMethod.getInstance() : SingleLineTransformationMethod.getInstance());
+        passwordToggle.setImageResource(isPasswordVisible ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
         isPasswordVisible = !isPasswordVisible;
         passwordInput.setSelection(passwordInput.getText().toString().length());
     }
@@ -324,7 +354,7 @@ public class LoginFragment extends Fragment {
     }
 
     private void showCustomToast(String message, boolean isSuccess) {
-        if (!isAdded() || getActivity() == null) return;
+        if (!isAdded()) return;
         Toast toast = new Toast(requireContext());
         View toastView = LayoutInflater.from(requireContext()).inflate(R.layout.custom_toast, null);
         TextView toastText = toastView.findViewById(R.id.toast_text);
@@ -346,10 +376,20 @@ public class LoginFragment extends Fragment {
         passwordInput.setBackgroundResource(R.drawable.edittext_bg);
     }
 
-    // Helper class for Firestore role setting
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (ccp != null && credInput != null) {
+            ccp.deregisterCarrierNumberEditText();
+            Log.d(TAG, "CCP deregistered from credInput");
+        }
+        if (sltLoader != null) {
+            sltLoader.onDestroy();
+        }
+    }
+
     private static class UserRole {
         public String role;
-
         public UserRole(String role) {
             this.role = role;
         }

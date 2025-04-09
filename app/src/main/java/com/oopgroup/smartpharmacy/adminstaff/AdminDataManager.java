@@ -481,7 +481,7 @@ public class AdminDataManager {
         showLoading(true);
         String id = coupon.getId() != null ? coupon.getId() : db.collection("coupons").document().getId();
         coupon.setId(id);
-        db.collection("coupons").document(id).set(coupon)
+        db.collection("coupons").document(id).set(coupon.toMap())
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
                     onSuccess.run();
@@ -499,8 +499,7 @@ public class AdminDataManager {
         db.collection("coupons").get()
                 .addOnSuccessListener(querySnapshot -> {
                     for (QueryDocumentSnapshot doc : querySnapshot) {
-                        Coupon coupon = doc.toObject(Coupon.class);
-                        coupon.setId(doc.getId());
+                        Coupon coupon = Coupon.fromMap(doc.getData(), doc.getId());
                         itemList.add(coupon);
                     }
                     onSuccess.accept(itemList);
@@ -514,7 +513,7 @@ public class AdminDataManager {
 
     public void updateCoupon(Coupon coupon, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
-        db.collection("coupons").document(coupon.getId()).set(coupon)
+        db.collection("coupons").document(coupon.getId()).set(coupon.toMap())
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
                     onSuccess.run();
@@ -528,15 +527,42 @@ public class AdminDataManager {
 
     public void deleteCoupon(Coupon coupon, Runnable onSuccess, Consumer<String> onFailure) {
         showLoading(true);
-        db.collection("coupons").document(coupon.getId()).delete()
+        // Soft delete: set isActive to false
+        coupon.setActive(false);
+        db.collection("coupons").document(coupon.getId()).set(coupon.toMap())
                 .addOnSuccessListener(aVoid -> {
                     showLoading(false);
+                    Log.d(TAG, "Coupon soft-deleted (isActive set to false): " + coupon.getId());
                     onSuccess.run();
                 })
                 .addOnFailureListener(e -> {
                     showLoading(false);
-                    Log.e(TAG, "Delete failed: " + e.getMessage());
-                    onFailure.accept("Delete failed: " + e.getMessage());
+                    Log.e(TAG, "Failed to soft-delete coupon: " + e.getMessage());
+                    onFailure.accept("Failed to soft-delete coupon: " + e.getMessage());
+                });
+    }
+
+    private void fixCouponsIsActiveField() {
+        db.collection("coupons")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                        Object isActiveObj = doc.get("isActive");
+                        if (isActiveObj == null) {
+                            db.collection("coupons")
+                                    .document(doc.getId())
+                                    .update("isActive", true)
+                                    .addOnSuccessListener(aVoid -> {
+                                        Log.d(TAG, "Added isActive: true to coupon: " + doc.getId());
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Failed to add isActive to coupon " + doc.getId() + ": " + e.getMessage(), e);
+                                    });
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch coupons for isActive fix: " + e.getMessage(), e);
                 });
     }
 

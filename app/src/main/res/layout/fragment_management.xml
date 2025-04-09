@@ -221,7 +221,6 @@
                     app:cardBackgroundColor="@color/card_background"
                     app:cardElevation="4dp"
                     app:cardCornerRadius="12dp">
-                    <!-- ... (rest of the lab tests section remains unchanged) -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -252,6 +251,84 @@
                                 android:textColor="@color/text_primary"
                                 android:textColorHint="@color/text_secondary"
                                 android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/labTestTestsInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/lab_test_tests_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="textMultiLine"
+                                android:minLines="3"
+                                android:maxLines="5" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/labTestStockInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/lab_test_stock_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="number" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/labTestActualPriceInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/lab_test_actual_price_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="numberDecimal" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:hintTextColor="@color/text_hint"
+                            app:boxBackgroundColor="@color/white"
+                            app:boxStrokeColor="@color/accent_blue"
+                            app:boxStrokeWidth="1dp"
+                            app:boxStrokeWidthFocused="2dp"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/labTestPriceInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="@string/lab_test_price_hint"
+                                android:textColor="@color/text_primary"
+                                android:textColorHint="@color/text_secondary"
+                                android:inputType="numberDecimal" />
                         </com.google.android.material.textfield.TextInputLayout>
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/uploadLabTestImageButton"

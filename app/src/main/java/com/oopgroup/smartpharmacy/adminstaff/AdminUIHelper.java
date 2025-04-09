@@ -43,7 +43,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private CardView bannerSection, categoriesSection, labTestsSection, productsSection, usersSection, notificationsSection, scannerSection, couponsSection;
     private EditText bannerTitleInput, bannerDescriptionInput, bannerDiscountInput;
     private EditText categoryNameInput;
-    private EditText labTestNameInput;
+    private EditText labTestNameInput, labTestTestsInput, labTestStockInput, labTestActualPriceInput, labTestPriceInput;
     private EditText productNameInput, productPriceInput, productRatingInput, productReviewCountInput, productQuantityInput, productDiscountPriceInput, productDescriptionInput, productBrandInput;
     private EditText notificationTitleInput, notificationMessageInput;
     private EditText scannerInstructionsInput;
@@ -63,6 +63,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     private Uri imageUri;
     private String currentTab = "banner";
     private Banner currentBanner;
+    private LabTest currentLabTest;
 
     private final AppCompatActivity activity;
     private final View rootView;
@@ -97,6 +98,10 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         bannerDiscountInput = rootView.findViewById(R.id.bannerDiscountInput);
         categoryNameInput = rootView.findViewById(R.id.categoryNameInput);
         labTestNameInput = rootView.findViewById(R.id.labTestNameInput);
+        labTestTestsInput = rootView.findViewById(R.id.labTestTestsInput);
+        labTestStockInput = rootView.findViewById(R.id.labTestStockInput);
+        labTestActualPriceInput = rootView.findViewById(R.id.labTestActualPriceInput);
+        labTestPriceInput = rootView.findViewById(R.id.labTestPriceInput);
         productNameInput = rootView.findViewById(R.id.productNameInput);
         productPriceInput = rootView.findViewById(R.id.productPriceInput);
         productRatingInput = rootView.findViewById(R.id.productRatingInput);
@@ -135,7 +140,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         uploadProductImageButton.setOnClickListener(v -> openImagePicker());
         addBannerButton.setOnClickListener(v -> addOrUpdateBanner());
         addCategoryButton.setOnClickListener(v -> addCategory());
-        addLabTestButton.setOnClickListener(v -> addLabTest());
+        addLabTestButton.setOnClickListener(v -> addOrUpdateLabTest());
         addProductButton.setOnClickListener(v -> addProduct());
         refreshUsersButton.setOnClickListener(v -> refreshUsers());
         sendNotificationButton.setOnClickListener(v -> sendNotification());
@@ -238,7 +243,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 break;
             case "labTests":
                 labTestsSection.setVisibility(View.VISIBLE);
-                labTestNameInput.setText("");
+                resetLabTestForm();
                 dataManager.fetchLabTests(items -> updateRecyclerView(items, true), this::showError);
                 break;
             case "products":
@@ -410,31 +415,59 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 this::showError);
     }
 
-    private void addLabTest() {
+    private void addOrUpdateLabTest() {
         String name = labTestNameInput.getText().toString().trim();
-        if (name.isEmpty()) {
-            Toast.makeText(activity, "Please enter lab test name", Toast.LENGTH_SHORT).show();
+        String tests = labTestTestsInput.getText().toString().trim();
+        String stockStr = labTestStockInput.getText().toString().trim();
+        String actualPriceStr = labTestActualPriceInput.getText().toString().trim();
+        String priceStr = labTestPriceInput.getText().toString().trim();
+
+        if (name.isEmpty() || tests.isEmpty() || stockStr.isEmpty() || actualPriceStr.isEmpty() || priceStr.isEmpty()) {
+            Toast.makeText(activity, "Please fill all fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (imageUri == null) {
+        int stock;
+        double actualPrice, price;
+        try {
+            stock = Integer.parseInt(stockStr);
+            actualPrice = Double.parseDouble(actualPriceStr);
+            price = Double.parseDouble(priceStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(activity, "Invalid number format in stock, actual price, or price", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (imageUri != null) {
+            dataManager.uploadImageAndExecute(imageUri, "labTests",
+                    imageUrl -> {
+                        LabTest labTest = new LabTest(
+                                currentLabTest != null ? currentLabTest.getId() : null,
+                                name, imageUrl, tests, stock, actualPrice, price
+                        );
+                        dataManager.saveLabTest(labTest,
+                                () -> {
+                                    Toast.makeText(activity, "Lab Test " + (currentLabTest != null ? "updated" : "added"), Toast.LENGTH_SHORT).show();
+                                    resetLabTestForm();
+                                    dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
+                                },
+                                this::showError);
+                    },
+                    this::showError);
+        } else if (currentLabTest != null && currentLabTest.getImageUrl() != null) {
+            LabTest labTest = new LabTest(
+                    currentLabTest.getId(), name, currentLabTest.getImageUrl(), tests, stock, actualPrice, price
+            );
+            dataManager.saveLabTest(labTest,
+                    () -> {
+                        Toast.makeText(activity, "Lab Test updated", Toast.LENGTH_SHORT).show();
+                        resetLabTestForm();
+                        dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
+                    },
+                    this::showError);
+        } else {
             Toast.makeText(activity, "Please upload an image", Toast.LENGTH_SHORT).show();
-            return;
         }
-
-        dataManager.uploadImageAndExecute(imageUri, "labTests",
-                imageUrl -> {
-                    LabTest labTest = new LabTest(null, name, imageUrl);
-                    dataManager.saveLabTest(labTest,
-                            () -> {
-                                Toast.makeText(activity, "Lab Test added", Toast.LENGTH_SHORT).show();
-                                labTestNameInput.setText("");
-                                imageUri = null;
-                                dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
-                            },
-                            this::showError);
-                },
-                this::showError);
     }
 
     private void addProduct() {
@@ -571,7 +604,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
             return;
         }
 
-        Coupon coupon = new Coupon(null, code, discount);
+        Coupon coupon = new Coupon(null, code, discount, true);
         dataManager.saveCoupon(coupon,
                 () -> {
                     Toast.makeText(activity, "Coupon added", Toast.LENGTH_SHORT).show();
@@ -588,6 +621,17 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
         bannerDiscountInput.setText("");
         currentBanner = null;
         addBannerButton.setText(R.string.add_update_banner);
+        imageUri = null;
+    }
+
+    private void resetLabTestForm() {
+        labTestNameInput.setText("");
+        labTestTestsInput.setText("");
+        labTestStockInput.setText("");
+        labTestActualPriceInput.setText("");
+        labTestPriceInput.setText("");
+        currentLabTest = null;
+        addLabTestButton.setText(R.string.add_lab_test);
         imageUri = null;
     }
 
@@ -693,44 +737,14 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
     }
 
     private void editLabTest(LabTest labTest) {
+        currentLabTest = labTest;
         labTestNameInput.setText(labTest.getName());
+        labTestTestsInput.setText(labTest.getTests());
+        labTestStockInput.setText(String.valueOf(labTest.getStock()));
+        labTestActualPriceInput.setText(String.valueOf(labTest.getActualPrice()));
+        labTestPriceInput.setText(String.valueOf(labTest.getPrice()));
         addLabTestButton.setText("Update Lab Test");
-        addLabTestButton.setOnClickListener(v -> {
-            String name = labTestNameInput.getText().toString().trim();
-            if (name.isEmpty()) {
-                Toast.makeText(activity, "Please enter lab test name", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            LabTest updatedLabTest = new LabTest(labTest.getId(), name, labTest.getImageUrl());
-            if (imageUri != null) {
-                dataManager.uploadImageAndExecute(imageUri, "labTests",
-                        imageUrl -> {
-                            updatedLabTest.setImageUrl(imageUrl);
-                            dataManager.updateLabTest(updatedLabTest,
-                                    () -> {
-                                        Toast.makeText(activity, "Lab Test updated", Toast.LENGTH_SHORT).show();
-                                        labTestNameInput.setText("");
-                                        imageUri = null;
-                                        addLabTestButton.setText("Add Lab Test");
-                                        addLabTestButton.setOnClickListener(v1 -> addLabTest());
-                                        dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
-                                    },
-                                    this::showError);
-                        },
-                        this::showError);
-            } else {
-                dataManager.updateLabTest(updatedLabTest,
-                        () -> {
-                            Toast.makeText(activity, "Lab Test updated", Toast.LENGTH_SHORT).show();
-                            labTestNameInput.setText("");
-                            imageUri = null;
-                            addLabTestButton.setText("Add Lab Test");
-                            addLabTestButton.setOnClickListener(v1 -> addLabTest());
-                            dataManager.fetchLabTests(this::updateRecyclerView, this::showError);
-                        },
-                        this::showError);
-            }
-        });
+        imageUri = null;
     }
 
     private void editProduct(Product product) {
@@ -857,7 +871,7 @@ public class AdminUIHelper implements AdminItemAdapter.OnItemClickListener {
                 return;
             }
 
-            Coupon updatedCoupon = new Coupon(coupon.getId(), code, discount);
+            Coupon updatedCoupon = new Coupon(coupon.getId(), code, discount, coupon.isActive());
             dataManager.updateCoupon(updatedCoupon,
                     () -> {
                         Toast.makeText(activity, "Coupon updated", Toast.LENGTH_SHORT).show();

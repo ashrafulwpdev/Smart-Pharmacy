@@ -1,21 +1,21 @@
 <resources>
-    <!-- Existing strings -->
+    <!-- App Name -->
     <string name="app_name">Smart Pharmacy</string>
+
+    <!-- Common / General -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="forgot_password"><u>Forgot Password?</u></string>
+    <string name="logout">Logout</string>
+    <string name="navigation_drawer_open">Open</string>
+    <string name="navigation_drawer_close">Close</string>
+    <string name="update_status">Update</string>
+
+    <!-- Facebook Integration -->
     <string name="facebook_app_id">9653945951295736</string>
     <string name="facebook_client_token">cdf5e7c5d2bcd746f4bddb2d4a4c6475</string>
     <string name="fb_login_protocol_scheme">fb9653945951295736</string>
-    <string name="hello_blank_fragment">Hello blank fragment</string>
-    <string name="select_category">Select Category</string>
-    <string name="product_name_hint">Product Name</string>
-    <string name="add_edit_product">Add/Edit Product</string>
-    <string name="quantity_hint">Quantity (e.g., 500 ML, 500 Capsules)</string>
-    <string name="original_price_hint">Original Price (RM)</string>
-    <string name="discounted_price_hint">Discounted Price (RM, optional)</string>
-    <string name="rating_hint">Rating (0-10)</string>
-    <string name="review_count_hint">Review Count</string>
-    <string name="upload_image">Upload Image</string>
-    <string name="add_product">Add Product</string>
+
+    <!-- Dashboard Tabs -->
     <string name="tab_banner">Banner</string>
     <string name="tab_categories">Categories</string>
     <string name="tab_lab_tests">Lab Tests</string>
@@ -24,73 +24,94 @@
     <string name="tab_orders">Orders</string>
     <string name="tab_notifications">Notifications</string>
     <string name="tab_scanner">Scanner</string>
+
+    <!-- Banners -->
     <string name="add_edit_banner">Add/Edit Banner</string>
     <string name="banner_title_hint">Banner Title</string>
     <string name="banner_description_hint">Description</string>
     <string name="banner_discount_hint">Discount (e.g., 20%)</string>
     <string name="add_banner">Add Banner</string>
+    <string name="add_update_banner">Add/Update Banner</string>
+    <string name="manage_banners">Manage Banners</string>
+
+    <!-- Categories -->
     <string name="add_edit_category">Add/Edit Category</string>
     <string name="category_name_hint">Category Name</string>
     <string name="add_category">Add Category</string>
+    <string name="select_category">Select Category</string>
+
+    <!-- Products -->
+    <string name="add_edit_product">Add/Edit Product</string>
+    <string name="product_name_hint">Product Name</string>
+    <string name="product_description_hint">Product Description</string>
+    <string name="brand_hint">Brand</string>
+    <string name="quantity_hint">Quantity (e.g., 500 ML, 500 Capsules)</string>
+    <string name="original_price_hint">Original Price (RM)</string>
+    <string name="discounted_price_hint">Discounted Price (RM, optional)</string>
+    <string name="rating_hint">Rating (0-10)</string>
+    <string name="review_count_hint">Review Count</string>
+    <string name="upload_image">Upload Image</string>
+    <string name="product_image_description">Product image</string>
+    <string name="add_product">Add Product</string>
+    <string name="add_to_cart">Add to Cart</string>
+
+    <!-- Sample Product Data -->
+    <string name="sample_product_name">Punarnavasav, Ayurvedic Tonic</string>
+    <string name="sample_product_quantity">500 ML</string>
+    <string name="sample_rating_text">5.0 (80 Reviews)</string>
+    <string name="sample_discounted_price">RM10.00</string>
+    <string name="sample_original_price">RM12.00</string>
+
+    <!-- Lab Tests -->
     <string name="add_edit_lab_test">Add/Edit Lab Test</string>
     <string name="lab_test_name_hint">Lab Test Name</string>
     <string name="add_lab_test">Add Lab Test</string>
-    <string name="sample_product_name">Punarnavasav, Ayurvedic Tonic</string>
-    <string name="sample_product_quantity">500 ML</string>
-    <string name="sample_rating_text">★ 5.0 (120 Reviews)</string>
-    <string name="sample_discounted_price">RM10.00</string>
-    <string name="sample_original_price">RM12.00</string>
-    <string name="add_to_cart">Add to Cart</string>
+    <string name="lab_test_tests_hint">Tests (comma-separated, e.g., Blood Sugar Test,Thyroid Profile)</string>
+    <string name="lab_test_stock_hint">Stock Quantity</string>
+    <string name="lab_test_actual_price_hint">Actual Price (Internal)</string>
+    <string name="lab_test_price_hint">Customer Price</string>
 
-    <!-- New strings for activity_admin.xml -->
-    <string name="admin_dashboard_title">Admin Dashboard</string>
-    <string name="manage_banners">Manage Banners</string>
-    <string name="add_update_banner">Add/Update Banner</string>
+    <!-- Users -->
     <string name="manage_users">Manage Users</string>
     <string name="refresh_user_list">Refresh User List</string>
+    <string name="admin_email_placeholder">admin@example.com</string>
+
+    <!-- Orders -->
     <string name="manage_orders">Manage Orders</string>
     <string name="refresh_orders">Refresh Orders</string>
+    <string name="cancel_order">Cancel</string>
+    <string name="approve_prescription">Approve</string>
+    <string name="reject_prescription">Reject</string>
+
+    <!-- Notifications -->
     <string name="send_notifications">Send Notifications</string>
     <string name="notification_title_hint">Notification Title</string>
     <string name="notification_message_hint">Message</string>
     <string name="select_target">Select Target</string>
     <string name="send_notification">Send Notification</string>
+    <string name="notification_target">Target Audience</string>
+
+    <!-- Scanner -->
     <string name="qr_barcode_scanner_settings">QR/Barcode Scanner Settings</string>
     <string name="scanner_instructions_hint">Instructions for Users</string>
     <string name="update_scanner_settings">Update Scanner Settings</string>
-
-    <!-- New strings for item_admin.xml -->
-    <string name="default_item_name">Item Name</string>
-    <string name="item_image_description">Item Image</string>
-    <string name="edit">Edit</string>
-    <string name="delete">Delete</string>
-
-
-    <string name="notification_target">Target Audience</string>
-
     <string name="scanner_settings">Scanner Settings</string>
 
-    <string name="item_image">Item Image</string>
-    <string name="placeholder_item_name">Item Name</string>
-    <string name="no_items_available">No Items</string>
-    <string name="logout">Logout</string>
-    <string name="navigation_drawer_open">Open</string>
-    <string name="navigation_drawer_close">Close</string>
-    <string name="admin_email_placeholder">admin@example.com</string>
-    <string name="product_description_hint">Product Description</string>
-    <string name="brand_hint">Brand</string>
-
-    <!-- Add these to your strings.xml file -->
+    <!-- Coupons -->
     <string name="manage_coupons">Manage Coupons</string>
     <string name="coupon_code_hint">Coupon Code</string>
     <string name="coupon_discount_hint">Discount Percentage</string>
     <string name="add_coupon">Add Coupon</string>
 
-    <string name="product_image_description">Product image</string>
-    <string name="update_status">Update</string>
-    <string name="approve_prescription">Approve</string>
-    <string name="reject_prescription">Reject</string>
-    <string name="cancel_order">Cancel</string>
+    <!-- Admin Dashboard -->
+    <string name="admin_dashboard_title">Admin Dashboard</string>
 
-
+    <!-- Item Admin -->
+    <string name="default_item_name">Item Name</string>
+    <string name="item_image_description">Item Image</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="item_image">Item Image</string>
+    <string name="placeholder_item_name">Item Name</string>
+    <string name="no_items_available">No Items</string>
 </resources>

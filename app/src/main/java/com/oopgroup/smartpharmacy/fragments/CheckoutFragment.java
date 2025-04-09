@@ -23,6 +23,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
+import com.oopgroup.smartpharmacy.models.Order;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,7 +50,9 @@ public class CheckoutFragment extends Fragment {
     private double grandTotal;
     private double discount;
     private double deliveryFee;
-    private List<Map<String, Object>> reorderItems;
+    private List<Map<String, Object>> items;
+    private String orderType;
+    private String promoCode;
     private String reorderPaymentMethod;
     private String assignedDeliveryManId;
 
@@ -88,14 +91,19 @@ public class CheckoutFragment extends Fragment {
             grandTotal = getArguments().getDouble("grand_total", 0.0);
             discount = getArguments().getDouble("discount", 0.0);
             deliveryFee = getArguments().getDouble("delivery_fee", 0.0);
-            reorderItems = (List<Map<String, Object>>) getArguments().getSerializable("reorder_items");
+            items = (List<Map<String, Object>>) getArguments().getSerializable("items");
+            orderType = getArguments().getString("order_type", "Product");
+            promoCode = getArguments().getString("promo_code");
             reorderPaymentMethod = getArguments().getString("reorder_payment_method");
-            Log.d(TAG, "Received reorder_items: " + (reorderItems != null ? reorderItems.size() : "null"));
+            Log.d(TAG, "Received items: " + (items != null ? items.size() : "null"));
+            Log.d(TAG, "Received order_type: " + orderType);
+            Log.d(TAG, "Received promo_code: " + promoCode);
             Log.d(TAG, "Received reorder_payment_method: " + reorderPaymentMethod);
         } else {
             grandTotal = 0.0;
             discount = 0.0;
             deliveryFee = 0.0;
+            orderType = "Product";
             Log.w(TAG, "No arguments received, falling back to Firestore for address");
         }
 
@@ -153,13 +161,16 @@ public class CheckoutFragment extends Fragment {
         });
 
         payNowButton.setOnClickListener(v -> {
+            payNowButton.setEnabled(false);
             if (!radioCreditCard.isChecked() && !radioPaypal.isChecked() && !radioCashOnDelivery.isChecked()) {
                 Toast.makeText(requireContext(), "Please select a payment method", Toast.LENGTH_SHORT).show();
+                payNowButton.setEnabled(true);
                 return;
             }
             if (auth.getCurrentUser() == null) {
                 Log.e(TAG, "User is not authenticated");
                 Toast.makeText(requireContext(), "Please log in to place an order", Toast.LENGTH_SHORT).show();
+                payNowButton.setEnabled(true);
                 return;
             }
             String orderId = generateCustomOrderId();
@@ -175,28 +186,65 @@ public class CheckoutFragment extends Fragment {
         String paymentMethod = radioCreditCard.isChecked() ? "Credit Card" :
                 radioPaypal.isChecked() ? "Paypal" : "Cash on Delivery";
 
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", orderId);
-        order.put("userId", userId);
-        order.put("addressId", selectedAddressId != null ? selectedAddressId : "");
-        order.put("paymentMethod", paymentMethod);
-        order.put("grandTotal", grandTotal);
-        order.put("status", "Order Placed");
-        order.put("createdAt", com.google.firebase.Timestamp.now());
-        order.put("currency", CURRENCY);
-        order.put("isReorder", reorderItems != null && !reorderItems.isEmpty());
-        order.put("orderType", "Product");
-        order.put("deliveryManId", assignedDeliveryManId != null ? assignedDeliveryManId : "");
+        if ("LabTest".equals(orderType) && items != null && !items.isEmpty()) {
+            db.collection("orders")
+                    .whereEqualTo("userId", userId)
+                    .whereEqualTo("orderType", "LabTest")
+                    .whereEqualTo("items", items)
+                    .whereGreaterThan("createdAt", com.google.firebase.Timestamp.now().toDate().getTime() - 60000)
+                    .get()
+                    .addOnSuccessListener(queryDocumentSnapshots -> {
+                        if (!queryDocumentSnapshots.isEmpty()) {
+                            Toast.makeText(requireContext(), "Order already placed recently", Toast.LENGTH_SHORT).show();
+                            payNowButton.setEnabled(true);
+                            return;
+                        }
+                        proceedWithOrderCreation(orderId, userId, paymentMethod);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.w(TAG, "Failed to check for duplicates, proceeding anyway: " + e.getMessage());
+                        proceedWithOrderCreation(orderId, userId, paymentMethod);
+                    });
+        } else {
+            proceedWithOrderCreation(orderId, userId, paymentMethod);
+        }
+    }
+
+    private void proceedWithOrderCreation(String orderId, String userId, String paymentMethod) {
+        Order order = new Order();
+        order.setOrderId(orderId);
+        order.setUserId(userId);
+        order.setAddressId(selectedAddressId != null ? selectedAddressId : "");
+        order.setPaymentMethod(paymentMethod);
+        order.setGrandTotal(grandTotal);
+        order.setStatus("Order Placed");
+        order.setCreatedAt(com.google.firebase.Timestamp.now());
+        order.setCurrency(CURRENCY);
+        order.setReorder(items != null && !items.isEmpty() && "Product".equals(orderType));
+        order.setOrderType(orderType);
+        order.setDeliveryBoyName(assignedDeliveryManId != null ? assignedDeliveryManId : "");
+
+        // Set firstProductId if items exist
+        if (items != null && !items.isEmpty()) {
+            order.setFirstProductId((String) items.get(0).get("productId"));
+        }
 
         Map<String, Object> totalBreakdown = new HashMap<>();
         totalBreakdown.put("itemTotal", grandTotal - deliveryFee + discount);
         totalBreakdown.put("deliveryFee", deliveryFee);
         totalBreakdown.put("discount", discount);
         totalBreakdown.put("grandTotal", grandTotal);
-        order.put("totalBreakdown", totalBreakdown);
+        if ("LabTest".equals(orderType) && promoCode != null) {
+            totalBreakdown.put("promoCode", promoCode);
+        }
+        order.setTotalBreakdown(totalBreakdown);
 
-        if (reorderItems != null && !reorderItems.isEmpty()) {
-            order.put("items", reorderItems);
+        if ("LabTest".equals(orderType)) {
+            order.setItems(items);
+            saveOrderToFirestore(order, orderId);
+            addNotification(userId, "Lab Test Booked", "Your lab test has been booked successfully.", "LabTestBooked");
+        } else if (items != null && !items.isEmpty()) {
+            order.setItems(items);
             saveOrderToFirestore(order, orderId);
             addNotification(userId, "Order Placed", "Your reorder has been placed successfully.", "OrderPlaced");
         } else {
@@ -215,27 +263,31 @@ public class CheckoutFragment extends Fragment {
                             orderItem.put("total", doc.getDouble("total"));
                             orderItems.add(orderItem);
                         }
-                        order.put("items", orderItems);
+                        order.setItems(orderItems);
+                        if (!orderItems.isEmpty()) {
+                            order.setFirstProductId((String) orderItems.get(0).get("productId"));
+                        }
                         saveOrderToFirestore(order, orderId);
                         addNotification(userId, "Order Placed", "Your order has been placed successfully.", "OrderPlaced");
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to fetch cart items: " + e.getMessage());
                         Toast.makeText(requireContext(), "Failed to fetch cart items", Toast.LENGTH_SHORT).show();
+                        payNowButton.setEnabled(true);
                     });
         }
     }
 
-    private void saveOrderToFirestore(Map<String, Object> order, String orderId) {
+    private void saveOrderToFirestore(Order order, String orderId) {
         db.collection("orders")
                 .document(orderId)
                 .set(order)
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Order created successfully with ID: " + orderId + " (isReorder: " + order.get("isReorder") + ")");
-                    if (reorderItems == null) {
+                    Log.d(TAG, "Order created successfully with ID: " + orderId + " (isReorder: " + order.isReorder() + ", orderType: " + order.getOrderType() + ")");
+                    if ("Product".equals(order.getOrderType()) && !order.isReorder()) {
                         clearCartItems();
                     }
-                    createTrackingEntry(orderId, "Order Placed", "Your order has been placed successfully.");
+                    createTrackingEntry(orderId, "Order Placed", "Your " + (order.getOrderType().equals("LabTest") ? "lab test" : "order") + " has been placed successfully.");
                     OrderSuccessDialog dialog = new OrderSuccessDialog();
                     Bundle args = new Bundle();
                     args.putString("orderId", orderId);
@@ -251,6 +303,7 @@ public class CheckoutFragment extends Fragment {
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to create order: " + e.getMessage());
                     Toast.makeText(requireContext(), "Failed to create order: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    payNowButton.setEnabled(true);
                 });
     }
 
@@ -290,10 +343,11 @@ public class CheckoutFragment extends Fragment {
     }
 
     private String generateCustomOrderId() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String date = sdf.format(new Date());
-        int randomNum = (int) (Math.random() * 10000);
-        return String.format("ORDER-SPH-%s-%04d", date, randomNum);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.getDefault());
+        String dateTime = sdf.format(new Date());
+        String userPrefix = auth.getCurrentUser().getUid().substring(0, 4);
+        int randomNum = (int) (Math.random() * 1000);
+        return String.format("ORDER-SPH-%s-%s-%03d", dateTime, userPrefix, randomNum);
     }
 
     private void fetchAndSetDeliveryAddress() {
@@ -389,7 +443,7 @@ public class CheckoutFragment extends Fragment {
     }
 
     private void assignDeliveryMan() {
-        if (selectedAddressId == null) {
+        if (selectedAddressId == null || "LabTest".equals(orderType)) {
             assignedDeliveryManId = null;
             return;
         }

@@ -8,6 +8,7 @@ import android.text.InputType;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -17,6 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
@@ -31,12 +33,12 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import com.oopgroup.smartpharmacy.utils.BaseActivity;
+import com.softourtech.slt.SLTLoader;
 
-public class ChangePasswordActivity extends BaseActivity {
+public class ChangePasswordActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "UserProfile";
-    private static final String TAG = "ChangePasswordActivity";
+    private static final String TAG = "ChangePwordActivity";
 
     private FirebaseAuth mAuth;
     private DatabaseReference usersReference;
@@ -48,11 +50,20 @@ public class ChangePasswordActivity extends BaseActivity {
     private ScrollView scrollView;
     private SwipeRefreshLayout swipeRefreshLayout;
     private SharedPreferences sharedPreferences;
+    private SLTLoader sltLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_change_password);
+
+        // Initialize SLTLoader with the activity's root view
+        View activityRoot = findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e(TAG, "Activity root view not found or not a ViewGroup");
+            return;
+        }
+        sltLoader = new SLTLoader(this, (ViewGroup) activityRoot);
 
         // Initialize SharedPreferences
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -263,7 +274,7 @@ public class ChangePasswordActivity extends BaseActivity {
     private void changePassword(String currentPass, String newPass) {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null && user.getEmail() != null) {
-            showCustomLoader(); // Show custom loader
+            showLoader(); // Show SLTLoader
             setUiEnabled(false);
 
             AuthCredential credential = EmailAuthProvider.getCredential(user.getEmail(), currentPass);
@@ -275,7 +286,7 @@ public class ChangePasswordActivity extends BaseActivity {
                                     .addOnSuccessListener(new OnSuccessListener<Void>() {
                                         @Override
                                         public void onSuccess(Void aVoid) {
-                                            hideLoader(); // Call inherited BaseActivity's hideLoader()
+                                            hideLoader(); // Hide SLTLoader
                                             setUiEnabled(true);
                                             resetInputBorders();
                                             showCustomToast("Password updated successfully", true);
@@ -285,7 +296,7 @@ public class ChangePasswordActivity extends BaseActivity {
                                     .addOnFailureListener(new OnFailureListener() {
                                         @Override
                                         public void onFailure(@NonNull Exception e) {
-                                            hideLoader(); // Call inherited BaseActivity's hideLoader()
+                                            hideLoader(); // Hide SLTLoader
                                             setUiEnabled(true);
                                             setErrorBorder(newPassword);
                                             showCustomToast("Failed to update password: " + e.getMessage(), false);
@@ -297,7 +308,7 @@ public class ChangePasswordActivity extends BaseActivity {
                     .addOnFailureListener(new OnFailureListener() {
                         @Override
                         public void onFailure(@NonNull Exception e) {
-                            hideLoader(); // Call inherited BaseActivity's hideLoader()
+                            hideLoader(); // Hide SLTLoader
                             setUiEnabled(true);
                             setErrorBorder(currentPassword);
                             showCustomToast("Incorrect current password", false);
@@ -306,7 +317,7 @@ public class ChangePasswordActivity extends BaseActivity {
                         }
                     });
         } else {
-            hideLoader(); // Call inherited BaseActivity's hideLoader()
+            hideLoader(); // Hide SLTLoader
             setUiEnabled(true);
             showCustomToast("User not logged in or email not found", false);
             startActivity(new Intent(this, LoginActivity.class));
@@ -348,17 +359,22 @@ public class ChangePasswordActivity extends BaseActivity {
         confirmPassword.setBackgroundResource(R.drawable.edittext_bg);
     }
 
-    // Custom loader method similar to ProfileFragment
-    private void showCustomLoader() {
-        LoaderConfig config = new LoaderConfig()
-                .setAnimationResId(R.raw.loading_global)
+    private void showLoader() {
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
                 .setWidthDp(40)
                 .setHeightDp(40)
                 .setUseRoundedBox(true)
                 .setOverlayColor(Color.parseColor("#80000000"))
                 .setChangeJsonColor(false);
-        showCustomLoader(config);
-        Log.d(TAG, "Custom loader shown");
+        sltLoader.showCustomLoader(config);
+        Log.d(TAG, "SLTLoader shown");
+    }
+
+    private void hideLoader() {
+        if (sltLoader != null) {
+            sltLoader.hideLoader();
+            Log.d(TAG, "SLTLoader hidden");
+        }
     }
 
     @Override
@@ -370,6 +386,9 @@ public class ChangePasswordActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        hideLoader(); // Call inherited BaseActivity's hideLoader()
+        if (sltLoader != null) {
+            sltLoader.onDestroy();
+            Log.d(TAG, "SLTLoader destroyed");
+        }
     }
 }

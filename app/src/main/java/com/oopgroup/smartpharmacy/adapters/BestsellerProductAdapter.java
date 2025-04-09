@@ -63,7 +63,7 @@ public class BestsellerProductAdapter extends RecyclerView.Adapter<BestsellerPro
         // Rating: Assuming out of 10, display as 5-star scale
         int rating = product.getRating();
         int reviewCount = product.getReviewCount();
-        holder.ratingText.setText(String.format("★ %.1f (%d Reviews)", rating / 2.0f, reviewCount));
+        holder.ratingText.setText(String.format("%.1f (%d Reviews)", rating / 2.0f, reviewCount));
 
         // Price handling
         double price = product.getPrice();

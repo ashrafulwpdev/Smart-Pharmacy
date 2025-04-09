@@ -124,12 +124,12 @@ public class InprogressOrdersFragment extends Fragment {
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
                         Address address = doc.toObject(Address.class);
-                        order.setAddress(address); // Store address in Order object
+                        order.setAddress(address);
                         Log.d(TAG, "Address fetched for order: " + order.getId());
                         fetchEstimatedDaysForOrder(order);
                     } else {
                         Log.w(TAG, "Address not found for order: " + order.getId() + ", addressId: " + order.getAddressId());
-                        orderList.add(order); // Add order even if address is missing
+                        orderList.add(order);
                         if ("Product".equals(order.getOrderType())) {
                             fetchTrackingForOrder(order);
                         } else {
@@ -141,7 +141,7 @@ public class InprogressOrdersFragment extends Fragment {
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to fetch address for order " + order.getId() + ": " + e.getMessage());
-                    orderList.add(order); // Add order even if address fetch fails
+                    orderList.add(order);
                     if ("Product".equals(order.getOrderType())) {
                         fetchTrackingForOrder(order);
                     } else {
@@ -173,10 +173,10 @@ public class InprogressOrdersFragment extends Fragment {
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
                         Integer estimatedDays = doc.getLong("estimatedDays") != null ? doc.getLong("estimatedDays").intValue() : 0;
-                        order.setEstimatedDays(estimatedDays); // Store in Order object
+                        order.setEstimatedDays(estimatedDays);
                         Log.d(TAG, "Estimated days fetched: " + estimatedDays + " for order: " + order.getId());
                     } else {
-                        order.setEstimatedDays(0); // Default to 0 if no delivery fee data
+                        order.setEstimatedDays(0);
                         Log.w(TAG, "No delivery fee data for postal code: " + postalCode + " for order: " + order.getId());
                     }
                     orderList.add(order);
@@ -189,7 +189,7 @@ public class InprogressOrdersFragment extends Fragment {
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to fetch estimated days for order " + order.getId() + ": " + e.getMessage());
-                    order.setEstimatedDays(0); // Default to 0 on failure
+                    order.setEstimatedDays(0);
                     orderList.add(order);
                     if ("Product".equals(order.getOrderType())) {
                         fetchTrackingForOrder(order);
@@ -282,7 +282,6 @@ public class InprogressOrdersFragment extends Fragment {
                 String currency = order.getCurrency() != null ? order.getCurrency() : "RM";
                 tvTotal.setText(String.format("%s %.2f", currency, order.getGrandTotal()));
 
-                // Address
                 if (order.getAddress() != null) {
                     Address address = order.getAddress();
                     String fullAddress = String.format("%s, %s, %s, %s, %s",
@@ -300,7 +299,6 @@ public class InprogressOrdersFragment extends Fragment {
                     tvAddress.setText("Address not available");
                 }
 
-                // Dynamic Estimated Delivery Date
                 SimpleDateFormat sdf = new SimpleDateFormat("EEEE, MMM dd", Locale.getDefault());
                 String dateLabel = "Product".equals(order.getOrderType()) ? "Delivery by " : "Visit on ";
                 if (order.getEstimatedDays() != null && order.getCreatedAt() != null) {
@@ -313,7 +311,7 @@ public class InprogressOrdersFragment extends Fragment {
                     tvDeliveryDate.setText(dateLabel + "N/A");
                 }
 
-                // Product Image
+                // Product Image using firstProductId
                 String productId = order.getFirstProductId();
                 if (productId != null) {
                     String collection = "Product".equals(order.getOrderType()) ? "products" : "labTests";
@@ -344,7 +342,6 @@ public class InprogressOrdersFragment extends Fragment {
                     ivProductImage.setImageResource(R.drawable.default_product_image);
                 }
 
-                // Buttons
                 if ("Product".equals(order.getOrderType())) {
                     btnTracking.setVisibility(View.VISIBLE);
                     btnTracking.setOnClickListener(v -> {

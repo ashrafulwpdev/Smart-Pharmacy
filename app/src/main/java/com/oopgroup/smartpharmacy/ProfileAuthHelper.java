@@ -26,11 +26,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.PhoneAuthCredential;
 import com.google.firebase.auth.PhoneAuthProvider;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -45,19 +41,15 @@ public class ProfileAuthHelper {
     private static final String TAG = "ProfileAuthHelper";
     private static final String PREFS_NAME = "AuthPrefs";
     private static final String LAST_VERIFICATION_TIME = "lastVerificationTime";
-    private static final long RESEND_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+    private static final long RESEND_TIMEOUT = 10 * 60 * 1000;
 
     private final Context context;
     private final FirebaseAuth auth;
     private final FirebaseUser currentUser;
     private final OnAuthCompleteListener authCompleteListener;
     private final SharedPreferences authPrefs;
-    private final DatabaseReference databaseReference;
-    private final DatabaseReference emailsReference;
-    private final DatabaseReference phoneNumbersReference;
-    private final DatabaseReference usernamesReference;
-    private final StorageReference storageReference;
     private final FirebaseFirestore firestore;
+    private final StorageReference storageReference;
 
     public ProfileAuthHelper(Context context, OnAuthCompleteListener listener) {
         this.context = context;
@@ -65,12 +57,26 @@ public class ProfileAuthHelper {
         this.currentUser = auth.getCurrentUser();
         this.authCompleteListener = listener;
         this.authPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        this.databaseReference = FirebaseDatabase.getInstance().getReference("users").child(currentUser.getUid());
-        this.emailsReference = FirebaseDatabase.getInstance().getReference("emails");
-        this.phoneNumbersReference = FirebaseDatabase.getInstance().getReference("phoneNumbers");
-        this.usernamesReference = FirebaseDatabase.getInstance().getReference("usernames");
-        this.storageReference = FirebaseStorage.getInstance().getReference("profile_images").child(currentUser.getUid());
         this.firestore = FirebaseFirestore.getInstance();
+        this.storageReference = FirebaseStorage.getInstance().getReference("profile_images").child(currentUser.getUid());
+    }
+
+    public interface OnAuthCompleteListener {
+        void onAuthStart();
+        void onAuthSuccess(String fullName, String gender, String birthday, String phoneNumber,
+                           String email, String username, String originalEmail, String originalPhoneNumber,
+                           String originalUsername);
+        void onEmailVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
+                                     String currentEmail, String username, String pendingEmail,
+                                     String originalEmail, String originalPhoneNumber, String originalUsername);
+        void onPhoneVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
+                                     String currentEmail, String username, String pendingPhoneNumber,
+                                     String originalEmail, String originalPhoneNumber, String originalUsername);
+        void onAuthFailed();
+    }
+
+    private interface ErrorCallback {
+        void onError(String message);
     }
 
     public void saveProfile(String fullName, String gender, String birthday, String phoneNumber, String email,
@@ -91,7 +97,7 @@ public class ProfileAuthHelper {
         boolean usernameChanged = !username.equals(originalUsername);
 
         if (!emailChanged && !phoneChanged && !usernameChanged && selectedImageUri == null) {
-            saveToDatabase(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri, currentImageUrl,
+            saveToFirestore(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri, currentImageUrl,
                     originalEmail, originalPhoneNumber, originalUsername);
             return;
         }
@@ -104,7 +110,7 @@ public class ProfileAuthHelper {
                 verifyPhoneNumber(fullName, gender, birthday, phoneNumber, email, username,
                         originalEmail, originalPhoneNumber, originalUsername);
             } else {
-                saveToDatabase(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri, currentImageUrl,
+                saveToFirestore(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri, currentImageUrl,
                         originalEmail, originalPhoneNumber, originalUsername);
             }
         }, errorMessage -> {
@@ -118,17 +124,15 @@ public class ProfileAuthHelper {
                                  Runnable onSuccess, ErrorCallback onFailure) {
         if (!email.equals(originalEmail) && !email.isEmpty()) {
             String emailKey = email.replace(".", "_");
-            emailsReference.child(emailKey).get().addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    if (task.getResult().exists() && !task.getResult().getValue(String.class).equals(currentUser.getUid())) {
-                        onFailure.onError("Email '" + email + "' is already in use by another account.");
-                    } else {
-                        checkPhoneNumber(phoneNumber, username, originalPhoneNumber, originalUsername, onSuccess, onFailure);
-                    }
-                } else {
-                    onFailure.onError("Failed to check email: " + task.getException().getMessage());
-                }
-            });
+            firestore.collection("emails").document(emailKey).get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists() && !documentSnapshot.getString("uid").equals(currentUser.getUid())) {
+                            onFailure.onError("Email '" + email + "' is already in use by another account.");
+                        } else {
+                            checkPhoneNumber(phoneNumber, username, originalPhoneNumber, originalUsername, onSuccess, onFailure);
+                        }
+                    })
+                    .addOnFailureListener(e -> onFailure.onError("Failed to check email: " + e.getMessage()));
         } else {
             checkPhoneNumber(phoneNumber, username, originalPhoneNumber, originalUsername, onSuccess, onFailure);
         }
@@ -137,17 +141,15 @@ public class ProfileAuthHelper {
     private void checkPhoneNumber(String phoneNumber, String username, String originalPhoneNumber, String originalUsername,
                                   Runnable onSuccess, ErrorCallback onFailure) {
         if (!phoneNumber.equals(originalPhoneNumber) && !phoneNumber.isEmpty()) {
-            phoneNumbersReference.child(phoneNumber).get().addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    if (task.getResult().exists() && !task.getResult().getValue(String.class).equals(currentUser.getUid())) {
-                        onFailure.onError("Phone number '" + phoneNumber + "' is already in use by another account.");
-                    } else {
-                        checkUsername(username, originalUsername, onSuccess, onFailure);
-                    }
-                } else {
-                    onFailure.onError("Failed to check phone number: " + task.getException().getMessage());
-                }
-            });
+            firestore.collection("phoneNumbers").document(phoneNumber).get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists() && !documentSnapshot.getString("uid").equals(currentUser.getUid())) {
+                            onFailure.onError("Phone number '" + phoneNumber + "' is already in use by another account.");
+                        } else {
+                            checkUsername(username, originalUsername, onSuccess, onFailure);
+                        }
+                    })
+                    .addOnFailureListener(e -> onFailure.onError("Failed to check phone number: " + e.getMessage()));
         } else {
             checkUsername(username, originalUsername, onSuccess, onFailure);
         }
@@ -155,74 +157,47 @@ public class ProfileAuthHelper {
 
     private void checkUsername(String username, String originalUsername, Runnable onSuccess, ErrorCallback onFailure) {
         if (!username.equals(originalUsername)) {
-            usernamesReference.child(username).get().addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    if (task.getResult().exists() && !task.getResult().getValue(String.class).equals(currentUser.getUid())) {
-                        onFailure.onError("Username '" + username + "' is already taken.");
-                    } else {
-                        onSuccess.run();
-                    }
-                } else {
-                    onFailure.onError("Failed to check username: " + task.getException().getMessage());
-                }
-            });
+            firestore.collection("usernames").document(username).get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists() && !documentSnapshot.getString("uid").equals(currentUser.getUid())) {
+                            onFailure.onError("Username '" + username + "' is already taken.");
+                        } else {
+                            onSuccess.run();
+                        }
+                    })
+                    .addOnFailureListener(e -> onFailure.onError("Failed to check username: " + e.getMessage()));
         } else {
             onSuccess.run();
         }
     }
 
-    private void saveToDatabase(String fullName, String gender, String birthday, String phoneNumber,
-                                String email, String username, Uri selectedImageUri, String currentImageUrl,
-                                String originalEmail, String originalPhoneNumber, String originalUsername) {
+    private void saveToFirestore(String fullName, String gender, String birthday, String phoneNumber,
+                                 String email, String username, Uri selectedImageUri, String currentImageUrl,
+                                 String originalEmail, String originalPhoneNumber, String originalUsername) {
         if (selectedImageUri != null) {
             StorageReference fileRef = storageReference.child("profile.jpg");
             UploadTask uploadTask = fileRef.putFile(selectedImageUri);
             uploadTask.addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
                 String downloadedImageUrl = uri.toString();
-                // Save imageUrl to Firestore 'users' collection
-                firestore.collection("users").document(currentUser.getUid())
-                        .set(new HashMap<String, Object>() {{
-                            put("imageUrl", downloadedImageUrl);
-                        }}, com.google.firebase.firestore.SetOptions.merge()) // Merge to avoid overwriting other fields
-                        .addOnSuccessListener(aVoid -> {
-                            writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, downloadedImageUrl,
-                                    originalEmail, originalPhoneNumber, originalUsername);
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Failed to save imageUrl to Firestore: " + e.getMessage());
-                            showToast("Failed to save image: " + e.getMessage(), false);
-                            authCompleteListener.onAuthFailed();
-                        });
+                writeToFirestore(fullName, gender, birthday, phoneNumber, email, username, downloadedImageUrl,
+                        originalEmail, originalPhoneNumber, originalUsername);
             })).addOnFailureListener(e -> {
                 Log.e(TAG, "Image upload failed: " + e.getMessage());
                 showToast("Image upload failed: " + e.getMessage(), false);
                 authCompleteListener.onAuthFailed();
             });
         } else {
-            // If no new image, ensure currentImageUrl is preserved in Firestore
-            firestore.collection("users").document(currentUser.getUid())
-                    .set(new HashMap<String, Object>() {{
-                        put("imageUrl", currentImageUrl != null ? currentImageUrl : "");
-                    }}, com.google.firebase.firestore.SetOptions.merge())
-                    .addOnSuccessListener(aVoid -> {
-                        writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, currentImageUrl,
-                                originalEmail, originalPhoneNumber, originalUsername);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to update imageUrl in Firestore: " + e.getMessage());
-                        showToast("Failed to save image reference: " + e.getMessage(), false);
-                        authCompleteListener.onAuthFailed();
-                    });
+            writeToFirestore(fullName, gender, birthday, phoneNumber, email, username, currentImageUrl,
+                    originalEmail, originalPhoneNumber, originalUsername);
         }
     }
 
-    private void writeToDatabase(String fullName, String gender, String birthday, String phoneNumber,
-                                 String email, String username, String imageUrl,
-                                 String originalEmail, String originalPhoneNumber, String originalUsername) {
+    private void writeToFirestore(String fullName, String gender, String birthday, String phoneNumber,
+                                  String email, String username, String imageUrl,
+                                  String originalEmail, String originalPhoneNumber, String originalUsername) {
         String uid = currentUser.getUid();
         String signInMethod = authPrefs.getString("signInMethod", "email");
 
-        // Prepare user data for Realtime Database (excluding imageUrl)
         Map<String, Object> userData = new HashMap<>();
         userData.put("fullName", fullName);
         userData.put("gender", gender);
@@ -231,103 +206,138 @@ public class ProfileAuthHelper {
         userData.put("email", email);
         userData.put("username", username);
         userData.put("signInMethod", signInMethod);
+        userData.put("imageUrl", imageUrl != null ? imageUrl : "");
 
         String pendingEmail = authPrefs.getString("pendingEmail", null);
         String pendingPhoneNumber = authPrefs.getString("pendingPhoneNumber", null);
-        if (pendingEmail != null && !email.equals(currentUser.getEmail())) {
-            userData.put("pendingEmail", pendingEmail);
-            Log.d(TAG, "Preserving pendingEmail: " + pendingEmail);
-        } else {
-            userData.put("pendingEmail", null);
-        }
-        if (pendingPhoneNumber != null && !phoneNumber.equals(currentUser.getPhoneNumber())) {
-            userData.put("pendingPhoneNumber", pendingPhoneNumber);
-            Log.d(TAG, "Preserving pendingPhoneNumber: " + pendingPhoneNumber);
-        } else {
-            userData.put("pendingPhoneNumber", null);
-        }
+        if (pendingEmail != null && !email.equals(currentUser.getEmail())) userData.put("pendingEmail", pendingEmail);
+        else userData.put("pendingEmail", null);
+        if (pendingPhoneNumber != null && !phoneNumber.equals(currentUser.getPhoneNumber())) userData.put("pendingPhoneNumber", pendingPhoneNumber);
+        else userData.put("pendingPhoneNumber", null);
 
-        // Fetch current user data to determine changes
-        databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                String currentPhoneNumber = snapshot.child("phoneNumber").getValue(String.class);
-                String currentEmail = snapshot.child("email").getValue(String.class);
-                String currentUsername = snapshot.child("username").getValue(String.class);
+        // Fetch all necessary data before the transaction
+        firestore.collection("users").document(uid).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    String currentPhoneNumber = documentSnapshot.exists() ? documentSnapshot.getString("phoneNumber") : null;
+                    String currentEmail = documentSnapshot.exists() ? documentSnapshot.getString("email") : null;
+                    String currentUsername = documentSnapshot.exists() ? documentSnapshot.getString("username") : null;
 
-                // Prepare multi-path update for Realtime Database
-                Map<String, Object> updates = new HashMap<>();
-                updates.put("/users/" + uid, userData);
+                    // Prepare batch updates based on pre-fetched data
+                    Map<String, Object> batchUpdates = new HashMap<>();
+                    batchUpdates.put("users/" + uid, userData);
 
-                // Handle phone number changes
-                if (!phoneNumber.equals(currentPhoneNumber) && !"phone".equals(signInMethod)) {
-                    if (currentPhoneNumber != null && !currentPhoneNumber.isEmpty()) {
-                        updates.put("/phoneNumbers/" + currentPhoneNumber, null); // Remove old phone number
+                    // Handle phone number updates
+                    if (!phoneNumber.equals(currentPhoneNumber) && !"phone".equals(signInMethod)) {
+                        if (currentPhoneNumber != null && !currentPhoneNumber.isEmpty()) {
+                            batchUpdates.put("phoneNumbers/" + currentPhoneNumber, null); // Mark for deletion
+                        }
+                        if (!phoneNumber.isEmpty()) {
+                            batchUpdates.put("phoneNumbers/" + phoneNumber, Map.of("uid", uid));
+                        }
                     }
-                    if (!phoneNumber.isEmpty()) {
-                        updates.put("/phoneNumbers/" + phoneNumber, uid); // Add new phone number
-                    }
-                }
 
-                // Handle email changes
-                if (!email.equals(currentEmail) && !"email".equals(signInMethod)) {
-                    if (currentEmail != null && !currentEmail.isEmpty()) {
-                        updates.put("/emails/" + currentEmail.replace(".", "_"), null); // Remove old email
+                    // Handle email updates
+                    if (!email.equals(currentEmail) && !"email".equals(signInMethod)) {
+                        if (currentEmail != null && !currentEmail.isEmpty()) {
+                            batchUpdates.put("emails/" + currentEmail.replace(".", "_"), null); // Mark for deletion
+                        }
+                        if (!email.isEmpty()) {
+                            batchUpdates.put("emails/" + email.replace(".", "_"), Map.of("uid", uid));
+                        }
                     }
-                    if (!email.isEmpty()) {
-                        updates.put("/emails/" + email.replace(".", "_"), uid); // Add new email
-                    }
-                }
 
-                // Handle username changes
-                if (!username.equals(currentUsername)) {
-                    if (currentUsername != null && !currentUsername.isEmpty()) {
-                        updates.put("/usernames/" + currentUsername, null); // Remove old username
+                    // Handle username updates
+                    if (!username.equals(currentUsername)) {
+                        if (currentUsername != null && !currentUsername.isEmpty()) {
+                            batchUpdates.put("usernames/" + currentUsername, null); // Mark for deletion
+                        }
+                        batchUpdates.put("usernames/" + username, Map.of("uid", uid));
                     }
-                    updates.put("/usernames/" + username, uid); // Add new username
-                }
 
-                // Perform atomic update in Realtime Database
-                FirebaseDatabase.getInstance().getReference().updateChildren(updates)
-                        .addOnSuccessListener(aVoid -> {
-                            SharedPreferences.Editor editor = authPrefs.edit();
-                            editor.putString("fullName", fullName);
-                            editor.putString("gender", gender);
-                            editor.putString("birthday", birthday);
-                            editor.putString("phoneNumber", phoneNumber);
-                            editor.putString("email", email);
-                            editor.putString("username", username);
-                            editor.putString("imageUrl", imageUrl != null ? imageUrl : "");
-                            if (pendingEmail != null && !email.equals(currentUser.getEmail())) {
-                                editor.putString("pendingEmail", pendingEmail);
+                    // Run transaction with no reads inside
+                    firestore.runTransaction(transaction -> {
+                        for (Map.Entry<String, Object> entry : batchUpdates.entrySet()) {
+                            String path = entry.getKey();
+                            Object value = entry.getValue();
+                            if (value == null) {
+                                Log.d(TAG, "Deleting: " + path);
+                                transaction.delete(firestore.document(path));
                             } else {
-                                editor.remove("pendingEmail");
+                                Log.d(TAG, "Setting: " + path);
+                                transaction.set(firestore.document(path), value);
                             }
-                            if (pendingPhoneNumber != null && !phoneNumber.equals(currentUser.getPhoneNumber())) {
-                                editor.putString("pendingPhoneNumber", pendingPhoneNumber);
-                            } else {
-                                editor.remove("pendingPhoneNumber");
-                            }
-                            editor.apply();
+                        }
+                        return null;
+                    }).addOnSuccessListener(aVoid -> {
+                        SharedPreferences.Editor editor = authPrefs.edit();
+                        editor.putString("fullName", fullName);
+                        editor.putString("gender", gender);
+                        editor.putString("birthday", birthday);
+                        editor.putString("phoneNumber", phoneNumber);
+                        editor.putString("email", email);
+                        editor.putString("username", username);
+                        editor.putString("imageUrl", imageUrl != null ? imageUrl : "");
+                        if (pendingEmail != null && !email.equals(currentUser.getEmail())) editor.putString("pendingEmail", pendingEmail);
+                        else editor.remove("pendingEmail");
+                        if (pendingPhoneNumber != null && !phoneNumber.equals(currentUser.getPhoneNumber())) editor.putString("pendingPhoneNumber", pendingPhoneNumber);
+                        else editor.remove("pendingPhoneNumber");
+                        editor.apply();
 
-                            Log.d(TAG, "Profile saved successfully");
-                            authCompleteListener.onAuthSuccess(fullName, gender, birthday, phoneNumber, email, username,
-                                    originalEmail, originalPhoneNumber, originalUsername);
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Failed to save profile: " + e.getMessage());
-                            showToast("Failed to save profile: " + e.getMessage(), false);
-                            authCompleteListener.onAuthFailed();
-                        });
-            }
+                        Log.d(TAG, "Profile saved successfully");
+                        authCompleteListener.onAuthSuccess(fullName, gender, birthday, phoneNumber, email, username,
+                                originalEmail, originalPhoneNumber, originalUsername);
+                    }).addOnFailureListener(e -> {
+                        Log.e(TAG, "Transaction failed: " + e.getMessage(), e);
+                        showToast("Failed to save profile: " + e.getMessage(), false);
+                        authCompleteListener.onAuthFailed();
+                    });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch current user data: " + e.getMessage());
+                    showToast("Failed to fetch profile data: " + e.getMessage(), false);
+                    authCompleteListener.onAuthFailed();
+                });
+    }
 
-            @Override
-            public void onCancelled(DatabaseError error) {
-                Log.e(TAG, "Failed to fetch current user data: " + error.getMessage());
-                showToast("Failed to fetch profile data: " + error.getMessage(), false);
-                authCompleteListener.onAuthFailed();
-            }
-        });
+    private void saveProfileWithPendingEmail(String fullName, String gender, String birthday, String phoneNumber,
+                                             String pendingEmail, String username, String imageUrl,
+                                             String originalEmail, String originalPhoneNumber, String originalUsername) {
+        String uid = currentUser.getUid();
+        String currentEmail = currentUser.getEmail() != null ? currentUser.getEmail() : originalEmail;
+
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("fullName", fullName);
+        userData.put("gender", gender);
+        userData.put("birthday", birthday);
+        userData.put("phoneNumber", phoneNumber);
+        userData.put("email", currentEmail);
+        userData.put("username", username);
+        userData.put("signInMethod", "email");
+        userData.put("imageUrl", imageUrl != null ? imageUrl : "");
+        userData.put("pendingEmail", pendingEmail);
+
+        firestore.collection("users").document(uid).set(userData)
+                .addOnSuccessListener(aVoid -> {
+                    SharedPreferences.Editor editor = authPrefs.edit();
+                    editor.putString("fullName", fullName);
+                    editor.putString("gender", gender);
+                    editor.putString("birthday", birthday);
+                    editor.putString("phoneNumber", phoneNumber);
+                    editor.putString("email", currentEmail);
+                    editor.putString("username", username);
+                    editor.putString("pendingEmail", pendingEmail);
+                    editor.putString("imageUrl", imageUrl != null ? imageUrl : "");
+                    editor.apply();
+
+                    Log.d(TAG, "Profile with pending email saved successfully");
+                    authCompleteListener.onEmailVerificationSent(fullName, gender, birthday, phoneNumber,
+                            currentEmail, username, pendingEmail, originalEmail, originalPhoneNumber, originalUsername);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save profile with pending email: " + e.getMessage());
+                    showToast("Failed to save profile: " + e.getMessage(), false);
+                    authCompleteListener.onAuthFailed();
+                });
     }
 
     public void showPasswordDialog(String fullName, String gender, String birthday, String phoneNumber,
@@ -393,6 +403,57 @@ public class ProfileAuthHelper {
         });
 
         dialog.show();
+    }
+
+    private void reauthenticateAndVerifyEmail(String fullName, String gender, String birthday,
+                                              String phoneNumber, String email, String username,
+                                              AuthCredential credential, Uri selectedImageUri, String currentImageUrl,
+                                              String originalEmail, String originalPhoneNumber, String originalUsername) {
+        if (currentUser == null) {
+            showToast("User session expired. Please log in again.", false);
+            context.startActivity(new Intent(context, LoginActivity.class));
+            ((Activity) context).finish();
+            return;
+        }
+
+        authCompleteListener.onAuthStart();
+        currentUser.reauthenticate(credential)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        if (!email.equalsIgnoreCase(currentUser.getEmail())) {
+                            auth.fetchSignInMethodsForEmail(email).addOnCompleteListener(fetchTask -> {
+                                if (fetchTask.isSuccessful() && !fetchTask.getResult().getSignInMethods().isEmpty()) {
+                                    showToast("This email is already in use by another account.", false);
+                                    authCompleteListener.onAuthFailed();
+                                } else {
+                                    currentUser.verifyBeforeUpdateEmail(email)
+                                            .addOnSuccessListener(aVoid -> {
+                                                Log.d(TAG, "Verification email sent to: " + email);
+                                                authPrefs.edit().putString("pendingEmail", email)
+                                                        .putLong(LAST_VERIFICATION_TIME, System.currentTimeMillis())
+                                                        .apply();
+
+                                                saveProfileWithPendingEmail(fullName, gender, birthday, phoneNumber,
+                                                        email, username, selectedImageUri != null ? null : currentImageUrl,
+                                                        originalEmail, originalPhoneNumber, originalUsername);
+                                            })
+                                            .addOnFailureListener(e -> {
+                                                Log.e(TAG, "Failed to send verification email: " + e.getMessage());
+                                                showToast("Failed to send verification email: " + e.getMessage(), false);
+                                                authCompleteListener.onAuthFailed();
+                                            });
+                                }
+                            });
+                        } else {
+                            saveToFirestore(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri,
+                                    currentImageUrl, originalEmail, originalPhoneNumber, originalUsername);
+                        }
+                    } else {
+                        String errorMsg = task.getException() != null ? task.getException().getMessage() : "Unknown error";
+                        showToast("Re-authentication failed: " + errorMsg, false);
+                        authCompleteListener.onAuthFailed();
+                    }
+                });
     }
 
     public void verifyPhoneNumber(String fullName, String gender, String birthday, String phoneNumber,
@@ -521,197 +582,39 @@ public class ProfileAuthHelper {
         dialog.show();
     }
 
-    private void reauthenticateAndVerifyEmail(String fullName, String gender, String birthday,
-                                              String phoneNumber, String email, String username,
-                                              AuthCredential credential, Uri selectedImageUri, String currentImageUrl,
-                                              String originalEmail, String originalPhoneNumber, String originalUsername) {
-        if (currentUser == null) {
-            showToast("User session expired. Please log in again.", false);
-            context.startActivity(new Intent(context, LoginActivity.class));
-            ((Activity) context).finish();
-            return;
-        }
-
-        authCompleteListener.onAuthStart();
-        currentUser.reauthenticate(credential)
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        if (!email.equalsIgnoreCase(currentUser.getEmail())) {
-                            auth.fetchSignInMethodsForEmail(email).addOnCompleteListener(fetchTask -> {
-                                if (fetchTask.isSuccessful() && !fetchTask.getResult().getSignInMethods().isEmpty()) {
-                                    showToast("This email is already in use by another account.", false);
-                                    authCompleteListener.onAuthFailed();
-                                } else {
-                                    currentUser.verifyBeforeUpdateEmail(email)
-                                            .addOnSuccessListener(aVoid -> {
-                                                Log.d(TAG, "Verification email sent to: " + email);
-                                                authPrefs.edit().putString("pendingEmail", email)
-                                                        .putLong(LAST_VERIFICATION_TIME, System.currentTimeMillis())
-                                                        .apply();
-
-                                                // Save profile with pending email
-                                                saveProfileWithPendingEmail(fullName, gender, birthday, phoneNumber,
-                                                        email, username, selectedImageUri != null ? null : currentImageUrl,
-                                                        originalEmail, originalPhoneNumber, originalUsername);
-                                            })
-                                            .addOnFailureListener(e -> {
-                                                Log.e(TAG, "Failed to send verification email: " + e.getMessage());
-                                                showToast("Failed to send verification email: " + e.getMessage(), false);
-                                                authCompleteListener.onAuthFailed();
-                                            });
-                                }
-                            });
-                        } else {
-                            saveToDatabase(fullName, gender, birthday, phoneNumber, email, username, selectedImageUri,
-                                    currentImageUrl, originalEmail, originalPhoneNumber, originalUsername);
-                        }
-                    } else {
-                        String errorMsg = task.getException() != null ? task.getException().getMessage() : "Unknown error";
-                        showToast("Re-authentication failed: " + errorMsg, false);
-                        authCompleteListener.onAuthFailed();
-                    }
-                });
-    }
-
-    private void saveProfileWithPendingEmail(String fullName, String gender, String birthday, String phoneNumber,
-                                             String email, String username, String imageUrl,
-                                             String originalEmail, String originalPhoneNumber, String originalUsername) {
-        Map<String, Object> user = new HashMap<>();
-        user.put("fullName", fullName);
-        user.put("gender", gender);
-        user.put("birthday", birthday);
-        user.put("phoneNumber", phoneNumber);
-        user.put("email", currentUser.getEmail()); // Current email until verified
-        user.put("username", username);
-        user.put("signInMethod", "email");
-        user.put("pendingEmail", email);
-
-        databaseReference.setValue(user)
-                .addOnSuccessListener(aVoid -> {
-                    // Update Firestore with imageUrl
-                    firestore.collection("users").document(currentUser.getUid())
-                            .set(new HashMap<String, Object>() {{
-                                put("imageUrl", imageUrl != null ? imageUrl : "");
-                            }}, com.google.firebase.firestore.SetOptions.merge())
-                            .addOnSuccessListener(aVoid1 -> {
-                                SharedPreferences.Editor editor = authPrefs.edit();
-                                editor.putString("fullName", fullName);
-                                editor.putString("gender", gender);
-                                editor.putString("birthday", birthday);
-                                editor.putString("phoneNumber", phoneNumber);
-                                editor.putString("email", currentUser.getEmail());
-                                editor.putString("username", username);
-                                editor.putString("imageUrl", imageUrl != null ? imageUrl : "");
-                                editor.putString("pendingEmail", email);
-                                editor.apply();
-
-                                authCompleteListener.onEmailVerificationSent(
-                                        fullName, gender, birthday, phoneNumber,
-                                        currentUser.getEmail(), username, email,
-                                        originalEmail, originalPhoneNumber, originalUsername);
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to update Firestore with imageUrl: " + e.getMessage());
-                                showToast("Failed to save image reference: " + e.getMessage(), false);
-                                authCompleteListener.onAuthFailed();
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to update database with pending email: " + e.getMessage());
-                    showToast("Failed to save profile: " + e.getMessage(), false);
-                    authCompleteListener.onAuthFailed();
-                });
-    }
-
-    private void updatePhoneNumber(PhoneAuthCredential credential, String fullName, String gender,
-                                   String birthday, String phoneNumber, String email, String username,
+    private void updatePhoneNumber(PhoneAuthCredential credential, String fullName, String gender, String birthday,
+                                   String phoneNumber, String email, String username,
                                    String originalEmail, String originalPhoneNumber, String originalUsername) {
-        if (currentUser == null) {
-            showToast("User session expired. Please log in again.", false);
-            context.startActivity(new Intent(context, LoginActivity.class));
-            ((Activity) context).finish();
-            return;
-        }
-
         authCompleteListener.onAuthStart();
         currentUser.updatePhoneNumber(credential)
                 .addOnSuccessListener(aVoid -> {
-                    authPrefs.edit().remove("pendingPhoneNumber").apply();
-                    writeToDatabase(fullName, gender, birthday, phoneNumber, email, username, null,
-                            originalEmail, originalPhoneNumber, originalUsername); // Update database after phone verification
+                    Log.d(TAG, "Phone number updated successfully to: " + phoneNumber);
+                    saveToFirestore(fullName, gender, birthday, phoneNumber, email, username, null,
+                            authPrefs.getString("imageUrl", ""), originalEmail, originalPhoneNumber, originalUsername);
                 })
                 .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to update phone number: " + e.getMessage());
                     showToast("Failed to update phone number: " + e.getMessage(), false);
                     authCompleteListener.onAuthFailed();
                 });
     }
 
-    public void resendEmailVerification(String email) {
-        long lastVerificationTime = authPrefs.getLong(LAST_VERIFICATION_TIME, 0);
-        long currentTime = System.currentTimeMillis();
-
-        if (currentTime - lastVerificationTime < RESEND_TIMEOUT) {
-            long timeLeft = RESEND_TIMEOUT - (currentTime - lastVerificationTime);
-            long minutesLeft = TimeUnit.MILLISECONDS.toMinutes(timeLeft);
-            long secondsLeft = TimeUnit.MILLISECONDS.toSeconds(timeLeft % (60 * 1000));
-            showToast("Please wait " + minutesLeft + "m " + secondsLeft + "s before resending.", false);
-            return;
-        }
-
-        authCompleteListener.onAuthStart();
-        currentUser.verifyBeforeUpdateEmail(email)
-                .addOnSuccessListener(aVoid -> {
-                    authPrefs.edit().putLong(LAST_VERIFICATION_TIME, System.currentTimeMillis()).apply();
-                    showToast("Verification email resent to " + email, true);
-                    authCompleteListener.onEmailVerificationSent(
-                            authPrefs.getString("fullName", ""),
-                            authPrefs.getString("gender", ""),
-                            authPrefs.getString("birthday", ""),
-                            authPrefs.getString("phoneNumber", ""),
-                            currentUser.getEmail(),
-                            authPrefs.getString("username", ""),
-                            email,
-                            currentUser.getEmail(),
-                            authPrefs.getString("phoneNumber", ""),
-                            authPrefs.getString("username", ""));
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to resend verification email: " + e.getMessage());
-                    showToast("Failed to resend verification email: " + e.getMessage(), false);
-                    authCompleteListener.onAuthFailed();
-                });
-    }
-
     private void showToast(String message, boolean isSuccess) {
-        Toast toast = Toast.makeText(context, message, Toast.LENGTH_LONG);
-        View view = LayoutInflater.from(context).inflate(R.layout.custom_toast, null);
-        TextView text = view.findViewById(R.id.toast_text);
-        text.setText(message);
-        text.setTextColor(Color.WHITE);
-        view.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
-        toast.setView(view);
+        LayoutInflater inflater = LayoutInflater.from(context);
+        View toastView = inflater.inflate(R.layout.custom_toast, null);
+        TextView toastText = toastView.findViewById(R.id.toast_text);
+        toastText.setText(message);
+        toastText.setTextColor(Color.WHITE);
+        toastView.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
+
+        Toast toast = new Toast(context);
+        toast.setDuration(Toast.LENGTH_LONG);
+        toast.setView(toastView);
+
+        int offsetDp = (int) (300 * context.getResources().getDisplayMetrics().density);
+        toast.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, offsetDp);
+
+        Log.d(TAG, "Showing toast: " + message);
         toast.show();
-    }
-
-    interface ErrorCallback {
-        void onError(String errorMessage);
-    }
-
-    public interface OnAuthCompleteListener {
-        void onAuthStart();
-
-        void onAuthSuccess(String fullName, String gender, String birthday, String phoneNumber,
-                           String email, String username, String originalEmail,
-                           String originalPhoneNumber, String originalUsername);
-
-        void onEmailVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
-                                     String currentEmail, String username, String pendingEmail,
-                                     String originalEmail, String originalPhoneNumber, String originalUsername);
-
-        void onPhoneVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
-                                     String currentEmail, String username, String pendingPhoneNumber,
-                                     String originalEmail, String originalPhoneNumber, String originalUsername);
-
-        void onAuthFailed();
     }
 }

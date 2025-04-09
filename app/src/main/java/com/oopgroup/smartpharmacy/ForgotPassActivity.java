@@ -1,21 +1,25 @@
 package com.oopgroup.smartpharmacy;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import com.airbnb.lottie.LottieAnimationView;
+
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.PhoneAuthCredential;
@@ -23,6 +27,7 @@ import com.google.firebase.auth.PhoneAuthOptions;
 import com.google.firebase.auth.PhoneAuthProvider;
 import com.hbb20.CountryCodePicker;
 import com.oopgroup.smartpharmacy.utils.AuthUtils;
+import com.softourtech.slt.SLTLoader;
 
 import java.util.concurrent.TimeUnit;
 
@@ -31,32 +36,37 @@ public class ForgotPassActivity extends AppCompatActivity {
     private static final String TAG = "ForgotPassActivity";
     private EditText credInput;
     private Button resetBtn;
-    private LottieAnimationView loadingSpinner;
     private TextView backToLoginText, validationMessage;
-    private ImageView emailIcon, phoneIcon; // Removed googleLogin, facebookLogin, githubLogin
+    private ImageView emailIcon, phoneIcon;
     private CountryCodePicker ccp;
     private FirebaseAuth mAuth;
     private boolean isPhoneInput = false;
     private boolean isTextChanging = false; // Guard against recursive TextWatcher calls
+    private SLTLoader sltLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_forgotpass);
 
+        // Initialize SLTLoader with the activity's root view
+        View activityRoot = findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e(TAG, "Activity root view not found or not a ViewGroup");
+            return;
+        }
+        sltLoader = new SLTLoader(this, (ViewGroup) activityRoot);
+
         mAuth = FirebaseAuth.getInstance();
 
         // Initialize UI elements
         credInput = findViewById(R.id.credInput);
         resetBtn = findViewById(R.id.resetBtn);
-        loadingSpinner = findViewById(R.id.loadingSpinner);
         backToLoginText = findViewById(R.id.backToLoginText);
         validationMessage = findViewById(R.id.validationMessage);
         emailIcon = findViewById(R.id.emailIcon);
         phoneIcon = findViewById(R.id.phoneIcon);
         ccp = findViewById(R.id.ccp);
-
-        // Removed Google, Facebook, GitHub initialization code
 
         // Set default country based on device locale, restricted to BD, MY, SG
         ccp.setCustomMasterCountries("BD,MY,SG");
@@ -145,8 +155,14 @@ public class ForgotPassActivity extends AppCompatActivity {
             startActivity(new Intent(this, LoginActivity.class));
             finish();
         });
+    }
 
-        // Removed Google, Facebook, GitHub login button listeners
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (sltLoader != null) {
+            sltLoader.onDestroy();
+        }
     }
 
     private void adjustCredInputPadding() {
@@ -167,12 +183,12 @@ public class ForgotPassActivity extends AppCompatActivity {
     }
 
     private void checkUserExists(String emailToCheck, String originalInput, boolean isPhone) {
-        loadingSpinner.setVisibility(View.VISIBLE);
+        showLoader();
         setUiEnabled(false);
 
         mAuth.fetchSignInMethodsForEmail(emailToCheck)
                 .addOnCompleteListener(task -> {
-                    loadingSpinner.setVisibility(View.GONE);
+                    hideLoader();
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         if (task.getResult().getSignInMethods() != null && !task.getResult().getSignInMethods().isEmpty()) {
@@ -208,9 +224,10 @@ public class ForgotPassActivity extends AppCompatActivity {
     }
 
     private void sendEmailResetLink(String email) {
+        showLoader();
         mAuth.sendPasswordResetEmail(email)
                 .addOnCompleteListener(task -> {
-                    loadingSpinner.setVisibility(View.GONE);
+                    hideLoader();
                     setUiEnabled(true);
                     if (task.isSuccessful()) {
                         resetInputBorders();
@@ -248,6 +265,7 @@ public class ForgotPassActivity extends AppCompatActivity {
         }
 
         Log.d(TAG, "Sending OTP to: " + phoneNumber);
+        showLoader();
         PhoneAuthOptions options = PhoneAuthOptions.newBuilder(mAuth)
                 .setPhoneNumber(phoneNumber)
                 .setTimeout(60L, TimeUnit.SECONDS)
@@ -255,7 +273,7 @@ public class ForgotPassActivity extends AppCompatActivity {
                 .setCallbacks(new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
                     @Override
                     public void onVerificationCompleted(PhoneAuthCredential credential) {
-                        loadingSpinner.setVisibility(View.GONE);
+                        hideLoader();
                         setUiEnabled(true);
                         resetInputBorders();
                         showCustomToast("Phone verified automatically", true);
@@ -267,7 +285,7 @@ public class ForgotPassActivity extends AppCompatActivity {
 
                     @Override
                     public void onVerificationFailed(com.google.firebase.FirebaseException e) {
-                        loadingSpinner.setVisibility(View.GONE);
+                        hideLoader();
                         setUiEnabled(true);
                         String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
                         Log.e(TAG, "OTP sending failed: " + errorMessage);
@@ -316,7 +334,7 @@ public class ForgotPassActivity extends AppCompatActivity {
 
                     @Override
                     public void onCodeSent(String verificationId, PhoneAuthProvider.ForceResendingToken token) {
-                        loadingSpinner.setVisibility(View.GONE);
+                        hideLoader();
                         setUiEnabled(true);
                         resetInputBorders();
                         showCustomToast("OTP sent to " + phoneNumber, true);
@@ -336,7 +354,6 @@ public class ForgotPassActivity extends AppCompatActivity {
         credInput.setEnabled(enabled);
         resetBtn.setEnabled(enabled);
         backToLoginText.setEnabled(enabled);
-        // Removed Google, Facebook, GitHub UI enable/disable code
     }
 
     private void showCustomToast(String message, boolean isSuccess) {
@@ -348,16 +365,9 @@ public class ForgotPassActivity extends AppCompatActivity {
         toastView.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
         Toast toast = new Toast(this);
         toast.setDuration(Toast.LENGTH_LONG);
+        toast.setGravity(Gravity.CENTER, 0, 0); // Center the toast
         toast.setView(toastView);
         toast.show();
-    }
-
-    // Removed Google, Facebook, GitHub sign-in methods
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        // Removed Google, Facebook activity result handling
     }
 
     private void setErrorBorder(EditText editText) {
@@ -366,5 +376,21 @@ public class ForgotPassActivity extends AppCompatActivity {
 
     private void resetInputBorders() {
         credInput.setBackgroundResource(R.drawable.edittext_bg);
+    }
+
+    private void showLoader() {
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"))
+                .setChangeJsonColor(false);
+        sltLoader.showCustomLoader(config);
+    }
+
+    private void hideLoader() {
+        if (sltLoader != null) {
+            sltLoader.hideLoader();
+        }
     }
 }

@@ -203,7 +203,7 @@ public class AddressDialogFragment extends DialogFragment {
         addressLayout.addView(detailsLayout);
 
         ImageView editButton = new ImageView(getContext());
-        LinearLayout.LayoutParams editButtonParams = new LinearLayout.LayoutParams(24, 24);
+        LinearLayout.LayoutParams editButtonParams = new LinearLayout.LayoutParams(80, 80);
         editButtonParams.setMargins(8, 0, 16, 0);
         editButton.setLayoutParams(editButtonParams);
         editButton.setImageResource(R.drawable.edit_ic);

@@ -3,13 +3,16 @@ package com.oopgroup.smartpharmacy;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
@@ -22,7 +25,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.airbnb.lottie.LottieAnimationView;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
@@ -38,11 +40,11 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.hbb20.CountryCodePicker;
 import com.oopgroup.smartpharmacy.utils.AuthUtils;
+import com.softourtech.slt.SLTLoader;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,58 +56,56 @@ public class SignupActivity extends AppCompatActivity {
     private static final int PHONE_STATE_PERMISSION_REQUEST_CODE = 1001;
     private static final String TAG = "SignupActivity";
     private EditText fullNameInput, credInput, passwordInput;
-    private LottieAnimationView loadingSpinner;
     private TextView loginText;
     private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin, emailIcon, phoneIcon;
     private CountryCodePicker ccp;
     private FirebaseAuth mAuth;
-    private DatabaseReference databaseReference;
-    private DatabaseReference emailsReference;
-    private DatabaseReference phoneNumbersReference;
-    private DatabaseReference usernamesReference;
     private FirebaseFirestore firestore;
     private boolean isPasswordVisible = false;
     private GoogleSignInClient mGoogleSignInClient;
     private CallbackManager callbackManager;
+    private SLTLoader sltLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_signup);
 
-        // Check Google Play Services availability
+        // Check Google Play Services
         int playServicesStatus = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
-        Log.d(TAG, "Google Play Services status: " + playServicesStatus);
         if (playServicesStatus != ConnectionResult.SUCCESS) {
-            Log.e(TAG, "Google Play Services unavailable: " + playServicesStatus);
             GoogleApiAvailability.getInstance().getErrorDialog(this, playServicesStatus, 0).show();
             return;
         }
 
-        // Initialize Firebase and Google Sign-In
+        // Initialize SLTLoader with the activity's root view
+        View activityRoot = findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e(TAG, "Activity root view not found or not a ViewGroup");
+            return;
+        }
+        sltLoader = new SLTLoader(this, (ViewGroup) activityRoot);
+
+        // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        databaseReference = FirebaseDatabase.getInstance().getReference("users");
-        emailsReference = FirebaseDatabase.getInstance().getReference("emails");
-        phoneNumbersReference = FirebaseDatabase.getInstance().getReference("phoneNumbers");
-        usernamesReference = FirebaseDatabase.getInstance().getReference("usernames");
         firestore = FirebaseFirestore.getInstance();
 
+        // Google Sign-In setup
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Initialize Facebook Login
+        // Facebook Login setup
         callbackManager = CallbackManager.Factory.create();
         LoginManager.getInstance().registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
             @Override
             public void onSuccess(LoginResult loginResult) {
-                loadingSpinner.setVisibility(View.VISIBLE);
+                showLoader();
                 setUiEnabled(false);
                 AuthUtils.firebaseAuthWithFacebook(SignupActivity.this, loginResult.getAccessToken().getToken(),
-                        databaseReference, emailsReference, phoneNumbersReference, usernamesReference,
-                        new AuthUtils.AuthCallback() {
+                        firestore, new AuthUtils.AuthCallback() {
                             @Override
                             public void onSuccess(FirebaseUser user) {
                                 handleSocialMediaSuccess(user, "Facebook");
@@ -125,7 +125,6 @@ public class SignupActivity extends AppCompatActivity {
 
             @Override
             public void onError(FacebookException exception) {
-                Log.e(TAG, "Facebook Sign-In error: " + exception.getMessage(), exception);
                 showCustomToast("Facebook Sign-In failed: " + exception.getMessage(), false);
             }
         });
@@ -135,7 +134,6 @@ public class SignupActivity extends AppCompatActivity {
         fullNameInput = findViewById(R.id.fullNameInput);
         credInput = findViewById(R.id.credInput);
         passwordInput = findViewById(R.id.passwordInput);
-        loadingSpinner = findViewById(R.id.loadingSpinner);
         loginText = findViewById(R.id.loginText);
         passwordToggle = findViewById(R.id.passwordToggle);
         googleLogin = findViewById(R.id.googleLogin);
@@ -167,7 +165,10 @@ public class SignupActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (mGoogleSignInClient != null && !isFinishing()) {
-            mGoogleSignInClient.signOut().addOnCompleteListener(task -> Log.d(TAG, "Signed out from Google on destroy"));
+            mGoogleSignInClient.signOut();
+        }
+        if (sltLoader != null) {
+            sltLoader.onDestroy();
         }
     }
 
@@ -189,27 +190,44 @@ public class SignupActivity extends AppCompatActivity {
 
     private void setupInputValidation() {
         fullNameInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { resetInputBorders(); }
-            @Override public void afterTextChanged(Editable s) {}
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                resetInputBorders();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
 
         credInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
                 resetInputBorders();
                 adjustCredInputPadding();
             }
-            @Override public void afterTextChanged(Editable s) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
 
         passwordInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
                 resetInputBorders();
                 if (s.length() < 6 && s.length() > 0) passwordInput.setError("Password must be at least 6 characters");
             }
-            @Override public void afterTextChanged(Editable s) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
     }
 
@@ -231,15 +249,11 @@ public class SignupActivity extends AppCompatActivity {
         String credentials = credInput.getText().toString().trim();
         String password = passwordInput.getText().toString().trim();
 
-        Log.d(TAG, "Starting signup with fullName: " + fullName + ", credentials: " + credentials);
-
         if (!validateInputs(fullName, credentials, password)) return;
 
         String emailOrPhone = AuthUtils.isValidEmail(credentials) ? credentials : AuthUtils.normalizePhoneNumberForBackend(credentials, ccp, null);
         String signInMethod = AuthUtils.isValidEmail(emailOrPhone) ? "email" : "phone";
         final String syntheticEmail = signInMethod.equals("email") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
-
-        Log.d(TAG, "Sign-in method: " + signInMethod + ", syntheticEmail: " + syntheticEmail);
 
         if (!AuthUtils.isValidEmail(emailOrPhone) && !AuthUtils.isValidPhoneNumber(emailOrPhone)) {
             setErrorBorder(credInput);
@@ -247,69 +261,53 @@ public class SignupActivity extends AppCompatActivity {
             return;
         }
 
-        loadingSpinner.setVisibility(View.VISIBLE);
+        showLoader();
         setUiEnabled(false);
 
-        DatabaseReference ref = signInMethod.equals("email") ? emailsReference : phoneNumbersReference;
-        String key = signInMethod.equals("email") ? emailOrPhone.replace(".", "_") : emailOrPhone;
-
-        AuthUtils.checkUniqueness(ref, key, syntheticEmail, isUnique -> {
-            if (!isUnique) {
-                loadingSpinner.setVisibility(View.GONE);
-                setUiEnabled(true);
-                setErrorBorder(credInput);
-                showCustomToast((signInMethod.equals("email") ? "Email" : "Phone number") + " already in use", false);
-                return;
-            }
-
-            Log.d(TAG, "Credentials are unique, generating username...");
-            AuthUtils.generateUniqueUsername(fullName, usernamesReference, username -> {
-                Log.d(TAG, "Generated username: " + username);
-                mAuth.createUserWithEmailAndPassword(syntheticEmail, password)
-                        .addOnCompleteListener(this, task -> {
-                            if (task.isSuccessful()) {
-                                FirebaseUser user = mAuth.getCurrentUser();
-                                if (user != null) {
-                                    saveUserData(user, fullName, emailOrPhone, signInMethod, username);
-                                }
+        AuthUtils.generateUniqueUsername(fullName, firestore.collection("usernames"), username -> {
+            mAuth.createUserWithEmailAndPassword(syntheticEmail, password)
+                    .addOnCompleteListener(this, task -> {
+                        if (task.isSuccessful()) {
+                            FirebaseUser user = mAuth.getCurrentUser();
+                            if (user != null) {
+                                saveUserData(user, fullName, emailOrPhone, signInMethod, username);
                             } else {
-                                Log.e(TAG, "Auth creation failed: " + task.getException().getMessage(), task.getException());
-                                loadingSpinner.setVisibility(View.GONE);
+                                hideLoader();
                                 setUiEnabled(true);
-                                showCustomToast("Signup failed: " + task.getException().getMessage(), false);
+                                showCustomToast("Signup failed: User is null", false);
                             }
-                        });
-            });
+                        } else {
+                            hideLoader();
+                            setUiEnabled(true);
+                            showCustomToast("Signup failed: " + task.getException().getMessage(), false);
+                        }
+                    });
         });
     }
 
     private void signInWithGoogle() {
-        Log.d(TAG, "Initiating Google Sign-In");
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
     }
 
     private void signInWithFacebook() {
-        Log.d(TAG, "Initiating Facebook Sign-In");
         LoginManager.getInstance().logInWithReadPermissions(this, Arrays.asList("email", "public_profile"));
     }
 
     private void signInWithGitHub() {
-        loadingSpinner.setVisibility(View.VISIBLE);
+        showLoader();
         setUiEnabled(false);
-        Log.d(TAG, "Initiating GitHub Sign-In");
-        AuthUtils.firebaseAuthWithGitHub(this, "YOUR_GITHUB_CLIENT_ID", databaseReference, emailsReference, phoneNumbersReference, usernamesReference,
-                new AuthUtils.AuthCallback() {
-                    @Override
-                    public void onSuccess(FirebaseUser user) {
-                        handleSocialMediaSuccess(user, "GitHub");
-                    }
+        AuthUtils.firebaseAuthWithGitHub(this, "YOUR_GITHUB_CLIENT_ID", firestore, new AuthUtils.AuthCallback() {
+            @Override
+            public void onSuccess(FirebaseUser user) {
+                handleSocialMediaSuccess(user, "GitHub");
+            }
 
-                    @Override
-                    public void onFailure(String errorMessage) {
-                        handleSocialMediaFailure("GitHub", errorMessage);
-                    }
-                });
+            @Override
+            public void onFailure(String errorMessage) {
+                handleSocialMediaFailure("GitHub", errorMessage);
+            }
+        });
     }
 
     @Override
@@ -319,23 +317,20 @@ public class SignupActivity extends AppCompatActivity {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
-                Log.d(TAG, "Google Sign-In successful, email: " + account.getEmail());
-                loadingSpinner.setVisibility(View.VISIBLE);
+                showLoader();
                 setUiEnabled(false);
-                AuthUtils.firebaseAuthWithGoogle(this, account.getIdToken(), databaseReference, emailsReference, phoneNumbersReference, usernamesReference,
-                        new AuthUtils.AuthCallback() {
-                            @Override
-                            public void onSuccess(FirebaseUser user) {
-                                handleSocialMediaSuccess(user, "Google");
-                            }
+                AuthUtils.firebaseAuthWithGoogle(this, account.getIdToken(), firestore, new AuthUtils.AuthCallback() {
+                    @Override
+                    public void onSuccess(FirebaseUser user) {
+                        handleSocialMediaSuccess(user, "Google");
+                    }
 
-                            @Override
-                            public void onFailure(String errorMessage) {
-                                handleSocialMediaFailure("Google", errorMessage);
-                            }
-                        });
+                    @Override
+                    public void onFailure(String errorMessage) {
+                        handleSocialMediaFailure("Google", errorMessage);
+                    }
+                });
             } catch (ApiException e) {
-                Log.e(TAG, "Google Sign-In failed, status code: " + e.getStatusCode(), e);
                 handleSocialMediaFailure("Google", "Sign-In failed: " + e.getMessage());
             }
         } else {
@@ -371,6 +366,7 @@ public class SignupActivity extends AppCompatActivity {
         toastText.setTextColor(ContextCompat.getColor(this, android.R.color.white));
         toastView.setBackgroundResource(isSuccess ? R.drawable.toast_success_bg : R.drawable.toast_error_bg);
         toast.setView(toastView);
+        toast.setGravity(Gravity.CENTER, 0, 0); // Center the toast
         toast.show();
     }
 
@@ -382,15 +378,6 @@ public class SignupActivity extends AppCompatActivity {
         fullNameInput.setBackgroundResource(R.drawable.edittext_bg);
         credInput.setBackgroundResource(R.drawable.edittext_bg);
         passwordInput.setBackgroundResource(R.drawable.edittext_bg);
-    }
-
-    private void setUserRoleInFirestore(String uid, String role) {
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("role", role);
-        firestore.collection("users").document(uid)
-                .set(userData)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Firestore role set for UID: " + uid))
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to set Firestore role: " + e.getMessage(), e));
     }
 
     private boolean validateInputs(String fullName, String credentials, String password) {
@@ -411,61 +398,94 @@ public class SignupActivity extends AppCompatActivity {
     }
 
     private void saveUserData(FirebaseUser user, String fullName, String emailOrPhone, String signInMethod, String username) {
-        AuthUtils.saveUserData(user, databaseReference, emailsReference, phoneNumbersReference, usernamesReference,
-                fullName,
-                signInMethod.equals("email") ? emailOrPhone : "",
-                signInMethod.equals("phone") ? emailOrPhone : "",
-                username,
-                signInMethod,
-                new AuthUtils.SaveUserDataCallback() {
-                    @Override
-                    public void onSuccess() {
-                        Log.d(TAG, "User data saved to Realtime Database");
-                        setUserRoleInFirestore(user.getUid(), "user");
-                        loadingSpinner.setVisibility(View.GONE);
-                        setUiEnabled(true);
-                        showCustomToast("Signup successful!", true);
-                        Intent intent = new Intent(SignupActivity.this, MainActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(intent);
-                        finish();
-                    }
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("fullName", fullName);
+        userData.put("email", signInMethod.equals("email") ? emailOrPhone : "");
+        userData.put("phoneNumber", signInMethod.equals("phone") ? emailOrPhone : "");
+        userData.put("username", username);
+        userData.put("signInMethod", signInMethod);
+        userData.put("role", "customer");
+        userData.put("imageUrl", "");
+        userData.put("gender", "Not specified");
+        userData.put("birthday", "01-01-2000");
 
-                    @Override
-                    public void onFailure(String errorMessage) {
-                        Log.e(TAG, "Failed to save user data: " + errorMessage);
-                        loadingSpinner.setVisibility(View.GONE);
-                        setUiEnabled(true);
-                        showCustomToast("Signup failed: " + errorMessage, false);
-                        user.delete()
-                                .addOnSuccessListener(aVoid -> Log.d(TAG, "Deleted failed user"))
-                                .addOnFailureListener(e -> Log.e(TAG, "Failed to delete user: " + e.getMessage(), e));
-                    }
-                });
+        Map<String, Object> uniqueData = new HashMap<>();
+        uniqueData.put("uid", user.getUid());
+
+        firestore.runTransaction(transaction -> {
+            DocumentReference userRef = firestore.collection("users").document(user.getUid());
+            transaction.set(userRef, userData);
+
+            if (signInMethod.equals("email") && !emailOrPhone.isEmpty()) {
+                DocumentReference emailRef = firestore.collection("emails").document(emailOrPhone.replace(".", "_"));
+                transaction.set(emailRef, uniqueData);
+            } else if (signInMethod.equals("phone") && !emailOrPhone.isEmpty()) {
+                DocumentReference phoneRef = firestore.collection("phoneNumbers").document(emailOrPhone);
+                transaction.set(phoneRef, uniqueData);
+            }
+            DocumentReference usernameRef = firestore.collection("usernames").document(username);
+            transaction.set(usernameRef, uniqueData);
+
+            return null;
+        }).addOnSuccessListener(aVoid -> {
+            Log.d(TAG, "User signup transaction succeeded");
+            hideLoader();
+            setUiEnabled(true);
+            showCustomToast("Signup successful!", true);
+            Intent intent = new Intent(SignupActivity.this, MainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            finish();
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Signup transaction failed: " + e.getMessage(), e);
+            hideLoader();
+            setUiEnabled(true);
+            String errorMsg = e.getMessage().contains("PERMISSION_DENIED") ?
+                    (signInMethod.equals("email") ? "Email already in use" : "Phone number already in use") :
+                    "Signup failed: " + e.getMessage();
+            showCustomToast(errorMsg, false);
+            user.delete().addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    Log.d(TAG, "Failed user deleted from Firebase Auth");
+                }
+            });
+        });
     }
 
     private void handleSocialMediaSuccess(FirebaseUser user, String provider) {
         if (mAuth.getCurrentUser() == null) {
-            Log.e(TAG, provider + " signup succeeded but user is null, likely signed out prematurely");
             showCustomToast(provider + " signup failed: Please try again", false);
-            loadingSpinner.setVisibility(View.GONE);
+            hideLoader();
             setUiEnabled(true);
             return;
         }
-        setUserRoleInFirestore(user.getUid(), "user");
-        loadingSpinner.setVisibility(View.GONE);
-        setUiEnabled(true);
-        showCustomToast(provider + " signup successful!", true);
-        Intent intent = new Intent(SignupActivity.this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
-        finish();
+        String fullName = user.getDisplayName() != null ? user.getDisplayName() : "Unknown";
+        String email = user.getEmail() != null ? user.getEmail() : "";
+        String phone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
+        String username = email.split("@")[0];
+        AuthUtils.generateUniqueUsername(fullName, firestore.collection("usernames"), uniqueUsername ->
+                saveUserData(user, fullName, email, "email", uniqueUsername));
     }
 
     private void handleSocialMediaFailure(String provider, String errorMessage) {
-        Log.e(TAG, provider + " signup failed: " + errorMessage);
-        loadingSpinner.setVisibility(View.GONE);
+        hideLoader();
         setUiEnabled(true);
         showCustomToast(provider + " signup failed: " + errorMessage, false);
+    }
+
+    private void showLoader() {
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"))
+                .setChangeJsonColor(false);
+        sltLoader.showCustomLoader(config);
+    }
+
+    private void hideLoader() {
+        if (sltLoader != null) {
+            sltLoader.hideLoader();
+        }
     }
 }

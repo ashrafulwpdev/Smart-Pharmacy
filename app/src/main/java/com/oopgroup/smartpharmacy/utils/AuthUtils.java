@@ -17,7 +17,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -28,10 +27,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.auth.OAuthProvider;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.hbb20.CountryCodePicker;
 
 import java.util.Arrays;
@@ -44,7 +41,6 @@ import java.util.regex.Pattern;
 
 public class AuthUtils {
     private static final String TAG = "AuthUtils";
-    private static final int REQUEST_PHONE_STATE_PERMISSION = 1001;
     private static final long DEBOUNCE_DELAY = 300;
     private static final long TOAST_DELAY = 2000;
     private static final int CCP_WIDTH_DP = 48;
@@ -156,7 +152,7 @@ public class AuthUtils {
             Log.d(TAG, "Unlocked country code due to invalid result: " + potentialNumber);
         }
 
-        String countryCode = ccp != null ? ccp.getSelectedCountryCodeWithPlus() : (simCountry != null ? getCountryCodeFromSim(simCountry) : "+60");
+        String countryCode = ccp != null ? ccp.getSelectedCountryCodeWithPlus() : (simCountry != null ? getCountryCodeFromSim(simCountry) : "+880");
         String detectedCountry = detectCountry(normalized);
 
         if (Pattern.matches(LOCAL_REGEX_BD, normalized) && detectedCountry.equals("BD")) {
@@ -222,12 +218,12 @@ public class AuthUtils {
     }
 
     private static String getCountryCodeFromSim(String simCountry) {
-        if (simCountry == null) return "+60";
+        if (simCountry == null) return "+880";
         switch (simCountry.toUpperCase()) {
             case "BD": return "+880";
             case "MY": return "+60";
             case "SG": return "+65";
-            default: return "+60";
+            default: return "+880";
         }
     }
 
@@ -262,7 +258,7 @@ public class AuthUtils {
             case "BD": return "+880";
             case "MY": return "+60";
             case "SG": return "+65";
-            default: return "+60";
+            default: return "+880";
         }
     }
 
@@ -290,12 +286,10 @@ public class AuthUtils {
             return;
         }
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(activity,
-                    new String[]{Manifest.permission.READ_PHONE_STATE},
-                    REQUEST_PHONE_STATE_PERMISSION);
-        } else {
-            retrieveSimNumber(activity, credInput);
+            Log.w(TAG, "Phone state permission not granted, skipping SIM fetch");
+            return;
         }
+        retrieveSimNumber(activity, credInput);
     }
 
     private static void retrieveSimNumber(Activity activity, EditText credInput) {
@@ -311,12 +305,12 @@ public class AuthUtils {
                 String normalizedSimNumber = normalizePhoneNumberForBackend(simNumber, null, simCountry);
                 if (isValidPhoneNumber(normalizedSimNumber)) {
                     credInput.setText(normalizedSimNumber);
-                    Log.d(TAG, "Set SIM number: " + normalizedSimNumber + ", Country: " + simCountry);
+                    Log.d(TAG, "Set SIM number: " + normalizedSimNumber);
                 } else {
-                    Log.w(TAG, "Invalid SIM number after normalization: " + normalizedSimNumber);
+                    Log.w(TAG, "Invalid SIM number: " + normalizedSimNumber);
                 }
             } else {
-                Log.w(TAG, "Invalid or empty SIM number: " + simNumber);
+                Log.w(TAG, "SIM number unavailable");
             }
         } catch (SecurityException e) {
             Log.e(TAG, "Permission denied: " + e.getMessage());
@@ -338,13 +332,9 @@ public class AuthUtils {
             ccp.registerCarrierNumberEditText(credInput);
             ccp.setNumberAutoFormattingEnabled(false);
             ccp.setCountryForNameCode(null);
-            Log.d(TAG, "Registered EditText with CCP, reset to no country");
+            Log.d(TAG, "Registered EditText with CCP");
         } else {
-            Log.e(TAG, "CountryCodePicker is null, flags will not appear");
-        }
-
-        if (validationMessage == null) {
-            Log.e(TAG, "Validation message TextView is null, feedback will not be displayed");
+            Log.w(TAG, "CountryCodePicker is null");
         }
 
         String simCountry = getSimCountry(activity);
@@ -357,27 +347,15 @@ public class AuthUtils {
             private long lastToastTime = 0;
 
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                Log.d(TAG, "Before text changed: " + s);
-            }
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (isUpdatingCountryCode.get() || isProcessingInput) {
-                    Log.d(TAG, "Skipping due to country code update or processing input");
-                    return;
-                }
-
+                if (isUpdatingCountryCode.get() || isProcessingInput) return;
                 String currentInput = s.toString().trim();
-                if (currentInput.equals(lastProcessedInputHolder[0])) {
-                    Log.d(TAG, "Skipping unchanged input: " + currentInput);
-                    return;
-                }
+                if (currentInput.equals(lastProcessedInputHolder[0])) return;
 
-                if (debounceRunnable[0] != null) {
-                    handler.removeCallbacks(debounceRunnable[0]);
-                }
-
+                if (debounceRunnable[0] != null) handler.removeCallbacks(debounceRunnable[0]);
                 debounceRunnable[0] = () -> {
                     isProcessingInput = true;
                     processInput(activity, currentInput, credInput, ccp, emailIcon, phoneIcon,
@@ -389,26 +367,24 @@ public class AuthUtils {
             }
 
             @Override
-            public void afterTextChanged(Editable s) {
-                Log.d(TAG, "After text changed: " + s);
-            }
+            public void afterTextChanged(Editable s) {}
         });
     }
 
     public static String getSimCountry(Activity activity) {
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return "BD"; // Default to BD if permission denied
+        }
         try {
             TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
-            if (tm != null && ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-                String simCountry = tm.getSimCountryIso() != null ? tm.getSimCountryIso().toUpperCase() : null;
-                Log.d(TAG, "SIM country detected: " + simCountry);
-                return simCountry;
-            } else {
-                Log.w(TAG, "SIM country not accessible (permission or null)");
+            if (tm != null) {
+                String simCountry = tm.getSimCountryIso();
+                return simCountry != null && simCountry.length() == 2 ? simCountry.toUpperCase() : "BD";
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting SIM country: " + e.getMessage());
         }
-        return null;
+        return "BD";
     }
 
     private static void processInput(Activity activity, String input, EditText credInput, CountryCodePicker ccp,
@@ -446,9 +422,7 @@ public class AuthUtils {
         int maxLength = getMaxLength(detectedCountry);
         int currentLength = cleanedInput.length();
 
-        if (cleanedInput.startsWith("+")) {
-            maxLength = 13;
-        }
+        if (cleanedInput.startsWith("+")) maxLength = 13;
 
         if ((expectedLength > 0 && currentLength >= expectedLength && !isValidPhoneNumber(backendNumber)) ||
                 currentLength > maxLength) {
@@ -456,7 +430,6 @@ public class AuthUtils {
             if (currentTime - lastToastTime >= TOAST_DELAY) {
                 Toast.makeText(activity, "Invalid phone number", Toast.LENGTH_SHORT).show();
                 toastTimeCallback.onToastTimeUpdated(currentTime);
-                Log.d(TAG, "Showing toast: Invalid phone number");
             }
             showValidationError(validationMessage,
                     "Invalid format (e.g., +8801712345678, +60123456789, +6591234567)",
@@ -464,12 +437,7 @@ public class AuthUtils {
             if (ccp != null) {
                 ccp.setCountryForNameCode(null);
                 ccp.setVisibility(View.GONE);
-                credInput.setPadding(
-                        (int) (12 * activity.getResources().getDisplayMetrics().density),
-                        credInput.getPaddingTop(),
-                        credInput.getPaddingEnd(),
-                        credInput.getPaddingBottom()
-                );
+                adjustPadding(credInput, 12, activity);
             }
         } else {
             updateUI(emailIcon, phoneIcon, ccp, validationMessage, credInput, false,
@@ -477,12 +445,7 @@ public class AuthUtils {
             if (ccp != null && detectedCountry.equals("Unknown")) {
                 ccp.setCountryForNameCode(null);
                 ccp.setVisibility(View.GONE);
-                credInput.setPadding(
-                        (int) (12 * activity.getResources().getDisplayMetrics().density),
-                        credInput.getPaddingTop(),
-                        credInput.getPaddingEnd(),
-                        credInput.getPaddingBottom()
-                );
+                adjustPadding(credInput, 12, activity);
             }
         }
     }
@@ -490,135 +453,75 @@ public class AuthUtils {
     private static void updateUI(ImageView emailIcon, ImageView phoneIcon, CountryCodePicker ccp,
                                  TextView validationMessage, EditText credInput, boolean isEmail, String message,
                                  int color, Activity activity) {
-        if (emailIcon != null) {
-            emailIcon.setVisibility(isEmail ? View.VISIBLE : View.GONE);
-            Log.d(TAG, "Email icon visibility: " + (isEmail ? "VISIBLE" : "GONE"));
-        }
-        if (phoneIcon != null) {
-            phoneIcon.setVisibility(isEmail ? View.GONE : View.VISIBLE);
-            Log.d(TAG, "Phone icon visibility: " + (isEmail ? "GONE" : "VISIBLE"));
-        }
+        if (emailIcon != null) emailIcon.setVisibility(isEmail ? View.VISIBLE : View.GONE);
+        if (phoneIcon != null) phoneIcon.setVisibility(isEmail ? View.GONE : View.VISIBLE);
         if (ccp != null) {
             if (isEmail) {
                 ccp.setVisibility(View.GONE);
-                credInput.setPadding(
-                        (int) (12 * activity.getResources().getDisplayMetrics().density),
-                        credInput.getPaddingTop(),
-                        credInput.getPaddingEnd(),
-                        credInput.getPaddingBottom()
-                );
+                adjustPadding(credInput, 12, activity);
             } else {
                 String normalizedNumber = normalizePhoneNumberForBackend(credInput.getText().toString(), ccp, getSimCountry(activity));
                 if (isValidPhoneNumber(normalizedNumber)) {
                     ccp.setVisibility(View.VISIBLE);
                     updateCountryFlag(normalizedNumber, ccp);
-                    credInput.setPadding(
-                            (int) (CCP_WIDTH_DP * activity.getResources().getDisplayMetrics().density),
-                            credInput.getPaddingTop(),
-                            credInput.getPaddingEnd(),
-                            credInput.getPaddingBottom()
-                    );
+                    adjustPadding(credInput, CCP_WIDTH_DP, activity);
                 } else {
                     ccp.setVisibility(View.GONE);
-                    credInput.setPadding(
-                            (int) (12 * activity.getResources().getDisplayMetrics().density),
-                            credInput.getPaddingTop(),
-                            credInput.getPaddingEnd(),
-                            credInput.getPaddingBottom()
-                    );
+                    adjustPadding(credInput, 12, activity);
                 }
             }
-            Log.d(TAG, "CCP visibility: " + (ccp.getVisibility() == View.VISIBLE ? "VISIBLE" : "GONE"));
         }
         if (validationMessage != null) {
             validationMessage.setText(message);
             validationMessage.setTextColor(ContextCompat.getColor(activity, color));
-            Log.d(TAG, "Validation message: " + message + ", color: " + color);
         }
     }
 
-    private static void showValidationError(TextView validationMessage, String message,
-                                            int color, Activity activity) {
+    private static void adjustPadding(EditText editText, int dp, Activity activity) {
+        editText.setPadding(
+                (int) (dp * activity.getResources().getDisplayMetrics().density),
+                editText.getPaddingTop(),
+                editText.getPaddingEnd(),
+                editText.getPaddingBottom()
+        );
+    }
+
+    private static void showValidationError(TextView validationMessage, String message, int color, Activity activity) {
         if (validationMessage != null) {
             validationMessage.setText(message);
             validationMessage.setTextColor(ContextCompat.getColor(activity, color));
-            Log.d(TAG, "Validation error message: " + message + ", color: " + color);
         }
     }
 
     private static void resetUI(ImageView emailIcon, ImageView phoneIcon, CountryCodePicker ccp,
                                 TextView validationMessage, EditText credInput) {
-        if (emailIcon != null) {
-            emailIcon.setVisibility(View.GONE);
-            Log.d(TAG, "Reset email icon visibility: GONE");
-        }
-        if (phoneIcon != null) {
-            phoneIcon.setVisibility(View.GONE);
-            Log.d(TAG, "Reset phone icon visibility: GONE");
-        }
+        if (emailIcon != null) emailIcon.setVisibility(View.GONE);
+        if (phoneIcon != null) phoneIcon.setVisibility(View.GONE);
         if (ccp != null) {
             ccp.setCountryForNameCode(null);
             ccp.setVisibility(View.GONE);
-            credInput.setPadding(
-                    (int) (12 * credInput.getContext().getResources().getDisplayMetrics().density),
-                    credInput.getPaddingTop(),
-                    credInput.getPaddingEnd(),
-                    credInput.getPaddingBottom()
-            );
-            Log.d(TAG, "Reset CCP visibility: GONE");
+            adjustPadding(credInput, 12, (Activity) credInput.getContext());
         }
-        if (validationMessage != null) {
-            validationMessage.setText("");
-            Log.d(TAG, "Reset validation message");
-        }
+        if (validationMessage != null) validationMessage.setText("");
     }
 
     public static boolean updateCountryFlag(String phoneNumber, CountryCodePicker ccp) {
-        if (ccp == null || phoneNumber == null) {
-            Log.w(TAG, "CCP or phoneNumber null");
-            return false;
-        }
-
+        if (ccp == null || phoneNumber == null) return false;
         try {
             isUpdatingCountryCode.set(true);
             String normalized = phoneNumber.replaceAll("[^0-9+]", "");
-            Log.d(TAG, "Normalized phone for flag update: '" + normalized + "'");
-
             if (isValidPhoneNumber(normalized)) {
                 if (normalized.startsWith("+880")) {
                     ccp.setCountryForNameCode("BD");
-                    Log.d(TAG, "Set country to BD: " + normalized);
                     return true;
                 } else if (normalized.startsWith("+60")) {
                     ccp.setCountryForNameCode("MY");
-                    Log.d(TAG, "Set country to MY: " + normalized);
                     return true;
                 } else if (normalized.startsWith("+65")) {
                     ccp.setCountryForNameCode("SG");
-                    Log.d(TAG, "Set country to SG: " + normalized);
                     return true;
                 }
             }
-
-            String prefix1 = normalized.length() >= 1 ? normalized.substring(0, 1) : "";
-            String prefix3 = normalized.length() >= 3 ? normalized.substring(0, 3) : "";
-            if (!normalized.startsWith("+")) {
-                if (SG_PREFIXES.contains(prefix1) && normalized.length() <= 8) {
-                    ccp.setCountryForNameCode("SG");
-                    Log.d(TAG, "Set country to SG (prefix match): " + normalized);
-                    return true;
-                } else if (BD_PREFIXES.contains(prefix3) && !MY_PREFIXES.contains(prefix3) && normalized.length() <= 11) {
-                    ccp.setCountryForNameCode("BD");
-                    Log.d(TAG, "Set country to BD (exclusive prefix): " + normalized);
-                    return true;
-                } else if (MY_PREFIXES.contains(prefix3) && !BD_PREFIXES.contains(prefix3) && normalized.length() <= 11) {
-                    ccp.setCountryForNameCode("MY");
-                    Log.d(TAG, "Set country to MY (exclusive prefix): " + normalized);
-                    return true;
-                }
-            }
-
-            Log.d(TAG, "No valid or plausible country match for: " + normalized);
             ccp.setCountryForNameCode(null);
             return false;
         } finally {
@@ -627,40 +530,31 @@ public class AuthUtils {
     }
 
     // Firebase Authentication Methods
-    public static void firebaseAuthWithGoogle(Activity activity, String idToken, DatabaseReference databaseReference,
-                                              DatabaseReference emailsReference, DatabaseReference phoneNumbersReference,
-                                              DatabaseReference usernamesReference, AuthCallback callback) {
-        if (!validateAuthParams(activity, databaseReference, callback)) return;
+    public static void firebaseAuthWithGoogle(Activity activity, String idToken, FirebaseFirestore firestore, AuthCallback callback) {
+        if (!validateAuthParams(activity, firestore, callback)) return;
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
-        performFirebaseAuth(activity, credential, "google", databaseReference, emailsReference,
-                phoneNumbersReference, usernamesReference, callback);
+        performFirebaseAuth(activity, credential, "google", firestore, callback);
     }
 
-    public static void firebaseAuthWithFacebook(Activity activity, String token, DatabaseReference databaseReference,
-                                                DatabaseReference emailsReference, DatabaseReference phoneNumbersReference,
-                                                DatabaseReference usernamesReference, AuthCallback callback) {
-        if (!validateAuthParams(activity, databaseReference, callback)) return;
+    public static void firebaseAuthWithFacebook(Activity activity, String token, FirebaseFirestore firestore, AuthCallback callback) {
+        if (!validateAuthParams(activity, firestore, callback)) return;
         AuthCredential credential = FacebookAuthProvider.getCredential(token);
-        performFirebaseAuth(activity, credential, "facebook", databaseReference, emailsReference,
-                phoneNumbersReference, usernamesReference, callback);
+        performFirebaseAuth(activity, credential, "facebook", firestore, callback);
     }
 
-    public static void firebaseAuthWithGitHub(Activity activity, String clientId, DatabaseReference databaseReference,
-                                              DatabaseReference emailsReference, DatabaseReference phoneNumbersReference,
-                                              DatabaseReference usernamesReference, AuthCallback callback) {
-        if (!validateAuthParams(activity, databaseReference, callback)) return;
+    public static void firebaseAuthWithGitHub(Activity activity, String clientId, FirebaseFirestore firestore, AuthCallback callback) {
+        if (!validateAuthParams(activity, firestore, callback)) return;
         OAuthProvider.Builder provider = OAuthProvider.newBuilder("github.com")
                 .addCustomParameter("client_id", clientId)
                 .setScopes(Arrays.asList("user:email"));
         FirebaseAuth.getInstance()
                 .startActivityForSignInWithProvider(activity, provider.build())
-                .addOnSuccessListener(authResult -> handleSocialMediaUser(authResult.getUser(), "github",
-                        databaseReference, emailsReference, phoneNumbersReference, usernamesReference, callback))
+                .addOnSuccessListener(authResult -> handleSocialMediaUser(authResult.getUser(), "github", firestore, callback))
                 .addOnFailureListener(e -> callback.onFailure("GitHub auth failed: " + e.getMessage()));
     }
 
-    private static boolean validateAuthParams(Activity activity, DatabaseReference databaseReference, AuthCallback callback) {
-        if (activity == null || databaseReference == null || callback == null) {
+    private static boolean validateAuthParams(Activity activity, FirebaseFirestore firestore, AuthCallback callback) {
+        if (activity == null || firestore == null || callback == null) {
             Log.e(TAG, "Invalid auth parameters");
             if (callback != null) callback.onFailure("Invalid parameters");
             return false;
@@ -669,17 +563,14 @@ public class AuthUtils {
     }
 
     private static void performFirebaseAuth(Activity activity, AuthCredential credential, String provider,
-                                            DatabaseReference databaseReference, DatabaseReference emailsReference,
-                                            DatabaseReference phoneNumbersReference, DatabaseReference usernamesReference,
-                                            AuthCallback callback) {
+                                            FirebaseFirestore firestore, AuthCallback callback) {
         FirebaseAuth.getInstance()
                 .signInWithCredential(credential)
                 .addOnCompleteListener(activity, task -> {
                     if (task.isSuccessful()) {
                         FirebaseUser user = task.getResult().getUser();
                         if (user != null) {
-                            handleSocialMediaUser(user, provider, databaseReference, emailsReference,
-                                    phoneNumbersReference, usernamesReference, callback);
+                            handleSocialMediaUser(user, provider, firestore, callback);
                         } else {
                             callback.onFailure("User null after auth");
                         }
@@ -689,9 +580,7 @@ public class AuthUtils {
                 });
     }
 
-    private static void handleSocialMediaUser(FirebaseUser user, String provider, DatabaseReference databaseReference,
-                                              DatabaseReference emailsReference, DatabaseReference phoneNumbersReference,
-                                              DatabaseReference usernamesReference, AuthCallback callback) {
+    private static void handleSocialMediaUser(FirebaseUser user, String provider, FirebaseFirestore firestore, AuthCallback callback) {
         if (user == null) {
             callback.onFailure("User null");
             return;
@@ -701,19 +590,13 @@ public class AuthUtils {
         String displayName = user.getDisplayName() != null ? user.getDisplayName() : "User";
         String phone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
 
-        // Check if user is already fully registered in Realtime DB
-        databaseReference.child(user.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    // User already exists in DB, no need to re-save
-                    callback.onSuccess(user);
-                } else {
-                    // For social providers, skip email uniqueness check and proceed with signup
-                    if ("google".equals(provider) || "facebook".equals(provider) || "github".equals(provider)) {
-                        generateUniqueUsername(displayName, usernamesReference, username ->
-                                saveUserData(user, databaseReference, emailsReference, phoneNumbersReference,
-                                        usernamesReference, displayName, email, phone, username, provider,
+        firestore.collection("users").document(user.getUid()).get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.exists()) {
+                        callback.onSuccess(user);
+                    } else {
+                        generateUniqueUsername(displayName, firestore.collection("usernames"), username ->
+                                saveUserData(user, firestore, displayName, email, phone, username, provider,
                                         new SaveUserDataCallback() {
                                             @Override
                                             public void onSuccess() {
@@ -725,42 +608,11 @@ public class AuthUtils {
                                                 callback.onFailure(error);
                                             }
                                         }));
-                    } else {
-                        // For email/password or phone, check uniqueness
-                        String key = email.replace(".", "_");
-                        checkUniqueness(emailsReference, key, email, isUnique -> {
-                            if (!isUnique) {
-                                FirebaseAuth.getInstance().signOut();
-                                callback.onFailure("Email '" + email + "' is already registered");
-                            } else {
-                                generateUniqueUsername(displayName, usernamesReference, username ->
-                                        saveUserData(user, databaseReference, emailsReference, phoneNumbersReference,
-                                                usernamesReference, displayName, email, phone, username, provider,
-                                                new SaveUserDataCallback() {
-                                                    @Override
-                                                    public void onSuccess() {
-                                                        callback.onSuccess(user);
-                                                    }
-
-                                                    @Override
-                                                    public void onFailure(String error) {
-                                                        callback.onFailure(error);
-                                                    }
-                                                }));
-                            }
-                        });
                     }
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                callback.onFailure("Database error: " + error.getMessage());
-            }
-        });
+                })
+                .addOnFailureListener(e -> callback.onFailure("Database error: " + e.getMessage()));
     }
 
-    // Add this to AuthUtils.java
     public static void firebaseLoginWithGoogle(Activity activity, String idToken, AuthCallback callback) {
         if (activity == null || callback == null) {
             Log.e(TAG, "Invalid parameters for Google login");
@@ -768,20 +620,12 @@ public class AuthUtils {
             return;
         }
 
-        // Check Google Play Services availability
         int result = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(activity);
         if (result != ConnectionResult.SUCCESS) {
             Log.e(TAG, "Google Play Services unavailable: " + result);
-            // Optionally prompt the user to resolve it
             GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(activity)
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "Play Services now available, retrying Google login");
-                        performGoogleLogin(activity, idToken, callback);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to resolve Play Services: " + e.getMessage());
-                        callback.onFailure("Google Play Services unavailable: " + e.getMessage());
-                    });
+                    .addOnSuccessListener(aVoid -> performGoogleLogin(activity, idToken, callback))
+                    .addOnFailureListener(e -> callback.onFailure("Google Play Services unavailable: " + e.getMessage()));
             return;
         }
 
@@ -809,88 +653,74 @@ public class AuthUtils {
                 });
     }
 
-    public static void checkUniqueness(DatabaseReference ref, String key, String emailOrSyntheticEmail, UniquenessCallback callback) {
-        ref.child(key).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                boolean isUniqueInDB = !snapshot.exists();
-                Log.d(TAG, "DB check for " + key + ": " + (isUniqueInDB ? "Unique" : "Not unique"));
-                // Only check Realtime DB, skip Firebase Auth for social signups
-                callback.onCheckComplete(isUniqueInDB);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Uniqueness check failed: " + error.getMessage());
-                callback.onCheckComplete(false);
-            }
-        });
-    }
-
-    public static void saveUserData(FirebaseUser user, DatabaseReference databaseReference, DatabaseReference emailsReference,
-                                    DatabaseReference phoneNumbersReference, DatabaseReference usernamesReference,
-                                    String fullName, String email, String phoneNumber, String username, String signInMethod,
-                                    SaveUserDataCallback callback) {
+    public static void saveUserData(FirebaseUser user, FirebaseFirestore firestore, String fullName, String email,
+                                    String phoneNumber, String username, String signInMethod, SaveUserDataCallback callback) {
         Map<String, Object> userData = new HashMap<>();
         userData.put("fullName", fullName != null ? fullName : "User");
         userData.put("email", email != null ? email : "");
         userData.put("phoneNumber", phoneNumber != null ? phoneNumber : "");
         userData.put("gender", "Not specified");
         userData.put("birthday", "01-01-2000");
-        userData.put("username", username != null ? username : "user" + new java.util.Random().nextInt(1000));
+        userData.put("username", username);
         userData.put("imageUrl", "");
         userData.put("signInMethod", signInMethod != null ? signInMethod : "unknown");
-        userData.put("role", "user"); // Added to match Realtime DB rules for admin checks
+        userData.put("role", "customer");
 
-        databaseReference.child(user.getUid()).setValue(userData)
+        Map<String, Object> uniqueData = new HashMap<>();
+        uniqueData.put("userId", user.getUid());
+
+        firestore.collection("users").document(user.getUid()).set(userData)
                 .addOnSuccessListener(aVoid -> {
-                    if ("email".equals(signInMethod) && email != null && !email.isEmpty()) {
-                        emailsReference.child(email.replace(".", "_")).setValue(user.getUid());
+                    Log.d(TAG, "User data saved successfully: " + userData.toString());
+                    if ("email".equals(signInMethod) && !email.isEmpty()) {
+                        firestore.collection("emails").document(email.replace(".", "_")).set(uniqueData)
+                                .addOnSuccessListener(aVoid1 -> Log.d(TAG, "Email uniqueness saved: " + email))
+                                .addOnFailureListener(e -> Log.e(TAG, "Failed to save email: " + e.getMessage()));
                     }
-                    if ("phone".equals(signInMethod) && phoneNumber != null && !phoneNumber.isEmpty()) {
-                        phoneNumbersReference.child(phoneNumber).setValue(user.getUid());
+                    if ("phone".equals(signInMethod) && !phoneNumber.isEmpty()) {
+                        firestore.collection("phoneNumbers").document(phoneNumber).set(uniqueData)
+                                .addOnSuccessListener(aVoid1 -> Log.d(TAG, "Phone uniqueness saved: " + phoneNumber))
+                                .addOnFailureListener(e -> Log.e(TAG, "Failed to save phone: " + e.getMessage()));
                     }
-                    if (username != null && !username.isEmpty()) {
-                        usernamesReference.child(username).setValue(user.getUid());
-                    }
-                    callback.onSuccess();
+                    firestore.collection("usernames").document(username).set(uniqueData)
+                            .addOnSuccessListener(aVoid2 -> {
+                                Log.d(TAG, "Username uniqueness saved: " + username);
+                                callback.onSuccess();
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to save username: " + e.getMessage());
+                                callback.onFailure("Failed to save username: " + e.getMessage());
+                            });
                 })
-                .addOnFailureListener(e -> callback.onFailure("Failed to save user data: " + e.getMessage()));
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save user data: " + e.getMessage());
+                    callback.onFailure("Failed to save user data: " + e.getMessage());
+                });
     }
 
-    public static void generateUniqueUsername(String fullName, DatabaseReference usernamesReference, UsernameCallback callback) {
+    public static void generateUniqueUsername(String fullName, CollectionReference usernamesRef, UsernameCallback callback) {
         String baseUsername = fullName != null ? fullName.replaceAll("[^a-zA-Z0-9]", "").toLowerCase() : "user";
         if (baseUsername.isEmpty()) baseUsername = "user";
-        checkUsernameAvailability(baseUsername, 1, usernamesReference, callback);
+        checkUsernameAvailability(baseUsername, 1, usernamesRef, callback);
     }
 
-    public static void checkUsernameAvailability(String baseUsername, int suffix, DatabaseReference usernamesReference, UsernameCallback callback) {
+    public static void checkUsernameAvailability(String baseUsername, int suffix, CollectionReference usernamesRef, UsernameCallback callback) {
         String candidate = suffix == 1 ? baseUsername : baseUsername + (suffix - 1);
-        usernamesReference.child(candidate).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!snapshot.exists()) {
-                    callback.onUsernameGenerated(candidate);
-                } else {
-                    checkUsernameAvailability(baseUsername, suffix + 1, usernamesReference, callback);
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                callback.onUsernameGenerated(baseUsername + new java.util.Random().nextInt(1000));
-            }
-        });
+        usernamesRef.document(candidate).get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        callback.onUsernameGenerated(candidate);
+                    } else {
+                        checkUsernameAvailability(baseUsername, suffix + 1, usernamesRef, callback);
+                    }
+                })
+                .addOnFailureListener(e -> callback.onUsernameGenerated(baseUsername + new java.util.Random().nextInt(1000)));
     }
 
     // Interfaces
     public interface AuthCallback {
         void onSuccess(FirebaseUser user);
         void onFailure(String errorMessage);
-    }
-
-    public interface UniquenessCallback {
-        void onCheckComplete(boolean isUnique);
     }
 
     public interface SaveUserDataCallback {

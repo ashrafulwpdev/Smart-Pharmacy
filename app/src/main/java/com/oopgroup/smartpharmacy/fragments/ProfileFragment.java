@@ -1,6 +1,5 @@
 package com.oopgroup.smartpharmacy.fragments;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -8,8 +7,6 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -21,7 +18,6 @@ import android.view.animation.ScaleAnimation;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,28 +35,18 @@ import com.bumptech.glide.request.RequestOptions;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseAuthInvalidUserException;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.GenericTypeIndicator;
-import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Source;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.oopgroup.smartpharmacy.ChangePasswordActivity;
 import com.oopgroup.smartpharmacy.EditProfileActivity;
 import com.oopgroup.smartpharmacy.LoginActivity;
 import com.oopgroup.smartpharmacy.ProfileAuthHelper;
 import com.oopgroup.smartpharmacy.R;
-import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
 import com.oopgroup.smartpharmacy.adminstaff.AdminMainActivity;
 import com.oopgroup.smartpharmacy.utils.LogoutConfirmationDialog;
 import com.softourtech.slt.SLTLoader;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 public class ProfileFragment extends Fragment {
@@ -86,9 +72,9 @@ public class ProfileFragment extends Fragment {
     // Firebase and data
     private FirebaseAuth mAuth;
     private FirebaseFirestore firestore;
-    private DatabaseReference databaseReference;
     private FirebaseUser currentUser;
     private ProfileAuthHelper authHelper;
+    private ListenerRegistration firestoreListener;
 
     private String cachedFullName, cachedPhoneNumber, cachedEmail, cachedImageUrl, cachedUsername;
     private String signInMethod = "email";
@@ -101,9 +87,7 @@ public class ProfileFragment extends Fragment {
     // SLTLoader instance
     private SLTLoader sltLoader;
 
-    public ProfileFragment() {
-        // Required empty public constructor
-    }
+    public ProfileFragment() {}
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -133,25 +117,17 @@ public class ProfileFragment extends Fragment {
         currentUser = mAuth.getCurrentUser();
 
         if (currentUser == null) {
-            if (isAdded()) {
-                Toast.makeText(requireContext(), "Please log in to view your profile.", Toast.LENGTH_LONG).show();
-                requireActivity().getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_container, new LoginFragment())
-                        .commit();
-            }
+            redirectToLogin();
             return;
         }
-
-        databaseReference = FirebaseDatabase.getInstance().getReference("users").child(currentUser.getUid());
 
         // Initialize UI
         initializeUI(view);
 
-        // Initialize SLTLoader with activity's content view
+        // Initialize SLTLoader
         View activityRoot = requireActivity().findViewById(android.R.id.content);
         if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
-            Log.e("ProfileFragment", "Activity root view (android.R.id.content) not found or not a ViewGroup");
+            Log.e("ProfileFragment", "Activity root view not found or not a ViewGroup");
             return;
         }
         sltLoader = new SLTLoader(requireContext(), (ViewGroup) activityRoot);
@@ -174,21 +150,21 @@ public class ProfileFragment extends Fragment {
         swipeRefreshLayout.setOnRefreshListener(this::onRefresh);
         backButton.setOnClickListener(v -> requireActivity().onBackPressed());
 
-        // Display initial data
+        // Display initial data and start real-time listener
         displayCachedProfileData();
         showCustomLoader();
-        loadProfileDataFromFirebase();
+        setupFirestoreRealtimeListener();
     }
 
     @Override
     public void onResume() {
         super.onResume();
         if (mAuth.getCurrentUser() == null) {
-            logoutAndRedirectToLogin();
+            redirectToLogin();
         } else {
             currentUser = mAuth.getCurrentUser();
             showCustomLoader();
-            loadProfileDataFromFirebase();
+            setupFirestoreRealtimeListener();
         }
     }
 
@@ -196,36 +172,8 @@ public class ProfileFragment extends Fragment {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == EDIT_PROFILE_REQUEST && resultCode == Activity.RESULT_OK && data != null) {
-            String newImageUrl = data.getStringExtra("imageUrl");
-            String newFullName = data.getStringExtra("fullName");
-            String newPhoneNumber = data.getStringExtra("phoneNumber");
-            String newEmail = data.getStringExtra("email");
-            String newUsername = data.getStringExtra("username");
-            String newPendingEmail = data.getStringExtra("pendingEmail");
-            String newPendingPhoneNumber = data.getStringExtra("pendingPhoneNumber");
-
-            SharedPreferences.Editor editor = sharedPreferences.edit();
-            if (newImageUrl != null) cachedImageUrl = newImageUrl;
-            if (newFullName != null) cachedFullName = newFullName;
-            if (newPhoneNumber != null) cachedPhoneNumber = newPhoneNumber;
-            if (newEmail != null) cachedEmail = newEmail;
-            if (newUsername != null) cachedUsername = newUsername;
-            if (newPendingEmail != null) pendingEmail = newPendingEmail;
-            if (newPendingPhoneNumber != null) pendingPhoneNumber = newPendingPhoneNumber;
-            editor.putString("fullName", cachedFullName);
-            editor.putString("phoneNumber", cachedPhoneNumber);
-            editor.putString("email", cachedEmail);
-            editor.putString("username", cachedUsername);
-            editor.putString("imageUrl", cachedImageUrl);
-            editor.putString("pendingEmail", pendingEmail);
-            editor.putString("pendingPhoneNumber", pendingPhoneNumber);
-            editor.putBoolean(KEY_DATA_FRESH, true);
-            editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
-            editor.apply();
-
+            updateCachedDataFromResult(data);
             displayCachedProfileData();
-            showCustomLoader();
-            loadProfileDataFromFirebase();
         }
     }
 
@@ -278,11 +226,7 @@ public class ProfileFragment extends Fragment {
                     .commit();
         });
 
-        paymentsLayout.setOnClickListener(v -> {
-            animateClick(v);
-            // Add logic for Payments
-        });
-
+        paymentsLayout.setOnClickListener(v -> animateClick(v));
         notificationsLayout.setOnClickListener(v -> {
             animateClick(v);
             requireActivity().getSupportFragmentManager()
@@ -291,11 +235,7 @@ public class ProfileFragment extends Fragment {
                     .addToBackStack("NotificationFragment")
                     .commit();
         });
-
-        termsLayout.setOnClickListener(v -> {
-            animateClick(v);
-            // Add logic for Terms & Conditions
-        });
+        termsLayout.setOnClickListener(v -> animateClick(v));
     }
 
     private void animateClick(View v) {
@@ -321,21 +261,18 @@ public class ProfileFragment extends Fragment {
     private void setupAdminButton() {
         adminButton.setOnClickListener(v -> {
             if (!isAdded()) return;
-
             int gmsStatus = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(requireContext());
             if (gmsStatus != ConnectionResult.SUCCESS) {
                 Log.e("ProfileFragment", "Google Play Services unavailable: " + gmsStatus);
                 showCustomToast("Google Play Services unavailable.", false);
                 return;
             }
-
             showCustomLoader();
             firestore.collection("users").document(currentUser.getUid())
-                    .get(Source.SERVER)
+                    .get()
                     .addOnSuccessListener(documentSnapshot -> {
-                        Log.d("ProfileFragment", "Firestore success: " + documentSnapshot.getData());
                         if (!isAdded()) return;
-                        hideLoader(); // Hide when data is loaded
+                        hideLoader();
                         String role = documentSnapshot.getString("role");
                         if ("admin".equals(role)) {
                             startActivity(new Intent(requireContext(), AdminMainActivity.class));
@@ -344,13 +281,115 @@ public class ProfileFragment extends Fragment {
                         }
                     })
                     .addOnFailureListener(e -> {
-                        Log.e("ProfileFragment", "Firestore failed: " + e.getMessage(), e);
-                        hideLoader(); // Hide on failure
+                        hideLoader();
                         if (isAdded()) {
                             showCustomToast("Failed to verify role: " + e.getMessage(), false);
                         }
                     });
         });
+    }
+
+    private void setupFirestoreRealtimeListener() {
+        if (firestoreListener != null) {
+            firestoreListener.remove();
+            firestoreListener = null;
+        }
+
+        firestoreListener = firestore.collection("users").document(currentUser.getUid())
+                .addSnapshotListener((documentSnapshot, e) -> {
+                    if (e != null) {
+                        Log.e("ProfileFragment", "Listen failed: " + e.getMessage());
+                        showCustomToast("Failed to load profile: " + e.getMessage(), false);
+                        hideLoader();
+                        swipeRefreshLayout.setRefreshing(false);
+                        return;
+                    }
+
+                    if (documentSnapshot != null && documentSnapshot.exists()) {
+                        updateCachedDataFromSnapshot(documentSnapshot);
+                        displayCachedProfileData();
+                        hideLoader();
+                        swipeRefreshLayout.setRefreshing(false);
+                    } else {
+                        displayCachedProfileData();
+                        hideLoader();
+                        swipeRefreshLayout.setRefreshing(false);
+                        showCustomToast("No profile data found.", false);
+                    }
+                });
+    }
+
+    private void updateCachedDataFromSnapshot(com.google.firebase.firestore.DocumentSnapshot documentSnapshot) {
+        String newFullName = documentSnapshot.getString("fullName") != null ? documentSnapshot.getString("fullName") : cachedFullName;
+        String newPhoneNumber = documentSnapshot.getString("phoneNumber") != null ? documentSnapshot.getString("phoneNumber") : cachedPhoneNumber;
+        String newEmail = documentSnapshot.getString("email") != null ? documentSnapshot.getString("email") : cachedEmail;
+        String newUsername = documentSnapshot.getString("username") != null ? documentSnapshot.getString("username") : cachedUsername;
+        String newImageUrl = documentSnapshot.getString("imageUrl") != null ? documentSnapshot.getString("imageUrl") : cachedImageUrl;
+        String newSignInMethod = documentSnapshot.getString("signInMethod") != null ? documentSnapshot.getString("signInMethod") : signInMethod;
+        pendingEmail = documentSnapshot.getString("pendingEmail") != null ? documentSnapshot.getString("pendingEmail") : pendingEmail;
+        pendingPhoneNumber = documentSnapshot.getString("pendingPhoneNumber") != null ? documentSnapshot.getString("pendingPhoneNumber") : pendingPhoneNumber;
+
+        if ("email".equals(newSignInMethod) && currentUser.isEmailVerified() && !pendingEmail.isEmpty()) {
+            updateEmailAfterVerification(currentUser.getEmail());
+        } else if ("phone".equals(newSignInMethod)) {
+            newPhoneNumber = currentUser.getPhoneNumber() != null ? currentUser.getPhoneNumber() : newPhoneNumber;
+        }
+
+        if (!Objects.equals(newFullName, cachedFullName) ||
+                !Objects.equals(newPhoneNumber, cachedPhoneNumber) ||
+                !Objects.equals(newEmail, cachedEmail) ||
+                !Objects.equals(newImageUrl, cachedImageUrl) ||
+                !Objects.equals(newUsername, cachedUsername) ||
+                !Objects.equals(newSignInMethod, signInMethod)) {
+            cachedFullName = newFullName;
+            cachedPhoneNumber = newPhoneNumber;
+            cachedEmail = newEmail;
+            cachedUsername = newUsername;
+            cachedImageUrl = newImageUrl;
+            signInMethod = newSignInMethod;
+
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putString("fullName", cachedFullName);
+            editor.putString("phoneNumber", cachedPhoneNumber);
+            editor.putString("email", cachedEmail);
+            editor.putString("username", cachedUsername);
+            editor.putString("imageUrl", cachedImageUrl);
+            editor.putString("signInMethod", signInMethod);
+            editor.putString("pendingEmail", pendingEmail);
+            editor.putString("pendingPhoneNumber", pendingPhoneNumber);
+            editor.putBoolean(KEY_DATA_FRESH, true);
+            editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
+            editor.apply();
+        }
+    }
+
+    private void updateCachedDataFromResult(Intent data) {
+        String newImageUrl = data.getStringExtra("imageUrl");
+        String newFullName = data.getStringExtra("fullName");
+        String newPhoneNumber = data.getStringExtra("phoneNumber");
+        String newEmail = data.getStringExtra("email");
+        String newUsername = data.getStringExtra("username");
+        String newPendingEmail = data.getStringExtra("pendingEmail");
+        String newPendingPhoneNumber = data.getStringExtra("pendingPhoneNumber");
+
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        if (newImageUrl != null) cachedImageUrl = newImageUrl;
+        if (newFullName != null) cachedFullName = newFullName;
+        if (newPhoneNumber != null) cachedPhoneNumber = newPhoneNumber;
+        if (newEmail != null) cachedEmail = newEmail;
+        if (newUsername != null) cachedUsername = newUsername;
+        if (newPendingEmail != null) pendingEmail = newPendingEmail;
+        if (newPendingPhoneNumber != null) pendingPhoneNumber = newPendingPhoneNumber;
+        editor.putString("fullName", cachedFullName);
+        editor.putString("phoneNumber", cachedPhoneNumber);
+        editor.putString("email", cachedEmail);
+        editor.putString("username", cachedUsername);
+        editor.putString("imageUrl", cachedImageUrl);
+        editor.putString("pendingEmail", pendingEmail);
+        editor.putString("pendingPhoneNumber", pendingPhoneNumber);
+        editor.putBoolean(KEY_DATA_FRESH, true);
+        editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
+        editor.apply();
     }
 
     private void displayCachedProfileData() {
@@ -367,14 +406,14 @@ public class ProfileFragment extends Fragment {
         }
         userPhone.setText(displayContact != null ? displayContact : "Not provided");
 
-        LinearLayout verificationStatusContainer = rootView.findViewById(R.id.verificationStatusContainer);
+        RelativeLayout verificationStatusContainer = rootView.findViewById(R.id.verificationStatusContainer);
         verificationStatusContainer.setVisibility(View.GONE);
         cancelVerificationButton.setVisibility(View.GONE);
         verificationTimer.setVisibility(View.GONE);
 
         if (currentUser != null) {
-            boolean emailPending = "email".equals(signInMethod) && pendingEmail != null && !pendingEmail.isEmpty() && !currentUser.isEmailVerified();
-            boolean phonePending = "phone".equals(signInMethod) && pendingPhoneNumber != null && !pendingPhoneNumber.isEmpty() && !Objects.equals(pendingPhoneNumber, currentUser.getPhoneNumber());
+            boolean emailPending = "email".equals(signInMethod) && !pendingEmail.isEmpty() && !currentUser.isEmailVerified();
+            boolean phonePending = "phone".equals(signInMethod) && !pendingPhoneNumber.isEmpty() && !Objects.equals(pendingPhoneNumber, currentUser.getPhoneNumber());
 
             if (emailPending || phonePending) {
                 verificationStatusContainer.setVisibility(View.VISIBLE);
@@ -383,36 +422,7 @@ public class ProfileFragment extends Fragment {
                 verificationStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.orange));
                 cancelVerificationButton.setVisibility(View.VISIBLE);
 
-                cancelVerificationButton.setOnClickListener(v -> {
-                    if (emailPending) {
-                        databaseReference.child("pendingEmail").removeValue()
-                                .addOnSuccessListener(aVoid -> {
-                                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                                    editor.remove("pendingEmail");
-                                    editor.remove("lastVerificationTime");
-                                    editor.apply();
-                                    pendingEmail = "";
-                                    if (countdownTimer != null) countdownTimer.cancel();
-                                    displayCachedProfileData();
-                                    showCustomToast("Email verification cancelled.", true);
-                                })
-                                .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
-                    } else if (phonePending) {
-                        databaseReference.child("pendingPhoneNumber").removeValue()
-                                .addOnSuccessListener(aVoid -> {
-                                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                                    editor.remove("pendingPhoneNumber");
-                                    editor.remove("lastVerificationTime");
-                                    editor.apply();
-                                    pendingPhoneNumber = "";
-                                    if (countdownTimer != null) countdownTimer.cancel();
-                                    displayCachedProfileData();
-                                    showCustomToast("Phone verification cancelled.", true);
-                                })
-                                .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
-                    }
-                });
-
+                cancelVerificationButton.setOnClickListener(v -> cancelVerification(emailPending, phonePending));
                 startVerificationTimer();
             } else if ("email".equals(signInMethod) && currentUser.isEmailVerified()) {
                 verificationStatusContainer.setVisibility(View.VISIBLE);
@@ -442,50 +452,73 @@ public class ProfileFragment extends Fragment {
         if (authHelper == null) {
             authHelper = new ProfileAuthHelper(requireActivity(), new ProfileAuthHelper.OnAuthCompleteListener() {
                 @Override
-                public void onAuthStart() {
-                    showCustomLoader();
-                }
-
+                public void onAuthStart() { showCustomLoader(); }
                 @Override
                 public void onAuthSuccess(String fullName, String gender, String birthday, String phoneNumber,
                                           String email, String username, String originalEmail,
                                           String originalPhoneNumber, String originalUsername) {
-                    showCustomLoader();
-                    loadProfileDataFromFirebase();
+                    hideLoader();
                 }
-
                 @Override
                 public void onEmailVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
                                                     String currentEmail, String username, String pendingEmail,
                                                     String originalEmail, String originalPhoneNumber, String originalUsername) {
-                    hideLoader();
-                    showCustomToast("Verification email sent to " + pendingEmail, true);
-                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                    editor.putLong("lastVerificationTime", System.currentTimeMillis());
-                    editor.apply();
-                    startVerificationTimer();
-                    displayCachedProfileData();
+                    handleVerificationSent("email", pendingEmail);
                 }
-
                 @Override
                 public void onPhoneVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
                                                     String currentEmail, String username, String pendingPhoneNumber,
                                                     String originalEmail, String originalPhoneNumber, String originalUsername) {
-                    hideLoader();
-                    showCustomToast("Verification code sent to " + pendingPhoneNumber, true);
-                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                    editor.putLong("lastVerificationTime", System.currentTimeMillis());
-                    editor.apply();
-                    startVerificationTimer();
-                    displayCachedProfileData();
+                    handleVerificationSent("phone", pendingPhoneNumber);
                 }
-
                 @Override
                 public void onAuthFailed() {
                     hideLoader();
                     showCustomToast("Operation failed. Please try again.", false);
                 }
             });
+        }
+    }
+
+    private void handleVerificationSent(String type, String value) {
+        hideLoader();
+        showCustomToast("Verification " + (type.equals("email") ? "email" : "code") + " sent to " + value, true);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putLong("lastVerificationTime", System.currentTimeMillis());
+        editor.apply();
+        startVerificationTimer();
+        displayCachedProfileData();
+    }
+
+    private void cancelVerification(boolean emailPending, boolean phonePending) {
+        if (emailPending) {
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingEmail", null)
+                    .addOnSuccessListener(aVoid -> {
+                        SharedPreferences.Editor editor = sharedPreferences.edit();
+                        editor.remove("pendingEmail");
+                        editor.remove("lastVerificationTime");
+                        editor.apply();
+                        pendingEmail = "";
+                        if (countdownTimer != null) countdownTimer.cancel();
+                        displayCachedProfileData();
+                        showCustomToast("Email verification cancelled.", true);
+                    })
+                    .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
+        } else if (phonePending) {
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingPhoneNumber", null)
+                    .addOnSuccessListener(aVoid -> {
+                        SharedPreferences.Editor editor = sharedPreferences.edit();
+                        editor.remove("pendingPhoneNumber");
+                        editor.remove("lastVerificationTime");
+                        editor.apply();
+                        pendingPhoneNumber = "";
+                        if (countdownTimer != null) countdownTimer.cancel();
+                        displayCachedProfileData();
+                        showCustomToast("Phone verification cancelled.", true);
+                    })
+                    .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
         }
     }
 
@@ -519,11 +552,12 @@ public class ProfileFragment extends Fragment {
     }
 
     private void autoCancelVerification() {
-        boolean emailPending = "email".equals(signInMethod) && pendingEmail != null && !pendingEmail.isEmpty() && !currentUser.isEmailVerified();
-        boolean phonePending = "phone".equals(signInMethod) && pendingPhoneNumber != null && !pendingPhoneNumber.isEmpty() && !Objects.equals(pendingPhoneNumber, currentUser.getPhoneNumber());
+        boolean emailPending = "email".equals(signInMethod) && !pendingEmail.isEmpty() && !currentUser.isEmailVerified();
+        boolean phonePending = "phone".equals(signInMethod) && !pendingPhoneNumber.isEmpty() && !Objects.equals(pendingPhoneNumber, currentUser.getPhoneNumber());
 
         if (emailPending) {
-            databaseReference.child("pendingEmail").removeValue()
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingEmail", null)
                     .addOnSuccessListener(aVoid -> {
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.remove("pendingEmail");
@@ -535,7 +569,8 @@ public class ProfileFragment extends Fragment {
                     })
                     .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
         } else if (phonePending) {
-            databaseReference.child("pendingPhoneNumber").removeValue()
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingPhoneNumber", null)
                     .addOnSuccessListener(aVoid -> {
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.remove("pendingPhoneNumber");
@@ -552,159 +587,20 @@ public class ProfileFragment extends Fragment {
     private void onRefresh() {
         showCustomLoader();
         swipeRefreshLayout.setRefreshing(true);
-        loadProfileDataFromFirebase(true);
-    }
-
-    private void loadProfileDataFromFirebase() {
-        loadProfileDataFromFirebase(false);
-    }
-
-    private void loadProfileDataFromFirebase(boolean forceRefresh) {
-        if (currentUser == null) {
-            logoutAndRedirectToLogin();
-            return;
-        }
-
         currentUser.reload().addOnCompleteListener(task -> {
-            if (!task.isSuccessful()) {
-                Exception e = task.getException();
-                if (e instanceof FirebaseAuthInvalidUserException) {
-                    showCustomToast("Session expired. Please log in again.", false);
-                    logoutAndRedirectToLogin();
-                } else {
-                    showCustomToast("Error refreshing session: " + e.getMessage(), false);
-                }
+            if (task.isSuccessful()) {
+                setupFirestoreRealtimeListener();
+            } else {
                 hideLoader();
                 swipeRefreshLayout.setRefreshing(false);
-                return;
-            }
-
-            currentUser.getIdToken(true).addOnCompleteListener(tokenTask -> {
-                if (!tokenTask.isSuccessful()) {
-                    hideLoader();
-                    swipeRefreshLayout.setRefreshing(false);
-                    showCustomToast("Failed to refresh token: " + tokenTask.getException().getMessage(), false);
-                    return;
-                }
-                fetchProfileData(forceRefresh);
-            });
-        });
-    }
-
-    private void fetchProfileData(boolean forceRefresh) {
-        databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                if (dataSnapshot.exists()) {
-                    Map<String, Object> userData = dataSnapshot.getValue(new GenericTypeIndicator<Map<String, Object>>() {});
-                    if (userData == null) {
-                        userData = new HashMap<>();
-                    }
-
-                    String newFullName = userData.get("fullName") != null ? (String) userData.get("fullName") : cachedFullName;
-                    String newPhoneNumber = userData.get("phoneNumber") != null ? (String) userData.get("phoneNumber") : cachedPhoneNumber;
-                    String newEmail = userData.get("email") != null ? (String) userData.get("email") : cachedEmail;
-                    String newUsername = userData.get("username") != null ? (String) userData.get("username") : cachedUsername;
-                    String newSignInMethod = userData.get("signInMethod") != null ? (String) userData.get("signInMethod") : signInMethod;
-                    pendingEmail = userData.get("pendingEmail") != null ? (String) userData.get("pendingEmail") : pendingEmail;
-                    pendingPhoneNumber = userData.get("pendingPhoneNumber") != null ? (String) userData.get("pendingPhoneNumber") : pendingPhoneNumber;
-
-                    if ("email".equals(newSignInMethod) && currentUser.isEmailVerified() && !pendingEmail.isEmpty()) {
-                        updateEmailAfterVerification(currentUser.getEmail());
-                    } else if ("phone".equals(newSignInMethod)) {
-                        newPhoneNumber = currentUser.getPhoneNumber() != null ? currentUser.getPhoneNumber() : newPhoneNumber;
-                    }
-
-                    String finalNewPhoneNumber = newPhoneNumber;
-                    Source source = forceRefresh ? Source.SERVER : Source.DEFAULT;
-                    firestore.collection("users").document(currentUser.getUid())
-                            .get(source)
-                            .addOnSuccessListener(documentSnapshot -> {
-                                String newImageUrl = documentSnapshot.getString("imageUrl") != null ? documentSnapshot.getString("imageUrl") : cachedImageUrl;
-
-                                if (!Objects.equals(newFullName, cachedFullName) ||
-                                        !Objects.equals(finalNewPhoneNumber, cachedPhoneNumber) ||
-                                        !Objects.equals(newEmail, cachedEmail) ||
-                                        !Objects.equals(newImageUrl, cachedImageUrl) ||
-                                        !Objects.equals(newUsername, cachedUsername) ||
-                                        !Objects.equals(newSignInMethod, signInMethod) ||
-                                        !Objects.equals(pendingEmail, sharedPreferences.getString("pendingEmail", "")) ||
-                                        !Objects.equals(pendingPhoneNumber, sharedPreferences.getString("pendingPhoneNumber", ""))) {
-                                    cachedFullName = newFullName;
-                                    cachedPhoneNumber = finalNewPhoneNumber;
-                                    cachedEmail = newEmail;
-                                    cachedUsername = newUsername;
-                                    cachedImageUrl = newImageUrl;
-                                    signInMethod = newSignInMethod;
-
-                                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                                    editor.putString("fullName", cachedFullName);
-                                    editor.putString("phoneNumber", cachedPhoneNumber);
-                                    editor.putString("email", cachedEmail);
-                                    editor.putString("username", cachedUsername);
-                                    editor.putString("imageUrl", cachedImageUrl);
-                                    editor.putString("signInMethod", signInMethod);
-                                    editor.putString("pendingEmail", pendingEmail);
-                                    editor.putString("pendingPhoneNumber", pendingPhoneNumber);
-                                    editor.putBoolean(KEY_DATA_FRESH, true);
-                                    editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
-                                    editor.apply();
-                                }
-
-                                displayCachedProfileData();
-                                hideLoader(); // Hide when data is fully loaded
-                                swipeRefreshLayout.setRefreshing(false);
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e("ProfileFragment", "Failed to fetch imageUrl from Firestore: " + e.getMessage());
-                                displayCachedProfileData();
-                                hideLoader(); // Hide on failure
-                                swipeRefreshLayout.setRefreshing(false);
-                                showCustomToast("Failed to load profile image: " + e.getMessage(), false);
-                            });
-                } else {
-                    Source source = forceRefresh ? Source.SERVER : Source.DEFAULT;
-                    firestore.collection("users").document(currentUser.getUid())
-                            .get(source)
-                            .addOnSuccessListener(documentSnapshot -> {
-                                String newImageUrl = documentSnapshot.getString("imageUrl") != null ? documentSnapshot.getString("imageUrl") : cachedImageUrl;
-                                if (!Objects.equals(newImageUrl, cachedImageUrl)) {
-                                    cachedImageUrl = newImageUrl;
-                                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                                    editor.putString("imageUrl", cachedImageUrl);
-                                    editor.putBoolean(KEY_DATA_FRESH, true);
-                                    editor.putBoolean(KEY_LAST_FETCH_SUCCESS, true);
-                                    editor.apply();
-                                }
-                                displayCachedProfileData();
-                                hideLoader(); // Hide when data is loaded
-                                swipeRefreshLayout.setRefreshing(false);
-                            })
-                            .addOnFailureListener(e -> {
-                                displayCachedProfileData();
-                                hideLoader(); // Hide on failure
-                                swipeRefreshLayout.setRefreshing(false);
-                                showCustomToast("Failed to load profile: " + e.getMessage(), false);
-                            });
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                hideLoader(); // Hide on cancellation
-                swipeRefreshLayout.setRefreshing(false);
-                showCustomToast("Failed to load profile: " + databaseError.getMessage(), false);
-                displayCachedProfileData();
+                showCustomToast("Failed to refresh session: " + task.getException().getMessage(), false);
             }
         });
     }
 
     private void updateEmailAfterVerification(String verifiedEmail) {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("email", verifiedEmail);
-        updates.put("pendingEmail", "");
-
-        databaseReference.updateChildren(updates)
+        firestore.collection("users").document(currentUser.getUid())
+                .update("email", verifiedEmail, "pendingEmail", null)
                 .addOnSuccessListener(aVoid -> {
                     cachedEmail = verifiedEmail;
                     pendingEmail = "";
@@ -731,16 +627,29 @@ public class ProfileFragment extends Fragment {
         if (contactInfo == null) {
             contactInfo = "phone".equals(signInMethod) && !cachedPhoneNumber.isEmpty() ? cachedPhoneNumber : cachedEmail;
         }
-        if ("phone".equals(signInMethod) && contactInfo.contains("@")) {
-            contactInfo = contactInfo.split("@")[0];
-        }
         return contactInfo != null ? contactInfo : "Not provided";
     }
 
     private void logoutAndRedirectToLogin() {
+        if (firestoreListener != null) {
+            firestoreListener.remove();
+            firestoreListener = null;
+        }
         mAuth.signOut();
-        startActivity(new Intent(requireContext(), LoginActivity.class));
+        Intent intent = new Intent(requireContext(), LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
         requireActivity().finish();
+    }
+
+    private void redirectToLogin() {
+        if (isAdded()) {
+            Toast.makeText(requireContext(), "Please log in to view your profile.", Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            requireActivity().finish();
+        }
     }
 
     private void showCustomToast(String message, boolean isSuccess) {
@@ -760,20 +669,17 @@ public class ProfileFragment extends Fragment {
         toast.show();
     }
 
-    @SuppressLint("RestrictedApi")
     private void showCustomLoader() {
         if (!isAdded() || sltLoader == null) {
             Log.w("ProfileFragment", "Cannot show loader: fragment not added or sltLoader null");
             return;
         }
-
         SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(R.raw.loading_global)
                 .setWidthDp(40)
                 .setHeightDp(40)
                 .setUseRoundedBox(true)
                 .setOverlayColor(Color.parseColor("#80000000"))
                 .setChangeJsonColor(false);
-
         try {
             sltLoader.showCustomLoader(config);
             Log.d("ProfileFragment", "Custom loader shown with SLTLoader");
@@ -792,7 +698,13 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (countdownTimer != null) countdownTimer.cancel();
+        if (firestoreListener != null) {
+            firestoreListener.remove();
+            firestoreListener = null;
+        }
+        if (countdownTimer != null) {
+            countdownTimer.cancel();
+        }
         if (sltLoader != null) {
             sltLoader.onDestroy();
             Log.d("ProfileFragment", "SLTLoader destroyed");

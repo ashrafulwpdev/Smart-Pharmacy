@@ -11,6 +11,7 @@ import android.text.method.SingleLineTransformationMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -23,9 +24,9 @@ import androidx.core.content.ContextCompat;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.oopgroup.smartpharmacy.utils.BaseActivity;
+import com.softourtech.slt.SLTLoader;
 
 public class ResetPasswordActivity extends BaseActivity {
-
     private static final String TAG = "ResetPasswordActivity";
     private EditText newPasswordInput, confirmPasswordInput;
     private ImageView newPasswordToggle, confirmPasswordToggle;
@@ -40,26 +41,20 @@ public class ResetPasswordActivity extends BaseActivity {
     private String oobCode;
     private boolean isNewPasswordVisible = false;
     private boolean isConfirmPasswordVisible = false;
-
-    // Single unified loader method
-    private void showLoadingIndicator() {
-        showCustomLoader(
-
-                R.raw.loading_global,       // Custom animation (replace with your resource)
-                dpToPx(40),      // Width: 60dp
-                dpToPx(40),      // Height: 60dp
-                true,
-                DEFAULT_OVERLAY_COLOR,
-                true,
-                Color.parseColor("#FF5722"),
-                1f                     // 1x animation speed
-        );
-    }
+    private SLTLoader sltLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_reset_password);
+
+        // Initialize SLTLoader with the activity's root view
+        View activityRoot = findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e(TAG, "Activity root view not found or not a ViewGroup");
+            return;
+        }
+        sltLoader = new SLTLoader(this, (ViewGroup) activityRoot);
 
         mAuth = FirebaseAuth.getInstance();
 
@@ -80,20 +75,23 @@ public class ResetPasswordActivity extends BaseActivity {
         errorContainer = findViewById(R.id.errorContainer);
         bottomSection = findViewById(R.id.bottomSection);
 
-        credentials = getIntent().getStringExtra("credentials");
-        verificationId = getIntent().getStringExtra("verificationId");
-        isEmailReset = getIntent().getBooleanExtra("isEmailReset", false);
+        Intent intent = getIntent();
+        credentials = intent.getStringExtra("credentials");
+        verificationId = intent.getStringExtra("verificationId");
+        isEmailReset = intent.getBooleanExtra("isEmailReset", false);
+        Uri data = intent.getData();
 
-        Uri data = getIntent().getData();
+        Log.d(TAG, "Intent received: " + intent.toString());
         if (data != null) {
             Log.d(TAG, "Deep link detected: " + data.toString());
             isEmailReset = true;
             oobCode = data.getQueryParameter("oobCode");
-            if (oobCode == null) {
-                Log.e(TAG, "No oobCode found in deep link");
+            if (oobCode == null || oobCode.isEmpty()) {
+                Log.e(TAG, "No oobCode found in deep link: " + data.toString());
                 showErrorState("Invalid Link", "Your reset link appears to be incomplete.");
                 return;
             }
+            Log.d(TAG, "oobCode extracted: " + oobCode);
             validateResetCode(oobCode);
         } else if (credentials == null) {
             Log.e(TAG, "No credentials provided and no deep link detected");
@@ -101,23 +99,21 @@ public class ResetPasswordActivity extends BaseActivity {
             return;
         } else {
             Log.d(TAG, "Launched via app flow with credentials: " + credentials);
+            resetFormContainer.setVisibility(View.VISIBLE);
             bottomSection.setVisibility(View.VISIBLE);
         }
 
-        // TextWatchers to reset borders on typing
         newPasswordInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { resetInputBorders(); }
             @Override public void afterTextChanged(Editable s) {}
         });
-
         confirmPasswordInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { resetInputBorders(); }
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        // Click listeners
         newPasswordToggle.setOnClickListener(v -> toggleNewPasswordVisibility());
         confirmPasswordToggle.setOnClickListener(v -> toggleConfirmPasswordVisibility());
         resetPasswordBtn.setOnClickListener(v -> handlePasswordReset());
@@ -132,27 +128,27 @@ public class ResetPasswordActivity extends BaseActivity {
         facebookLogin.setOnClickListener(v -> showCustomToast("Facebook login not implemented yet", false));
     }
 
-    private void toggleNewPasswordVisibility() {
-        if (isNewPasswordVisible) {
-            newPasswordInput.setTransformationMethod(PasswordTransformationMethod.getInstance());
-            newPasswordToggle.setImageResource(R.drawable.ic_eye_off);
-        } else {
-            newPasswordInput.setTransformationMethod(SingleLineTransformationMethod.getInstance());
-            newPasswordToggle.setImageResource(R.drawable.ic_eye_on);
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (sltLoader != null) {
+            sltLoader.onDestroy();
         }
+    }
+
+    private void toggleNewPasswordVisibility() {
         isNewPasswordVisible = !isNewPasswordVisible;
+        newPasswordInput.setTransformationMethod(isNewPasswordVisible ?
+                SingleLineTransformationMethod.getInstance() : PasswordTransformationMethod.getInstance());
+        newPasswordToggle.setImageResource(isNewPasswordVisible ? R.drawable.ic_eye_on : R.drawable.ic_eye_off);
         newPasswordInput.setSelection(newPasswordInput.getText().length());
     }
 
     private void toggleConfirmPasswordVisibility() {
-        if (isConfirmPasswordVisible) {
-            confirmPasswordInput.setTransformationMethod(PasswordTransformationMethod.getInstance());
-            confirmPasswordToggle.setImageResource(R.drawable.ic_eye_off);
-        } else {
-            confirmPasswordInput.setTransformationMethod(SingleLineTransformationMethod.getInstance());
-            confirmPasswordToggle.setImageResource(R.drawable.ic_eye_on);
-        }
         isConfirmPasswordVisible = !isConfirmPasswordVisible;
+        confirmPasswordInput.setTransformationMethod(isConfirmPasswordVisible ?
+                SingleLineTransformationMethod.getInstance() : PasswordTransformationMethod.getInstance());
+        confirmPasswordToggle.setImageResource(isConfirmPasswordVisible ? R.drawable.ic_eye_on : R.drawable.ic_eye_off);
         confirmPasswordInput.setSelection(confirmPasswordInput.getText().length());
     }
 
@@ -161,34 +157,27 @@ public class ResetPasswordActivity extends BaseActivity {
         String confirmPassword = confirmPasswordInput.getText().toString().trim();
 
         resetInputBorders();
-        boolean hasErrors = false;
-        if (newPassword.isEmpty()) {
-            setErrorBorder(newPasswordInput);
-            hasErrors = true;
-        }
-        if (confirmPassword.isEmpty()) {
-            setErrorBorder(confirmPasswordInput);
-            hasErrors = true;
-        }
-        if (hasErrors) {
+        if (newPassword.isEmpty() || confirmPassword.isEmpty()) {
+            if (newPassword.isEmpty()) setErrorBorder(newPasswordInput);
+            if (confirmPassword.isEmpty()) setErrorBorder(confirmPasswordInput);
             showCustomToast("Please fill in both password fields", false);
             return;
         }
 
         if (!newPassword.equals(confirmPassword)) {
-            showCustomToast("Passwords do not match", false);
             setErrorBorder(confirmPasswordInput);
+            showCustomToast("Passwords do not match", false);
             return;
         }
 
         if (newPassword.length() < 6) {
-            showCustomToast("Password must be at least 6 characters", false);
             setErrorBorder(newPasswordInput);
+            showCustomToast("Password must be at least 6 characters", false);
             return;
         }
 
         setUiEnabled(false);
-        showLoadingIndicator();
+        showLoader();
         errorContainer.setVisibility(View.GONE);
 
         if (isEmailReset && oobCode != null) {
@@ -199,7 +188,7 @@ public class ResetPasswordActivity extends BaseActivity {
     }
 
     private void validateResetCode(String actionCode) {
-        showLoadingIndicator();
+        showLoader();
         mAuth.verifyPasswordResetCode(actionCode)
                 .addOnCompleteListener(task -> {
                     hideLoader();
@@ -210,13 +199,13 @@ public class ResetPasswordActivity extends BaseActivity {
                         errorContainer.setVisibility(View.GONE);
                         bottomSection.setVisibility(View.VISIBLE);
                     } else {
+                        Log.e(TAG, "Reset code validation failed", task.getException());
                         handleResetError(task.getException());
                     }
                 });
     }
 
     private void resetEmailPassword(String actionCode, String newPassword) {
-        showLoadingIndicator();
         mAuth.confirmPasswordReset(actionCode, newPassword)
                 .addOnCompleteListener(task -> {
                     hideLoader();
@@ -231,7 +220,6 @@ public class ResetPasswordActivity extends BaseActivity {
 
     private void resetPhonePassword(String phoneNumber, String newPassword) {
         if (mAuth.getCurrentUser() != null) {
-            showLoadingIndicator();
             mAuth.getCurrentUser().updatePassword(newPassword)
                     .addOnCompleteListener(task -> {
                         hideLoader();
@@ -240,9 +228,8 @@ public class ResetPasswordActivity extends BaseActivity {
                             resetInputBorders();
                             showCustomToast("Password reset successfully", true);
                             mAuth.signOut();
-                            Intent intent = new Intent(this, LoginActivity.class);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(intent);
+                            startActivity(new Intent(this, LoginActivity.class)
+                                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
                             finish();
                         } else {
                             handleResetError(task.getException());
@@ -256,7 +243,6 @@ public class ResetPasswordActivity extends BaseActivity {
     }
 
     private void signInAndRedirect(String email, String newPassword) {
-        showLoadingIndicator();
         mAuth.signInWithEmailAndPassword(email, newPassword)
                 .addOnCompleteListener(task -> {
                     hideLoader();
@@ -265,9 +251,8 @@ public class ResetPasswordActivity extends BaseActivity {
                         resetInputBorders();
                         showCustomToast("Password reset successfully", true);
                         mAuth.signOut();
-                        Intent intent = new Intent(this, LoginActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                        startActivity(intent);
+                        startActivity(new Intent(this, LoginActivity.class)
+                                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
                         finish();
                     } else {
                         handleResetError(task.getException());
@@ -282,7 +267,8 @@ public class ResetPasswordActivity extends BaseActivity {
             message = "Your reset link is no longer valid.";
         } else if (exception != null) {
             title = "Reset Failed";
-            message = "An issue occurred while resetting your password.";
+            message = "An issue occurred: " + exception.getMessage();
+            Log.e(TAG, "Reset error details: " + exception.getMessage(), exception);
         } else {
             title = "Reset Failed";
             message = "An unexpected error occurred.";
@@ -334,6 +320,22 @@ public class ResetPasswordActivity extends BaseActivity {
     private void resetInputBorders() {
         newPasswordInput.setBackgroundResource(R.drawable.edittext_bg);
         confirmPasswordInput.setBackgroundResource(R.drawable.edittext_bg);
+    }
+
+    private void showLoader() {
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"))
+                .setChangeJsonColor(false);
+        sltLoader.showCustomLoader(config);
+    }
+
+    public void hideLoader() {
+        if (sltLoader != null) {
+            sltLoader.hideLoader();
+        }
     }
 
     @Override

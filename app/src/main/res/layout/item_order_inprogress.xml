@@ -62,7 +62,7 @@
                         android:layout_height="wrap_content"
                         android:paddingHorizontal="8dp"
                         android:paddingVertical="4dp"
-                        android:background="@color/inactiveTab"
+                        android:background="@drawable/rounded_background"
                         android:text="Received"
                         android:textColor="#083EC9"
                         android:textSize="12sp"

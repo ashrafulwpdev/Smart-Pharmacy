@@ -50,7 +50,8 @@
             android:name=".ResetPasswordActivity"
             android:exported="true"
             android:launchMode="singleTask">
-            <intent-filter>
+            <!-- Dynamic Link Filter -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -59,13 +60,23 @@
                     android:host="smartpharmacyuni.page.link"
                     android:pathPrefix="/resetpass" />
             </intent-filter>
+            <!-- Firebase Default Auth Link Filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="smart-pharmacy-city.firebaseapp.com"
+                    android:pathPrefix="/__/auth/action" />
+            </intent-filter>
         </activity>
         <activity android:name=".MainActivity" android:exported="false" />
         <activity android:name=".EditProfileActivity" android:exported="false" />
         <activity android:name=".ChangePasswordActivity" android:exported="false" />
         <activity android:name=".adminstaff.AdminActivity" android:exported="false" />
-        <activity android:name=".ManageAddressActivity" />
-        <activity android:name=".adminstaff.AdminMainActivity" />
+        <activity android:name=".ManageAddressActivity" android:exported="false" />
+        <activity android:name=".adminstaff.AdminMainActivity" android:exported="false" />
 
         <!-- Facebook SDK -->
         <meta-data

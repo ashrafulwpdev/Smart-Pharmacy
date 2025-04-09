@@ -13,11 +13,12 @@ import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
 
+import com.google.firebase.auth.FirebaseAuth;
 import com.oopgroup.smartpharmacy.fragments.NavCategoriesFragment;
 import com.oopgroup.smartpharmacy.fragments.HomeFragment;
 import com.oopgroup.smartpharmacy.fragments.LabTestFragment;
+import com.oopgroup.smartpharmacy.fragments.LabTestDetailsFragment; // Add this import
 import com.oopgroup.smartpharmacy.fragments.ProductDetailsFragment;
 import com.oopgroup.smartpharmacy.fragments.ProfileFragment;
 import com.oopgroup.smartpharmacy.fragments.ScannerFragment;
@@ -45,18 +46,15 @@ public class MainActivity extends BaseActivity {
         initializeUI();
         setupNavigationListeners();
         setupBackStackListener();
-
-        // Set up the modern back press handling
         setupBackPressedCallback();
 
-        // Handle intent extras for navigation
         Intent intent = getIntent();
         if (intent != null && intent.getBooleanExtra("SHOW_PROFILE_FRAGMENT", false)) {
             Log.d(TAG, "Received intent to show ProfileFragment");
             navigateToProfile();
         } else if (savedInstanceState == null) {
             setSelectedNavItem(navHome, icHome, homeIndicator);
-            loadFragment(new HomeFragment(), false); // Don't add to back stack initially
+            loadFragment(new HomeFragment(), false);
         }
     }
 
@@ -89,7 +87,7 @@ public class MainActivity extends BaseActivity {
     private void setupNavigationListeners() {
         navHome.setOnClickListener(v -> {
             setSelectedNavItem(navHome, icHome, homeIndicator);
-            loadFragment(new HomeFragment(), false); // Don't add to back stack
+            loadFragment(new HomeFragment(), false);
             backPressCount = 0;
             showBottomNav();
         });
@@ -130,8 +128,6 @@ public class MainActivity extends BaseActivity {
             transaction.addToBackStack(null);
         }
         transaction.commit();
-
-        // Update bottom navigation visibility and selection state
         updateBottomNavForFragment(fragment);
     }
 
@@ -146,9 +142,18 @@ public class MainActivity extends BaseActivity {
     public void navigateToHome() {
         Log.d(TAG, "Navigating to HomeFragment");
         setSelectedNavItem(navHome, icHome, homeIndicator);
-        loadFragment(new HomeFragment(), false); // Don't add to back stack
+        loadFragment(new HomeFragment(), false);
         backPressCount = 0;
         showBottomNav();
+    }
+
+    public void handleLogout() {
+        FirebaseAuth.getInstance().signOut();
+        Intent intent = new Intent(this, LoginActivity.class); // Assuming LoginActivity hosts LoginFragment
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+        Log.d(TAG, "User logged out, navigating to LoginActivity");
     }
 
     private void setSelectedNavItem(LinearLayout newSelectedLayout, ImageView newSelectedIcon, View indicator) {
@@ -230,12 +235,9 @@ public class MainActivity extends BaseActivity {
                 Log.d(TAG, "Back stack count: " + backStackCount);
 
                 if (backStackCount > 0) {
-                    // Pop the back stack to go to the previous fragment
                     Log.d(TAG, "Popping back stack");
                     getSupportFragmentManager().popBackStack();
-                    // Note: updateBottomNavOnBack is now handled by the back stack listener
                 } else if (currentFragment instanceof HomeFragment) {
-                    // If on HomeFragment, handle exit logic
                     backPressCount++;
                     Log.d(TAG, "On HomeFragment, backPressCount=" + backPressCount);
                     if (backPressCount == 1) {
@@ -245,7 +247,6 @@ public class MainActivity extends BaseActivity {
                         finish();
                     }
                 } else {
-                    // If no back stack and not on HomeFragment, go to HomeFragment
                     Log.d(TAG, "Navigating to HomeFragment");
                     navigateToHome();
                 }
@@ -274,6 +275,9 @@ public class MainActivity extends BaseActivity {
             } else if (currentFragment instanceof LabTestFragment) {
                 setSelectedNavItem(navLabTest, icLabTest, labTestIndicator);
                 showBottomNav();
+            } else if (currentFragment instanceof LabTestDetailsFragment) { // Added this condition
+                setSelectedNavItem(navLabTest, icLabTest, labTestIndicator); // Keep "Lab Test" tab selected
+                showBottomNav();
             } else if (currentFragment instanceof ProfileFragment) {
                 setSelectedNavItem(navProfile, icProfile, profileIndicator);
                 showBottomNav();
@@ -281,7 +285,6 @@ public class MainActivity extends BaseActivity {
                 hideBottomNav();
                 Log.d(TAG, "Bottom nav hidden for " + currentFragment.getClass().getSimpleName());
             } else {
-                // Default behavior for other fragments (e.g., ProductsFragment, CheckoutFragment)
                 hideBottomNav();
                 Log.d(TAG, "Bottom nav hidden for unhandled fragment: " + currentFragment.getClass().getSimpleName());
             }

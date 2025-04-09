@@ -5,6 +5,7 @@ import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -14,6 +15,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -32,11 +34,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import com.airbnb.lottie.LottieAnimationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -44,8 +43,10 @@ import com.hbb20.CountryCodePicker;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.oopgroup.smartpharmacy.utils.AuthUtils;
+import com.softourtech.slt.SLTLoader;
 
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -69,12 +70,11 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     private Button saveButton, cancelVerificationButton;
     private CountryCodePicker ccp;
     private SwipeRefreshLayout swipeRefreshLayout;
-    private LottieAnimationView loadingSpinner;
     private CardView verificationControls;
+    private SLTLoader sltLoader;
 
     private FirebaseAuth auth;
     private FirebaseUser currentUser;
-    private DatabaseReference databaseReference;
     private FirebaseFirestore firestore;
     private StorageReference storageReference;
     private SharedPreferences sharedPreferences;
@@ -99,6 +99,14 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_profile);
+
+        // Initialize SLTLoader with the activity's root view
+        View activityRoot = findViewById(android.R.id.content);
+        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
+            Log.e(TAG, "Activity root view not found or not a ViewGroup");
+            return;
+        }
+        sltLoader = new SLTLoader(this, (ViewGroup) activityRoot);
 
         pickImage = registerForActivityResult(
                 new ActivityResultContracts.GetContent(),
@@ -127,7 +135,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         setupListeners();
         setupDynamicInput();
         loadCachedProfileData();
-        loadProfileDataFromFirebase();
+        loadProfileDataFromFirestore();
 
         originalUsername = sharedPreferences.getString("username", "");
     }
@@ -138,9 +146,9 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         if (requestCode == REQUEST_PHONE_STATE_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.d(TAG, "READ_PHONE_STATE permission granted");
-                loadProfileDataFromFirebase();
+                loadProfileDataFromFirestore();
             } else {
-                Log.w(TAG, "READ_PHONE_STATE permission denied, phone detection may be less accurate");
+                Log.w(TAG, "READ_PHONE_STATE permission denied");
                 showCustomToast("Permission denied. Phone number detection may be less accurate.", false);
             }
         }
@@ -150,6 +158,13 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putParcelable("selectedImageUri", selectedImageUri);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (countdownTimer != null) countdownTimer.cancel();
+        if (sltLoader != null) sltLoader.onDestroy();
     }
 
     private void initializeFirebase() {
@@ -162,7 +177,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
             finish();
             return;
         }
-        databaseReference = FirebaseDatabase.getInstance().getReference("users").child(currentUser.getUid());
         firestore = FirebaseFirestore.getInstance();
         storageReference = FirebaseStorage.getInstance().getReference("profile_images").child(currentUser.getUid());
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -208,7 +222,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         saveButton = findViewById(R.id.saveButton);
         cancelVerificationButton = findViewById(R.id.cancelVerificationButton);
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
-        loadingSpinner = findViewById(R.id.loadingSpinner);
         verificationControls = findViewById(R.id.verificationControlsCard);
         verificationStatus = findViewById(R.id.verificationStatus);
         verificationTimer = findViewById(R.id.verificationTimer);
@@ -216,13 +229,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         emailValidationMessage = findViewById(R.id.emailValidationMessage);
 
         cameraIcon.setVisibility(View.VISIBLE);
-
-        try {
-            loadingSpinner.setAnimation(R.raw.loading_spinner);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load Lottie animation: " + e.getMessage(), e);
-            loadingSpinner.setVisibility(View.GONE);
-        }
 
         if (ccp != null) {
             ccp.setCustomMasterCountries("BD,MY,SG");
@@ -251,7 +257,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         birthdayEditText.setOnClickListener(v -> showDatePickerDialog());
         saveButton.setOnClickListener(v -> saveProfileData());
         cancelVerificationButton.setOnClickListener(v -> cancelVerification());
-        swipeRefreshLayout.setOnRefreshListener(this::loadProfileDataFromFirebase);
+        swipeRefreshLayout.setOnRefreshListener(this::loadProfileDataFromFirestore);
 
         phoneNumberInput.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus && ccp.getVisibility() == View.VISIBLE) {
@@ -318,7 +324,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 String newUsername = s.toString().trim();
-                if (!newUsername.equals(originalUsername) && !newUsername.isEmpty()) {
+                if (!newUsername.isEmpty() && !newUsername.equals(originalUsername)) {
                     checkUsernameAvailability(newUsername);
                 } else {
                     usernameEditText.setError(null);
@@ -332,22 +338,27 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     }
 
     private void checkUsernameAvailability(String username) {
-        DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
-        usersRef.orderByChild("username").equalTo(username).get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                if (task.getResult().exists() && !username.equals(originalUsername)) {
-                    usernameEditText.setError("Username already taken");
-                    setErrorBorder(usernameEditText);
-                    showCustomToast("Username already taken", false);
-                } else {
-                    usernameEditText.setError(null);
-                    resetInputBorders();
-                }
-            } else {
-                Log.e(TAG, "Failed to check username: " + task.getException().getMessage());
-                showCustomToast("Failed to check username availability", false);
-            }
-        });
+        firestore.collection("usernames").document(username).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        String existingUid = documentSnapshot.getString("uid");
+                        if (!currentUser.getUid().equals(existingUid)) {
+                            usernameEditText.setError("Username already taken");
+                            setErrorBorder(usernameEditText);
+                            showCustomToast("Username already taken", false);
+                        } else {
+                            usernameEditText.setError(null);
+                            resetInputBorders();
+                        }
+                    } else {
+                        usernameEditText.setError(null);
+                        resetInputBorders();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to check username: " + e.getMessage());
+                    showCustomToast("Failed to check username availability", false);
+                });
     }
 
     private void setupDynamicInput() {
@@ -442,7 +453,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         loadProfileImage(cachedImageUrl.isEmpty() ? null : Uri.parse(cachedImageUrl));
     }
 
-    private void loadProfileDataFromFirebase() {
+    private void loadProfileDataFromFirestore() {
         if (currentUser == null) {
             Log.e(TAG, "User not authenticated. Redirecting to login.");
             showCustomToast("User not authenticated. Please log in.", false);
@@ -451,6 +462,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
             return;
         }
 
+        showLoader();
         currentUser.reload().addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 currentEmail = currentUser.getEmail();
@@ -460,113 +472,84 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                 showCustomToast("Failed to refresh session: " + task.getException().getMessage(), false);
             }
 
-            // Load profile data from Realtime Database
-            databaseReference.get().addOnCompleteListener(dbTask -> {
-                if (dbTask.isSuccessful() && dbTask.getResult().exists()) {
-                    Map<String, Object> userData = (Map<String, Object>) dbTask.getResult().getValue();
-                    String fullName = userData.get("fullName") != null ? (String) userData.get("fullName") : "User";
-                    String gender = userData.get("gender") != null ? (String) userData.get("gender") : DEFAULT_GENDER;
-                    String birthday = userData.get("birthday") != null ? (String) userData.get("birthday") : DEFAULT_BIRTHDAY;
-                    String phoneNumber = userData.get("phoneNumber") != null ? (String) userData.get("phoneNumber") : "";
-                    String email = userData.get("email") != null ? (String) userData.get("email") : "";
-                    originalUsername = userData.get("username") != null ? (String) userData.get("username") : "";
-                    pendingEmail = userData.get("pendingEmail") != null ? (String) userData.get("pendingEmail") : "";
-                    pendingPhoneNumber = userData.get("pendingPhoneNumber") != null ? (String) userData.get("pendingPhoneNumber") : "";
-                    signInMethod = userData.get("signInMethod") != null ? (String) userData.get("signInMethod") : "email";
+            firestore.collection("users").document(currentUser.getUid()).get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        hideLoader();
+                        if (documentSnapshot.exists()) {
+                            String fullName = documentSnapshot.getString("fullName") != null ? documentSnapshot.getString("fullName") : "User";
+                            String gender = documentSnapshot.getString("gender") != null ? documentSnapshot.getString("gender") : DEFAULT_GENDER;
+                            String birthday = documentSnapshot.getString("birthday") != null ? documentSnapshot.getString("birthday") : DEFAULT_BIRTHDAY;
+                            String phoneNumber = documentSnapshot.getString("phoneNumber") != null ? documentSnapshot.getString("phoneNumber") : "";
+                            String email = documentSnapshot.getString("email") != null ? documentSnapshot.getString("email") : "";
+                            originalUsername = documentSnapshot.getString("username") != null ? documentSnapshot.getString("username") : "";
+                            pendingEmail = documentSnapshot.getString("pendingEmail") != null ? documentSnapshot.getString("pendingEmail") : "";
+                            pendingPhoneNumber = documentSnapshot.getString("pendingPhoneNumber") != null ? documentSnapshot.getString("pendingPhoneNumber") : "";
+                            signInMethod = documentSnapshot.getString("signInMethod") != null ? documentSnapshot.getString("signInMethod") : "email";
+                            currentImageUrl = documentSnapshot.getString("imageUrl");
 
-                    fullNameEditText.setText(fullName);
-                    genderSpinner.setSelection(((ArrayAdapter<String>) genderSpinner.getAdapter()).getPosition(gender));
-                    birthdayEditText.setText(birthday);
+                            fullNameEditText.setText(fullName);
+                            genderSpinner.setSelection(((ArrayAdapter<String>) genderSpinner.getAdapter()).getPosition(gender));
+                            birthdayEditText.setText(birthday);
 
-                    isProgrammaticChange = true;
-                    phoneNumberInput.setText(phoneNumber);
-                    emailInput.setText(email);
-                    usernameEditText.setText(originalUsername);
-                    displayFullNameTextView.setText(fullName);
-                    isProgrammaticChange = false;
+                            isProgrammaticChange = true;
+                            phoneNumberInput.setText(phoneNumber);
+                            emailInput.setText(email);
+                            usernameEditText.setText(originalUsername);
+                            displayFullNameTextView.setText(fullName);
+                            isProgrammaticChange = false;
 
-                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                    editor.putString("fullName", fullName);
-                    editor.putString("gender", gender);
-                    editor.putString("birthday", birthday);
-                    editor.putString("phoneNumber", phoneNumber);
-                    editor.putString("email", email);
-                    editor.putString("username", originalUsername);
-                    editor.putString("signInMethod", signInMethod);
-                    editor.putString("pendingEmail", pendingEmail);
-                    editor.putString("pendingPhoneNumber", pendingPhoneNumber);
-                    editor.apply();
+                            SharedPreferences.Editor editor = sharedPreferences.edit();
+                            editor.putString("fullName", fullName);
+                            editor.putString("gender", gender);
+                            editor.putString("birthday", birthday);
+                            editor.putString("phoneNumber", phoneNumber);
+                            editor.putString("email", email);
+                            editor.putString("username", originalUsername);
+                            editor.putString("signInMethod", signInMethod);
+                            editor.putString("pendingEmail", pendingEmail);
+                            editor.putString("pendingPhoneNumber", pendingPhoneNumber);
+                            editor.putString("imageUrl", currentImageUrl);
+                            editor.apply();
 
-                    currentPhoneNumber = phoneNumber;
-                    currentEmail = email;
-                    previousEmail = currentEmail;
-                    previousPhoneNumber = currentPhoneNumber;
+                            currentPhoneNumber = phoneNumber;
+                            currentEmail = email;
+                            previousEmail = currentEmail;
+                            previousPhoneNumber = currentPhoneNumber;
 
-                    // Load imageUrl from Firestore 'users' collection
-                    firestore.collection("users").document(currentUser.getUid()).get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                if (documentSnapshot.exists()) {
-                                    currentImageUrl = documentSnapshot.getString("imageUrl");
-                                    editor.putString("imageUrl", currentImageUrl);
-                                    editor.apply();
-                                    if (selectedImageUri == null) {
-                                        loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
-                                    }
-                                } else if (selectedImageUri == null) {
-                                    loadProfileImage(null);
+                            if (selectedImageUri == null) {
+                                loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
+                            }
+
+                            if (!phoneNumber.isEmpty() && AuthUtils.isValidPhoneNumber(AuthUtils.normalizePhoneNumberForBackend(phoneNumber, ccp, AuthUtils.getSimCountry(this)))) {
+                                isPhoneInput = true;
+                                String normalized = AuthUtils.normalizePhoneNumberForBackend(phoneNumber, ccp, AuthUtils.getSimCountry(this));
+                                if (AuthUtils.updateCountryFlag(normalized, ccp)) {
+                                    ccp.setVisibility(View.VISIBLE);
+                                } else {
+                                    ccp.setVisibility(View.GONE);
                                 }
-                                swipeRefreshLayout.setRefreshing(false);
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to fetch imageUrl from Firestore: " + e.getMessage());
-                                if (selectedImageUri == null) {
-                                    loadProfileImage(null);
-                                }
-                                swipeRefreshLayout.setRefreshing(false);
-                            });
+                                adjustPhoneInputPadding();
+                            } else {
+                                ccp.setVisibility(View.GONE);
+                            }
 
-                    if (!phoneNumber.isEmpty() && AuthUtils.isValidPhoneNumber(AuthUtils.normalizePhoneNumberForBackend(phoneNumber, ccp, AuthUtils.getSimCountry(this)))) {
-                        isPhoneInput = true;
-                        String normalized = AuthUtils.normalizePhoneNumberForBackend(phoneNumber, ccp, AuthUtils.getSimCountry(this));
-                        if (AuthUtils.updateCountryFlag(normalized, ccp)) {
-                            ccp.setVisibility(View.VISIBLE);
+                            restrictFieldsBasedOnSignInMethod();
+                            updateVerificationUI();
                         } else {
-                            ccp.setVisibility(View.GONE);
+                            if (selectedImageUri == null) {
+                                loadProfileImage(null);
+                            }
+                            emailInput.setText(currentEmail);
+                            showCustomToast("No profile data found.", false);
                         }
-                        adjustPhoneInputPadding();
-                    } else {
-                        ccp.setVisibility(View.GONE);
-                    }
-
-                    restrictFieldsBasedOnSignInMethod();
-                    updateVerificationUI();
-                } else {
-                    if (selectedImageUri == null) {
-                        loadProfileImage(null);
-                    }
-                    emailInput.setText(currentEmail);
-                    showCustomToast("No profile data found.", false);
-                    swipeRefreshLayout.setRefreshing(false);
-
-                    // Still attempt to load imageUrl even if Realtime DB data is missing
-                    firestore.collection("users").document(currentUser.getUid()).get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                if (documentSnapshot.exists()) {
-                                    currentImageUrl = documentSnapshot.getString("imageUrl");
-                                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                                    editor.putString("imageUrl", currentImageUrl);
-                                    editor.apply();
-                                    if (selectedImageUri == null) {
-                                        loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
-                                    }
-                                }
-                            });
-                }
-            }).addOnFailureListener(e -> {
-                Log.e(TAG, "Failed to fetch profile data from Realtime Database: " + e.getMessage());
-                showCustomToast("Failed to fetch profile data: " + e.getMessage(), false);
-                swipeRefreshLayout.setRefreshing(false);
-            });
+                        swipeRefreshLayout.setRefreshing(false);
+                    })
+                    .addOnFailureListener(e -> {
+                        hideLoader();
+                        Log.e(TAG, "Failed to fetch profile data from Firestore: " + e.getMessage());
+                        showCustomToast("Failed to fetch profile data: " + e.getMessage(), false);
+                        swipeRefreshLayout.setRefreshing(false);
+                    });
         });
     }
 
@@ -680,20 +663,24 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
 
     private void checkUsernameAndSave(String fullName, String gender, String birthday, String fullPhoneNumber,
                                       String email, String username, String originalEmail, String originalPhoneNumber) {
-        DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
-        usersRef.orderByChild("username").equalTo(username).get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                if (task.getResult().exists() && !username.equals(originalUsername)) {
-                    setErrorBorder(usernameEditText);
-                    showCustomToast("Username already taken", false);
-                } else {
-                    proceedWithSave(fullName, gender, birthday, fullPhoneNumber, email, username, originalEmail, originalPhoneNumber);
-                }
-            } else {
-                Log.e(TAG, "Username check failed: " + task.getException().getMessage());
-                showCustomToast("Failed to verify username: " + task.getException().getMessage(), false);
-            }
-        });
+        firestore.collection("usernames").document(username).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        String existingUid = documentSnapshot.getString("uid");
+                        if (!currentUser.getUid().equals(existingUid)) {
+                            setErrorBorder(usernameEditText);
+                            showCustomToast("Username already taken", false);
+                        } else {
+                            proceedWithSave(fullName, gender, birthday, fullPhoneNumber, email, username, originalEmail, originalPhoneNumber);
+                        }
+                    } else {
+                        proceedWithSave(fullName, gender, birthday, fullPhoneNumber, email, username, originalEmail, originalPhoneNumber);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Username check failed: " + e.getMessage());
+                    showCustomToast("Failed to verify username: " + e.getMessage(), false);
+                });
     }
 
     private void proceedWithSave(String fullName, String gender, String birthday, String fullPhoneNumber,
@@ -704,8 +691,11 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
 
     private void cancelVerification() {
         if ("email".equals(signInMethod) && !pendingEmail.isEmpty()) {
-            databaseReference.child("pendingEmail").removeValue()
+            showLoader();
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingEmail", null)
                     .addOnSuccessListener(aVoid -> {
+                        hideLoader();
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.remove("pendingEmail");
                         editor.remove("lastVerificationTime");
@@ -717,10 +707,16 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                         updateVerificationUI();
                         showCustomToast("Email verification cancelled.", true);
                     })
-                    .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
+                    .addOnFailureListener(e -> {
+                        hideLoader();
+                        showCustomToast("Failed to cancel verification: " + e.getMessage(), false);
+                    });
         } else if ("phone".equals(signInMethod) && !pendingPhoneNumber.isEmpty() && !Objects.equals(pendingPhoneNumber, currentPhoneNumber)) {
-            databaseReference.child("pendingPhoneNumber").removeValue()
+            showLoader();
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingPhoneNumber", null)
                     .addOnSuccessListener(aVoid -> {
+                        hideLoader();
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.remove("pendingPhoneNumber");
                         editor.remove("lastVerificationTime");
@@ -732,7 +728,10 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                         updateVerificationUI();
                         showCustomToast("Phone verification cancelled.", true);
                     })
-                    .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
+                    .addOnFailureListener(e -> {
+                        hideLoader();
+                        showCustomToast("Failed to cancel verification: " + e.getMessage(), false);
+                    });
         }
     }
 
@@ -789,8 +788,11 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
 
     private void autoCancelVerification() {
         if ("email".equals(signInMethod) && !pendingEmail.isEmpty()) {
-            databaseReference.child("pendingEmail").removeValue()
+            showLoader();
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingEmail", null)
                     .addOnSuccessListener(aVoid -> {
+                        hideLoader();
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.remove("pendingEmail");
                         editor.remove("lastVerificationTime");
@@ -801,10 +803,16 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                         updateVerificationUI();
                         showCustomToast("Verification timed out and cancelled.", false);
                     })
-                    .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
+                    .addOnFailureListener(e -> {
+                        hideLoader();
+                        showCustomToast("Failed to cancel verification: " + e.getMessage(), false);
+                    });
         } else if ("phone".equals(signInMethod) && !pendingPhoneNumber.isEmpty() && !Objects.equals(pendingPhoneNumber, currentPhoneNumber)) {
-            databaseReference.child("pendingPhoneNumber").removeValue()
+            showLoader();
+            firestore.collection("users").document(currentUser.getUid())
+                    .update("pendingPhoneNumber", null)
                     .addOnSuccessListener(aVoid -> {
+                        hideLoader();
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.remove("pendingPhoneNumber");
                         editor.remove("lastVerificationTime");
@@ -815,7 +823,10 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
                         updateVerificationUI();
                         showCustomToast("Verification timed out and cancelled.", false);
                     })
-                    .addOnFailureListener(e -> showCustomToast("Failed to cancel verification: " + e.getMessage(), false));
+                    .addOnFailureListener(e -> {
+                        hideLoader();
+                        showCustomToast("Failed to cancel verification: " + e.getMessage(), false);
+                    });
         }
     }
 
@@ -846,14 +857,29 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         int offsetDp = (int) (300 * getResources().getDisplayMetrics().density);
         toast.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, offsetDp);
 
-        Log.d(TAG, "Showing toast: " + message + ", Offset: " + offsetDp + "px, Gravity: BOTTOM");
+        Log.d(TAG, "Showing toast: " + message);
         toast.show();
+    }
+
+    private void showLoader() {
+        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
+                .setWidthDp(40)
+                .setHeightDp(40)
+                .setUseRoundedBox(true)
+                .setOverlayColor(Color.parseColor("#80000000"))
+                .setChangeJsonColor(false);
+        sltLoader.showCustomLoader(config);
+    }
+
+    private void hideLoader() {
+        if (sltLoader != null) {
+            sltLoader.hideLoader();
+        }
     }
 
     @Override
     public void onAuthStart() {
-        loadingSpinner.setVisibility(View.VISIBLE);
-        loadingSpinner.playAnimation();
+        showLoader();
         saveButton.setEnabled(false);
     }
 
@@ -861,7 +887,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     public void onAuthSuccess(String fullName, String gender, String birthday, String phoneNumber,
                               String email, String username, String originalEmail,
                               String originalPhoneNumber, String originalUsername) {
-        loadingSpinner.setVisibility(View.GONE);
+        hideLoader();
         saveButton.setEnabled(true);
         currentEmail = email;
         currentPhoneNumber = phoneNumber;
@@ -894,7 +920,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     public void onEmailVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
                                         String currentEmail, String username, String pendingEmail,
                                         String originalEmail, String originalPhoneNumber, String originalUsername) {
-        loadingSpinner.setVisibility(View.GONE);
+        hideLoader();
         saveButton.setEnabled(true);
         this.pendingEmail = pendingEmail;
         emailInput.setText(currentEmail);
@@ -924,7 +950,7 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     public void onPhoneVerificationSent(String fullName, String gender, String birthday, String phoneNumber,
                                         String currentEmail, String username, String pendingPhoneNumber,
                                         String originalEmail, String originalPhoneNumber, String originalUsername) {
-        loadingSpinner.setVisibility(View.GONE);
+        hideLoader();
         saveButton.setEnabled(true);
         this.pendingPhoneNumber = pendingPhoneNumber;
         phoneNumberInput.setText(currentPhoneNumber);
@@ -952,18 +978,12 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
 
     @Override
     public void onAuthFailed() {
-        loadingSpinner.setVisibility(View.GONE);
+        hideLoader();
         saveButton.setEnabled(true);
         phoneNumberInput.setText(previousPhoneNumber);
         emailInput.setText(previousEmail);
         loadProfileImage(currentImageUrl != null && !currentImageUrl.isEmpty() ? Uri.parse(currentImageUrl) : null);
         selectedImageUri = null;
         showCustomToast("Profile update failed. Please try again.", false);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (countdownTimer != null) countdownTimer.cancel();
     }
 }

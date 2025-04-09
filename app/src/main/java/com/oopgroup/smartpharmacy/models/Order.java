@@ -28,6 +28,7 @@ public class Order implements Serializable {
     private String deliveryBoyPhone; // For product orders
     private String prescriptionUrl; // URL to uploaded prescription, if any
     private Boolean prescriptionApproved; // Approval status of prescription
+    private String firstProductId; // Explicit field for first product/lab test ID
 
     public Order() {
         this.orderType = "LabTest"; // Default to "LabTest" if not specified
@@ -98,7 +99,9 @@ public class Order implements Serializable {
     public Boolean getPrescriptionApproved() { return prescriptionApproved; }
     public void setPrescriptionApproved(Boolean prescriptionApproved) { this.prescriptionApproved = prescriptionApproved; }
 
-    public String getFirstProductId() {
-        return (items != null && !items.isEmpty()) ? (String) items.get(0).get("productId") : null;
-    }
+    @PropertyName("firstProductId")
+    public String getFirstProductId() { return firstProductId; }
+
+    @PropertyName("firstProductId")
+    public void setFirstProductId(String firstProductId) { this.firstProductId = firstProductId; }
 }

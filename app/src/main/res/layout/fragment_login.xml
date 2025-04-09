@@ -65,7 +65,8 @@
             android:layout_below="@id/subtitle"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="20dp"
-            android:padding="0dp">
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp">
 
             <EditText
                 android:id="@+id/credInput"
@@ -236,15 +237,5 @@
                 android:scaleType="fitCenter"
                 android:src="@drawable/fb_ic" />
         </LinearLayout>
-
-        <com.airbnb.lottie.LottieAnimationView
-            android:id="@+id/loadingSpinner"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_centerInParent="true"
-            android:visibility="gone"
-            app:lottie_rawRes="@raw/loading_spinner"
-            app:lottie_autoPlay="true"
-            app:lottie_loop="true" />
     </RelativeLayout>
 </RelativeLayout>
