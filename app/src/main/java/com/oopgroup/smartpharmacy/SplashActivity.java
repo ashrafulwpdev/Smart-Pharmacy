@@ -15,6 +15,8 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.dynamiclinks.FirebaseDynamicLinks;
+import com.google.firebase.dynamiclinks.PendingDynamicLinkData;
 
 public class SplashActivity extends AppCompatActivity {
     private static final String TAG = "SplashActivity";
@@ -26,6 +28,8 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Set background_light as fallback
+        getWindow().setBackgroundDrawableResource(R.color.background_light);
         setContentView(R.layout.activity_splash);
 
         // Initialize handler
@@ -34,20 +38,36 @@ public class SplashActivity extends AppCompatActivity {
         // Initialize SharedPreferences
         prefs = getSharedPreferences("SmartPharmacyPrefs", MODE_PRIVATE);
 
-        // Handle deep links
+        // Log intent details
         Intent intent = getIntent();
-        Uri deepLink = intent.getData();
+        Log.d(TAG, "Intent received: action=" + intent.getAction() + ", data=" + intent.getData());
 
-        if (deepLink != null) {
-            Log.d(TAG, "Deep link received: " + deepLink.toString());
-            handleDeepLink(deepLink);
-            return;
-        }
-
-        Log.d(TAG, "No deep link received");
-
-        // Initialize Firebase and check Play Services
-        initializeFirebaseAndProceed();
+        // Handle Dynamic Links
+        FirebaseDynamicLinks.getInstance()
+                .getDynamicLink(intent)
+                .addOnSuccessListener(this, pendingDynamicLinkData -> {
+                    Uri deepLink = null;
+                    if (pendingDynamicLinkData != null) {
+                        deepLink = pendingDynamicLinkData.getLink();
+                    }
+                    Log.d(TAG, "Dynamic link result: " + (deepLink != null ? deepLink.toString() : "null"));
+                    if (deepLink != null) {
+                        handleDeepLink(deepLink);
+                    } else {
+                        Log.d(TAG, "No dynamic link, checking intent data");
+                        Uri intentData = intent.getData();
+                        Log.d(TAG, "Intent data: " + (intentData != null ? intentData.toString() : "null"));
+                        if (intentData != null) {
+                            handleDeepLink(intentData);
+                        } else {
+                            initializeFirebaseAndProceed();
+                        }
+                    }
+                })
+                .addOnFailureListener(this, e -> {
+                    Log.e(TAG, "Failed to retrieve dynamic link: " + e.getMessage());
+                    initializeFirebaseAndProceed();
+                });
     }
 
     private void initializeFirebaseAndProceed() {
@@ -70,7 +90,6 @@ public class SplashActivity extends AppCompatActivity {
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to resolve Play Services: " + e.getMessage());
-                        // Fallback: Proceed anyway, as app is functional
                         initializeAuthAndNavigate();
                     });
         } else {
@@ -87,18 +106,28 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     private void handleDeepLink(Uri deepLink) {
-        boolean isResetPasswordLink = deepLink.toString().contains("smartpharmacyuni.page.link") ||
+        Log.d(TAG, "Handling deep link: " + deepLink.toString());
+        String mode = deepLink.getQueryParameter("mode");
+        String oobCode = deepLink.getQueryParameter("oobCode");
+        Log.d(TAG, "Deep link details: mode=" + mode + ", oobCode=" + oobCode);
+
+        boolean isResetPasswordLink = deepLink.toString().contains("smartpharmacyuni.page.link/resetpass") ||
                 (deepLink.getHost() != null &&
                         deepLink.getHost().equals("smart-pharmacy-city.firebaseapp.com") &&
                         deepLink.getPath() != null &&
                         deepLink.getPath().startsWith("/__/auth/action") &&
-                        "resetPassword".equals(deepLink.getQueryParameter("mode")));
+                        "resetPassword".equals(mode));
 
-        if (isResetPasswordLink) {
+        if (isResetPasswordLink && oobCode != null) {
+            Log.d(TAG, "Reset password link detected, navigating to ResetPasswordActivity");
             Intent resetIntent = new Intent(this, ResetPasswordActivity.class);
             resetIntent.setData(deepLink);
+            resetIntent.putExtra("isEmailReset", true);
             startActivity(resetIntent);
             finish();
+        } else {
+            Log.w(TAG, "Invalid or unhandled deep link: " + deepLink.toString());
+            initializeFirebaseAndProceed();
         }
     }
 
@@ -134,7 +163,6 @@ public class SplashActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            // Maintain immersive mode
             getWindow().getDecorView().setSystemUiVisibility(
                     View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -148,7 +176,6 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Clean up handler callbacks
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
         }

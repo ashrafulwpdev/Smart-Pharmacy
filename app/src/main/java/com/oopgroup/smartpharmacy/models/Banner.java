@@ -6,17 +6,19 @@ public class Banner {
     private String description;
     private String discount;
     private String imageUrl;
+    private String couponCode; // New field for coupon code
 
     public Banner() {
         // Default constructor required for Firebase
     }
 
-    public Banner(String id, String title, String description, String discount, String imageUrl) {
+    public Banner(String id, String title, String description, String discount, String imageUrl, String couponCode) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.discount = discount;
         this.imageUrl = imageUrl;
+        this.couponCode = couponCode;
     }
 
     public String getId() { return id; }
@@ -29,4 +31,6 @@ public class Banner {
     public void setDiscount(String discount) { this.discount = discount; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
 }

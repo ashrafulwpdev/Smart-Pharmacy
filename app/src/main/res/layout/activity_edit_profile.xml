@@ -45,22 +45,20 @@
             android:layout_marginTop="16dp"
             android:background="@drawable/circ_border_profile"
             android:padding="3dp"
-            android:scaleType="fitCenter"
-            android:clipToOutline="true"
-            android:elevation="4dp"
-            android:src="@drawable/default_profile" />
+            android:scaleType="centerCrop"
+            android:elevation="4dp" />
 
+        <!-- Camera Icon -->
         <ImageView
             android:id="@+id/cameraIcon"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:layout_alignBottom="@id/profileImage"
             android:layout_alignEnd="@id/profileImage"
-            android:background="@drawable/circ_border_profile"
+            android:background="@drawable/circle_background"
             android:src="@drawable/camera_ic"
             android:padding="6dp"
             android:elevation="6dp" />
-
         <!-- Full Name Display -->
         <TextView
             android:id="@+id/displayFullName"

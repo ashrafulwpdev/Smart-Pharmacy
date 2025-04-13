@@ -1,5 +1,7 @@
 package com.oopgroup.smartpharmacy.fragments;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -11,14 +13,19 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.request.RequestOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.oopgroup.smartpharmacy.EditProfileActivity;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.fragments.AddressDialogFragment.OnAddressSelectedListener;
 import com.oopgroup.smartpharmacy.models.Coupon;
@@ -33,7 +40,7 @@ public class LabTestBookingFragment extends DialogFragment {
     private static final String ARG_TEST_NAME = "test_name";
     private static final String ARG_TEST_PROVIDER = "test_provider";
     private static final String ARG_TEST_PRICE = "test_price";
-    private static final String CURRENCY = "RM"; // Standardize currency to match CheckoutFragment
+    private static final String CURRENCY = "RM";
 
     private TextView selectedTestNameTextView, selectedTestProviderTextView, selectedTestPriceTextView;
     private TextView patientNameTextView, locationAddressTextView;
@@ -50,6 +57,9 @@ public class LabTestBookingFragment extends DialogFragment {
     private double originalTestPrice;
     private double discountedTestPrice;
     private String appliedPromoCode;
+    private String profileImageUrl;
+
+    private ActivityResultLauncher<Intent> editProfileLauncher;
 
     public static LabTestBookingFragment newInstance(String testName, String testProvider, double testPrice) {
         LabTestBookingFragment fragment = new LabTestBookingFragment();
@@ -65,6 +75,35 @@ public class LabTestBookingFragment extends DialogFragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setStyle(DialogFragment.STYLE_NORMAL, R.style.FullScreenDialog);
+
+        // Initialize the ActivityResultLauncher
+        editProfileLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        Intent data = result.getData();
+                        String updatedFullName = data.getStringExtra("fullName");
+                        String updatedImageUrl = data.getStringExtra("imageUrl");
+
+                        if (updatedFullName != null) {
+                            patientNameTextView.setText(updatedFullName);
+                        }
+                        if (updatedImageUrl != null && !updatedImageUrl.isEmpty()) {
+                            profileImageUrl = updatedImageUrl;
+                            Glide.with(requireContext())
+                                    .load(profileImageUrl)
+                                    .apply(new RequestOptions()
+                                            .circleCrop()
+                                            .placeholder(R.drawable.default_profile)
+                                            .error(R.drawable.default_profile)
+                                            .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC))
+                                    .into(patientImageView);
+                        } else {
+                            patientImageView.setImageResource(R.drawable.default_profile);
+                        }
+                    }
+                }
+        );
     }
 
     @Override
@@ -137,7 +176,10 @@ public class LabTestBookingFragment extends DialogFragment {
         });
 
         editPatientButton.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Edit patient functionality to be implemented", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(requireContext(), EditProfileActivity.class);
+            intent.putExtra("fullName", patientNameTextView.getText().toString());
+            intent.putExtra("imageUrl", profileImageUrl);
+            editProfileLauncher.launch(intent);
         });
 
         editLocationButton.setOnClickListener(v -> {
@@ -169,26 +211,21 @@ public class LabTestBookingFragment extends DialogFragment {
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
                         String fullName = documentSnapshot.getString("fullName");
-                        String profileImageUrl = documentSnapshot.getString("imageUrl");
+                        profileImageUrl = documentSnapshot.getString("imageUrl");
 
-                        // Log the fetched data for debugging
                         Log.d("LabTestBookingFragment", "Full Name: " + fullName);
                         Log.d("LabTestBookingFragment", "Profile Image URL: " + profileImageUrl);
 
-                        // Set patient name
                         patientNameTextView.setText(fullName != null ? fullName : "Unknown User");
 
-                        // Load profile image if available
-                        if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
-                            Glide.with(requireContext())
-                                    .load(profileImageUrl)
-                                    .placeholder(R.drawable.default_profile)
-                                    .error(R.drawable.default_profile)
-                                    .into(patientImageView);
-                        } else {
-                            Log.d("LabTestBookingFragment", "No profile image URL found, using default");
-                            patientImageView.setImageResource(R.drawable.default_profile);
-                        }
+                        Glide.with(requireContext())
+                                .load(profileImageUrl)
+                                .apply(new RequestOptions()
+                                        .circleCrop()
+                                        .placeholder(R.drawable.default_profile)
+                                        .error(R.drawable.default_profile)
+                                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC))
+                                .into(patientImageView);
                     } else {
                         Log.e("LabTestBookingFragment", "User document does not exist");
                         Toast.makeText(requireContext(), "User data not found", Toast.LENGTH_LONG).show();
@@ -294,13 +331,11 @@ public class LabTestBookingFragment extends DialogFragment {
     }
 
     private void confirmBooking() {
-        // Validate authentication
         if (mAuth.getCurrentUser() == null) {
             Toast.makeText(requireContext(), "Please log in to continue", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Validate required fields
         if (selectedAddressId == null) {
             Toast.makeText(requireContext(), "Please select a pickup address", Toast.LENGTH_SHORT).show();
             return;
@@ -315,32 +350,28 @@ public class LabTestBookingFragment extends DialogFragment {
         String testName = args.getString(ARG_TEST_NAME);
         String testProvider = args.getString(ARG_TEST_PROVIDER);
 
-        // Prepare data for CheckoutFragment
         Bundle checkoutArgs = new Bundle();
         checkoutArgs.putString("selected_address_id", selectedAddressId);
         checkoutArgs.putDouble("grand_total", discountedTestPrice);
-        checkoutArgs.putDouble("discount", originalTestPrice - discountedTestPrice); // Discount amount
-        checkoutArgs.putDouble("delivery_fee", 0.0); // No delivery fee for lab tests
+        checkoutArgs.putDouble("discount", originalTestPrice - discountedTestPrice);
+        checkoutArgs.putDouble("delivery_fee", 0.0);
         checkoutArgs.putString("order_type", "LabTest");
 
-        // Pass lab test specific details as a single item
         Map<String, Object> labTestItem = new HashMap<>();
         labTestItem.put("name", testName);
         labTestItem.put("testProvider", testProvider);
         labTestItem.put("price", discountedTestPrice);
-        labTestItem.put("quantity", 1); // Lab test has a quantity of 1
+        labTestItem.put("quantity", 1);
         labTestItem.put("total", discountedTestPrice);
 
         List<Map<String, Object>> items = new ArrayList<>();
         items.add(labTestItem);
         checkoutArgs.putSerializable("items", (ArrayList<Map<String, Object>>) items);
 
-        // Pass promo code if applied
         if (appliedPromoCode != null) {
             checkoutArgs.putString("promo_code", appliedPromoCode);
         }
 
-        // Navigate to CheckoutFragment
         CheckoutFragment checkoutFragment = new CheckoutFragment();
         checkoutFragment.setArguments(checkoutArgs);
         requireActivity().getSupportFragmentManager()
@@ -349,7 +380,6 @@ public class LabTestBookingFragment extends DialogFragment {
                 .addToBackStack(null)
                 .commit();
 
-        // Dismiss the current dialog fragment
         dismiss();
     }
 }

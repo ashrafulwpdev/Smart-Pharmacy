@@ -19,9 +19,9 @@
     <RelativeLayout
         android:id="@+id/login_frame"
         android:layout_width="342dp"
-        android:layout_height="600dp"
+        android:layout_height="wrap_content"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="120dp"
+        android:layout_marginTop="80dp"
         android:background="@drawable/login_bgframe"
         android:elevation="6dp"
         android:padding="16dp">
@@ -58,13 +58,46 @@
             android:textColor="#1F1F1F"
             android:textSize="14sp" />
 
+        <!-- Radio Buttons for Input Type -->
+        <RadioGroup
+            android:id="@+id/inputTypeGroup"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/subtitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="15dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <RadioButton
+                android:id="@+id/emailRadio"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Email"
+                android:textColor="#1F1F1F"
+                android:textSize="16sp"
+                android:checked="true"
+                android:paddingEnd="10dp" />
+
+            <RadioButton
+                android:id="@+id/phoneRadio"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Phone"
+                android:textColor="#1F1F1F"
+                android:textSize="16sp"
+                android:paddingStart="10dp" />
+        </RadioGroup>
+
         <RelativeLayout
             android:id="@+id/credContainer"
             android:layout_width="280dp"
             android:layout_height="50dp"
-            android:layout_below="@id/subtitle"
+            android:layout_below="@id/inputTypeGroup"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="10dp"
             android:paddingTop="0dp"
             android:paddingBottom="0dp">
 
@@ -89,7 +122,6 @@
                 android:layout_centerVertical="true"
                 android:layout_marginStart="10dp"
                 android:visibility="gone"
-                app:ccp_defaultNameCode="BD"
                 app:ccp_textSize="16sp"
                 app:ccp_showFlag="true"
                 app:ccp_showNameCode="false"
@@ -104,7 +136,7 @@
                 android:layout_centerVertical="true"
                 android:layout_marginEnd="10dp"
                 android:src="@drawable/email_ic"
-                android:visibility="gone" />
+                android:visibility="visible" />
 
             <ImageView
                 android:id="@+id/phoneIcon"
@@ -117,13 +149,24 @@
                 android:visibility="gone" />
         </RelativeLayout>
 
+        <TextView
+            android:id="@+id/validationMessage"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/credContainer"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="5dp"
+            android:text=""
+            android:textColor="#1F1F1F"
+            android:textSize="12sp" />
+
         <RelativeLayout
             android:id="@+id/passwordContainer"
             android:layout_width="280dp"
             android:layout_height="50dp"
-            android:layout_below="@id/credContainer"
+            android:layout_below="@id/validationMessage"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="15dp"
+            android:layout_marginTop="10dp"
             android:padding="0dp">
 
             <EditText
@@ -156,11 +199,12 @@
             android:layout_below="@id/passwordContainer"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <CheckBox
                 android:id="@+id/rememberMeCheckbox"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Remember Me"
@@ -208,7 +252,8 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/signupText"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="20dp"
             android:orientation="horizontal">
 
             <ImageView

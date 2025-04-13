@@ -15,8 +15,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,7 +44,7 @@ import com.oopgroup.smartpharmacy.ForgotPassActivity;
 import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.SignupActivity;
-import com.oopgroup.smartpharmacy.adminstaff.AdminActivity;
+import com.oopgroup.smartpharmacy.adminstaff.AdminMainActivity;
 import com.oopgroup.smartpharmacy.utils.AuthUtils;
 import com.softourtech.slt.SLTLoader;
 
@@ -51,21 +54,34 @@ public class LoginFragment extends Fragment {
     private static final String TAG = "LoginFragment";
 
     private EditText credInput, passwordInput;
-    private TextView signupText, forgotText;
-    private ImageView passwordToggle, googleLogin, emailIcon, phoneIcon;
+    private TextView signupText, forgotText, validationMessage;
+    private ImageView passwordToggle, googleLogin, facebookLogin, githubLogin, emailIcon, phoneIcon;
     private CountryCodePicker ccp;
+    private RadioGroup inputTypeGroup;
+    private RadioButton emailRadio, phoneRadio;
+    private CheckBox rememberMeCheckbox;
     private FirebaseAuth mAuth;
     private GoogleSignInClient mGoogleSignInClient;
     private FirebaseFirestore firestore;
     private boolean isPasswordVisible = false;
+    private boolean isPhoneInput = false;
+    private boolean isTextChanging = false;
+    private boolean isModeLocked = false; // Start in dynamic mode
     private SLTLoader sltLoader;
 
     private final ActivityResultLauncher<String> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
                 if (isGranted) {
-                    AuthUtils.fetchSimNumber(requireActivity(), credInput);
+                    Log.d(TAG, "READ_PHONE_STATE permission granted, fetching SIM number");
+                    isPhoneInput = true;
+                    phoneRadio.setChecked(true);
+                    isModeLocked = true;
+                    AuthUtils.fetchSimNumber(requireActivity(), credInput, ccp);
                 } else {
                     Log.w(TAG, "Phone state permission denied");
+                    isPhoneInput = false;
+                    inputTypeGroup.clearCheck();
+                    isModeLocked = false;
                     showCustomToast("Permission denied. SIM number detection unavailable.", false);
                 }
             });
@@ -81,14 +97,9 @@ public class LoginFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize SLTLoader with the activity's root view (full screen)
+        // Initialize SLTLoader
         View activityRoot = requireActivity().findViewById(android.R.id.content);
-        if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
-            Log.e(TAG, "Activity root view not found or not a ViewGroup");
-            sltLoader = new SLTLoader(requireContext(), (ViewGroup) view); // Fallback to fragment root
-        } else {
-            sltLoader = new SLTLoader(requireContext(), (ViewGroup) activityRoot);
-        }
+        sltLoader = new SLTLoader(requireContext(), activityRoot instanceof ViewGroup ? (ViewGroup) activityRoot : (ViewGroup) view);
 
         mAuth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
@@ -99,71 +110,196 @@ public class LoginFragment extends Fragment {
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
 
+        // Initialize UI elements
         credInput = view.findViewById(R.id.credInput);
         passwordInput = view.findViewById(R.id.passwordInput);
         signupText = view.findViewById(R.id.signupText);
         forgotText = view.findViewById(R.id.forgotText);
         passwordToggle = view.findViewById(R.id.passwordToggle);
         googleLogin = view.findViewById(R.id.googleLogin);
+        facebookLogin = view.findViewById(R.id.facebookLogin);
+        githubLogin = view.findViewById(R.id.githublogin);
         emailIcon = view.findViewById(R.id.emailIcon);
         phoneIcon = view.findViewById(R.id.phoneIcon);
         ccp = view.findViewById(R.id.ccp);
+        validationMessage = view.findViewById(R.id.validationMessage);
+        inputTypeGroup = view.findViewById(R.id.inputTypeGroup);
+        emailRadio = view.findViewById(R.id.emailRadio);
+        phoneRadio = view.findViewById(R.id.phoneRadio);
+        rememberMeCheckbox = view.findViewById(R.id.rememberMeCheckbox);
         Button loginBtn = view.findViewById(R.id.loginBtn);
 
         setupCCP();
-        requestPhoneStatePermission();
         setupDynamicInput();
         setupInputValidation();
+        setupInputTypeToggle();
 
+        // Initialize UI state for full dynamic mode
+        inputTypeGroup.clearCheck();
+        isModeLocked = false;
+        isPhoneInput = false;
+        ccp.setVisibility(View.GONE);
+        emailIcon.setVisibility(View.VISIBLE);
+        phoneIcon.setVisibility(View.GONE);
+        validationMessage.setText("");
+
+        // Event listeners
         loginBtn.setOnClickListener(v -> handleLogin());
         signupText.setOnClickListener(v -> startActivity(new Intent(requireContext(), SignupActivity.class)));
         forgotText.setOnClickListener(v -> handleForgotPassword());
         passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
         googleLogin.setOnClickListener(v -> signInWithGoogle());
+        facebookLogin.setOnClickListener(v -> signInWithFacebook());
+        githubLogin.setOnClickListener(v -> signInWithGitHub());
+
+        // Request permission
+        requestPhoneStatePermission();
     }
 
     private void setupCCP() {
         if (ccp != null && credInput != null) {
             ccp.registerCarrierNumberEditText(credInput);
             ccp.setCustomMasterCountries("BD,MY,SG");
-            ccp.setCountryForNameCode("BD");
             ccp.setNumberAutoFormattingEnabled(false);
-            Log.d(TAG, "CCP registered with credInput");
-        } else {
-            Log.e(TAG, "CCP or credInput is null");
+            ccp.setCountryForNameCode("MY");
+            Log.d(TAG, "CCP registered with credInput, restricted to BD,MY,SG");
         }
     }
 
     private void requestPhoneStatePermission() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE);
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "READ_PHONE_STATE permission already granted");
+            isPhoneInput = true;
+            phoneRadio.setChecked(true);
+            isModeLocked = true;
+            AuthUtils.fetchSimNumber(requireActivity(), credInput, ccp);
         } else {
-            AuthUtils.fetchSimNumber(requireActivity(), credInput);
+            Log.d(TAG, "Requesting READ_PHONE_STATE permission");
+            requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE);
         }
     }
 
     private void setupDynamicInput() {
-        AuthUtils.setupDynamicInput(requireActivity(), credInput, ccp, emailIcon, phoneIcon, null);
-        adjustCredInputPadding();
+        AuthUtils.setupDynamicInput(requireActivity(), credInput, ccp, emailIcon, phoneIcon, validationMessage, isPhone -> {
+            if (!isModeLocked) {
+                isPhoneInput = isPhone;
+                credInput.setInputType(isPhone ?
+                        android.text.InputType.TYPE_CLASS_NUMBER :
+                        (android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS));
+                ccp.setVisibility(isPhone ? View.VISIBLE : View.GONE);
+                emailIcon.setVisibility(isPhone ? View.GONE : View.VISIBLE);
+                phoneIcon.setVisibility(isPhone ? View.VISIBLE : View.GONE);
+                adjustCredInputPadding();
+                Log.d(TAG, "Dynamic input type changed: isPhone=" + isPhone);
+            }
+        });
+    }
+
+    private void setupInputTypeToggle() {
+        inputTypeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.emailRadio) {
+                isPhoneInput = false;
+                isModeLocked = true;
+                credInput.setText("");
+                credInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                ccp.setVisibility(View.GONE);
+                emailIcon.setVisibility(View.VISIBLE);
+                phoneIcon.setVisibility(View.GONE);
+                validationMessage.setText("");
+                adjustCredInputPadding();
+                Log.d(TAG, "Mode locked to email");
+            } else if (checkedId == R.id.phoneRadio) {
+                isPhoneInput = true;
+                isModeLocked = true;
+                credInput.setText("");
+                credInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                ccp.setVisibility(View.VISIBLE);
+                emailIcon.setVisibility(View.GONE);
+                phoneIcon.setVisibility(View.VISIBLE);
+                validationMessage.setText("");
+                adjustCredInputPadding();
+                Log.d(TAG, "Mode locked to phone");
+            } else {
+                isModeLocked = false;
+                isPhoneInput = false;
+                credInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                ccp.setVisibility(View.GONE);
+                emailIcon.setVisibility(View.VISIBLE);
+                phoneIcon.setVisibility(View.GONE);
+                validationMessage.setText("");
+                adjustCredInputPadding();
+                Log.d(TAG, "Mode unlocked, dynamic switching enabled");
+            }
+        });
     }
 
     private void setupInputValidation() {
         credInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (isTextChanging) return;
+                isTextChanging = true;
                 resetInputBorders();
                 adjustCredInputPadding();
+                String input = s.toString().trim();
+                if (input.isEmpty()) {
+                    validationMessage.setText("");
+                    if (!isModeLocked) {
+                        isPhoneInput = false;
+                        ccp.setVisibility(View.GONE);
+                        emailIcon.setVisibility(View.VISIBLE);
+                        phoneIcon.setVisibility(View.GONE);
+                    }
+                } else {
+                    if (isModeLocked) {
+                        if (isPhoneInput) {
+                            String normalized = AuthUtils.normalizePhoneNumberForBackend(input, ccp, null);
+                            boolean isValid = AuthUtils.isValidPhoneNumber(normalized);
+                            validationMessage.setText(isValid ? "Valid phone number" : "Invalid phone number");
+                            validationMessage.setTextColor(ContextCompat.getColor(requireContext(),
+                                    isValid ? android.R.color.holo_green_dark : android.R.color.holo_red_dark));
+                        } else {
+                            boolean isValid = AuthUtils.isValidEmail(input);
+                            validationMessage.setText(isValid ? "Valid email" : "Invalid email format");
+                            validationMessage.setTextColor(ContextCompat.getColor(requireContext(),
+                                    isValid ? android.R.color.holo_green_dark : android.R.color.holo_red_dark));
+                        }
+                    } else {
+                        // Dynamic mode validation
+                        if (AuthUtils.looksLikeEmail(input)) {
+                            boolean isValid = AuthUtils.isValidEmail(input);
+                            validationMessage.setText(isValid ? "Valid email" : "Typing email...");
+                            validationMessage.setTextColor(ContextCompat.getColor(requireContext(),
+                                    isValid ? android.R.color.holo_green_dark : android.R.color.black));
+                        } else {
+                            String normalized = AuthUtils.normalizePhoneNumberForBackend(input, ccp, null);
+                            boolean isValid = AuthUtils.isValidPhoneNumber(normalized);
+                            validationMessage.setText(isValid ? "Valid phone number" : "Typing phone number...");
+                            validationMessage.setTextColor(ContextCompat.getColor(requireContext(),
+                                    isValid ? android.R.color.holo_green_dark : android.R.color.black));
+                        }
+                    }
+                }
+                isTextChanging = false;
             }
-            @Override public void afterTextChanged(Editable s) {}
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
 
         passwordInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
                 resetInputBorders();
-                if (s.length() < 6 && s.length() > 0) passwordInput.setError("Password must be at least 6 characters");
+                if (s.length() < 6 && s.length() > 0) {
+                    passwordInput.setError("Password must be at least 6 characters");
+                }
             }
-            @Override public void afterTextChanged(Editable s) {}
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
     }
 
@@ -192,29 +328,33 @@ public class LoginFragment extends Fragment {
             return;
         }
 
-        String emailOrPhone = AuthUtils.isValidEmail(credentials) ? credentials : AuthUtils.normalizePhoneNumberForBackend(credentials, ccp, AuthUtils.getSimCountry(requireActivity()));
-        final String loginEmail = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
+        String emailOrPhone = isPhoneInput ?
+                AuthUtils.normalizePhoneNumberForBackend(credentials, ccp, null) :
+                credentials;
+        if (isPhoneInput && !AuthUtils.isValidPhoneNumber(emailOrPhone)) {
+            setErrorBorder(credInput);
+            showCustomToast("Invalid phone number", false);
+            return;
+        } else if (!isPhoneInput && !AuthUtils.isValidEmail(emailOrPhone)) {
+            setErrorBorder(credInput);
+            showCustomToast("Invalid email format", false);
+            return;
+        }
 
-        // Show centered loader
-        SLTLoader.LoaderConfig config = new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
+        String loginEmail = emailOrPhone.contains("@") ? emailOrPhone : emailOrPhone + "@smartpharmacy.com";
+        sltLoader.showCustomLoader(new SLTLoader.LoaderConfig(com.softourtech.slt.R.raw.loading_global)
                 .setWidthDp(40)
                 .setHeightDp(40)
                 .setUseRoundedBox(true)
-                .setOverlayColor(Color.parseColor("#80000000")); // Match ProfileFragment
-               config.setChangeJsonColor(false);
-
-        sltLoader.showCustomLoader(config);
+                .setOverlayColor(Color.parseColor("#80000000")));
         setUiEnabled(false);
 
         mAuth.signInWithEmailAndPassword(loginEmail, password)
                 .addOnCompleteListener(requireActivity(), task -> {
                     sltLoader.hideLoader();
                     setUiEnabled(true);
-                    if (task.isSuccessful()) {
-                        FirebaseUser user = mAuth.getCurrentUser();
-                        if (user != null && isAdded()) {
-                            checkUserRole(user);
-                        }
+                    if (task.isSuccessful() && isAdded()) {
+                        checkUserRole(mAuth.getCurrentUser());
                     } else if (isAdded()) {
                         showCustomToast("Login failed: " + task.getException().getMessage(), false);
                     }
@@ -237,17 +377,10 @@ public class LoginFragment extends Fragment {
                     sltLoader.hideLoader();
                     String role = documentSnapshot.getString("role");
                     if (role == null) {
-                        sltLoader.showCustomLoader(config);
                         firestore.collection("users").document(user.getUid())
                                 .set(new UserRole("customer"), com.google.firebase.firestore.SetOptions.merge())
-                                .addOnSuccessListener(aVoid -> {
-                                    sltLoader.hideLoader();
-                                    proceedWithRole(user, "customer");
-                                })
-                                .addOnFailureListener(e -> {
-                                    sltLoader.hideLoader();
-                                    proceedWithRole(user, "customer");
-                                });
+                                .addOnSuccessListener(aVoid -> proceedWithRole(user, "customer"))
+                                .addOnFailureListener(e -> proceedWithRole(user, "customer"));
                     } else {
                         proceedWithRole(user, role);
                     }
@@ -263,16 +396,10 @@ public class LoginFragment extends Fragment {
         Intent intent;
         switch (role) {
             case "admin":
-                intent = new Intent(requireContext(), AdminActivity.class);
+                intent = new Intent(requireContext(), AdminMainActivity.class);
                 break;
             case "pharmacist":
-                intent = new Intent(requireContext(), MainActivity.class);
-                Log.w(TAG, "Pharmacist role detected, redirecting to MainActivity (placeholder)");
-                break;
             case "delivery_staff":
-                intent = new Intent(requireContext(), MainActivity.class);
-                Log.w(TAG, "Delivery Staff role detected, redirecting to MainActivity (placeholder)");
-                break;
             case "customer":
             default:
                 intent = new Intent(requireContext(), MainActivity.class);
@@ -294,7 +421,7 @@ public class LoginFragment extends Fragment {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == RC_GOOGLE_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
@@ -336,6 +463,27 @@ public class LoginFragment extends Fragment {
         }
     }
 
+    private void signInWithFacebook() {
+        showCustomToast("Facebook login not implemented", false);
+    }
+
+    private void signInWithGitHub() {
+        AuthUtils.firebaseAuthWithGitHub(requireActivity(), "your_github_client_id", firestore, new AuthUtils.AuthCallback() {
+            @Override
+            public void onSuccess(FirebaseUser user) {
+                if (isAdded()) {
+                    checkUserRole(user);
+                }
+            }
+            @Override
+            public void onFailure(String errorMessage) {
+                if (isAdded()) {
+                    showCustomToast("GitHub login failed: " + errorMessage, false);
+                }
+            }
+        });
+    }
+
     private void togglePasswordVisibility() {
         passwordInput.setTransformationMethod(isPasswordVisible ? PasswordTransformationMethod.getInstance() : SingleLineTransformationMethod.getInstance());
         passwordToggle.setImageResource(isPasswordVisible ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
@@ -351,6 +499,12 @@ public class LoginFragment extends Fragment {
         forgotText.setEnabled(enabled);
         passwordToggle.setEnabled(enabled);
         googleLogin.setEnabled(enabled);
+        facebookLogin.setEnabled(enabled);
+        githubLogin.setEnabled(enabled);
+        inputTypeGroup.setEnabled(enabled);
+        emailRadio.setEnabled(enabled);
+        phoneRadio.setEnabled(enabled);
+        rememberMeCheckbox.setEnabled(enabled);
     }
 
     private void showCustomToast(String message, boolean isSuccess) {
@@ -384,7 +538,9 @@ public class LoginFragment extends Fragment {
             Log.d(TAG, "CCP deregistered from credInput");
         }
         if (sltLoader != null) {
+            sltLoader.hideLoader();
             sltLoader.onDestroy();
+            sltLoader = null;
         }
     }
 

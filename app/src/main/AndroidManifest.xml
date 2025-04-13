@@ -7,20 +7,30 @@
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="com.google.android.gms.auth.api.phone.SMS_RETRIEVED" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
-        android:name=".Application"
+        android:name=".SmartPharmacyApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="Smart Pharmacy"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme"
+        android:theme="@style/Theme.MyApp"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33">
 
@@ -28,40 +38,38 @@
         <meta-data
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
-        <!-- Firebase API Key (optional, for debugging) -->
-        <meta-data
-            android:name="com.google.firebase.api_key"
-            android:value="AIzaSyBG8QphDWEL653YdcrTOs69IWLT6NkiJQE" />
 
+        <!-- FileProvider for camera -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.oopgroup.smartpharmacy.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- SplashActivity -->
         <activity
             android:name=".SplashActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.SplashScreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-        <activity android:name=".OnBoardingActivity" android:exported="false" />
-        <activity android:name=".LoginActivity" android:exported="false" />
-        <activity android:name=".SignupActivity" android:exported="false" />
-        <activity android:name=".ForgotPassActivity" android:exported="false" />
-        <activity android:name=".OtpVerificationActivity" android:exported="false" />
-        <activity
-            android:name=".ResetPasswordActivity"
-            android:exported="true"
-            android:launchMode="singleTask">
-            <!-- Dynamic Link Filter -->
+            <!-- Dynamic Link Filter for custom domain -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="smartpharmacyuni.page.link"
-                    android:pathPrefix="/resetpass" />
+                    android:host="smartpharmacyuni.page.link" />
             </intent-filter>
             <!-- Firebase Default Auth Link Filter -->
-            <intent-filter>
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -71,10 +79,20 @@
                     android:pathPrefix="/__/auth/action" />
             </intent-filter>
         </activity>
+
+        <!-- Other activities -->
+        <activity android:name=".OnBoardingActivity" android:exported="false" />
+        <activity android:name=".LoginActivity" android:exported="false" />
+        <activity android:name=".SignupActivity" android:exported="false" />
+        <activity android:name=".ForgotPassActivity" android:exported="false" />
+        <activity android:name=".OtpVerificationActivity" android:exported="false" />
+        <activity
+            android:name=".ResetPasswordActivity"
+            android:exported="false"
+            android:launchMode="singleTask" />
         <activity android:name=".MainActivity" android:exported="false" />
         <activity android:name=".EditProfileActivity" android:exported="false" />
         <activity android:name=".ChangePasswordActivity" android:exported="false" />
-        <activity android:name=".adminstaff.AdminActivity" android:exported="false" />
         <activity android:name=".ManageAddressActivity" android:exported="false" />
         <activity android:name=".adminstaff.AdminMainActivity" android:exported="false" />
 

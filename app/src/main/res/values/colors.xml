@@ -19,7 +19,7 @@
     <color name="light_gray">#F5F5F5</color>
 
     <!-- Background Colors -->
-    <color name="background_light">#FFFFFF</color> <!-- Same as white, kept for semantic meaning -->
+    <color name="background_light">#F5F6F5</color> <!-- Same as white, kept for semantic meaning -->
     <color name="card_background">#F5F5F5</color> <!-- Same as light_gray, kept for semantic meaning -->
 
     <!-- Text Colors -->
@@ -99,6 +99,8 @@
     <color name="error">#DF1C41</color>
     <color name="errorDark">#95122B</color>
     <color name="errorDarker">#710E21</color>
+    <color name="primary_color">#3F51B5</color> <!-- Indigo, adjust as needed -->
+
 
 
 

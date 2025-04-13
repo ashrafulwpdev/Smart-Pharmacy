@@ -2,7 +2,8 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
 
     <View
         android:layout_width="match_parent"
@@ -21,15 +22,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        android:overScrollMode="never">
+        android:overScrollMode="never"
+        android:paddingBottom="80dp">
 
         <RelativeLayout
             android:id="@+id/signup_frame"
             android:layout_width="342dp"
-            android:layout_height="480dp"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:layout_marginTop="130dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginTop="80dp"
+            android:layout_marginBottom="80dp"
             android:layout_centerHorizontal="true"
             android:background="@drawable/login_bgframe"
             android:elevation="5dp"
@@ -67,11 +69,44 @@
                 android:textColor="#1F1F1F"
                 android:textSize="14sp" />
 
+            <!-- Radio Buttons for Input Type -->
+            <RadioGroup
+                android:id="@+id/inputTypeGroup"
+                android:layout_width="280dp"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/subtitle"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="15dp"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <RadioButton
+                    android:id="@+id/emailRadio"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Email"
+                    android:textColor="#1F1F1F"
+                    android:textSize="16sp"
+                    android:checked="true"
+                    android:paddingEnd="10dp" />
+
+                <RadioButton
+                    android:id="@+id/phoneRadio"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Phone"
+                    android:textColor="#1F1F1F"
+                    android:textSize="16sp"
+                    android:paddingStart="10dp" />
+            </RadioGroup>
+
             <EditText
                 android:id="@+id/fullNameInput"
                 android:layout_width="280dp"
                 android:layout_height="50dp"
-                android:layout_below="@id/subtitle"
+                android:layout_below="@id/inputTypeGroup"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="20dp"
                 android:background="@drawable/edittext_bg"
@@ -113,7 +148,7 @@
                     android:layout_centerVertical="true"
                     android:layout_marginStart="10dp"
                     android:visibility="gone"
-                    app:ccp_defaultNameCode="BD"
+                    app:ccp_defaultNameCode="MY"
                     app:ccp_textSize="16sp"
                     app:ccp_showFlag="true"
                     app:ccp_showNameCode="false"
@@ -128,7 +163,7 @@
                     android:layout_centerVertical="true"
                     android:layout_marginEnd="10dp"
                     android:src="@drawable/email_ic"
-                    android:visibility="gone" />
+                    android:visibility="visible" />
 
                 <ImageView
                     android:id="@+id/phoneIcon"
@@ -141,11 +176,22 @@
                     android:visibility="gone" />
             </RelativeLayout>
 
+            <TextView
+                android:id="@+id/validationMessage"
+                android:layout_width="280dp"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/credContainer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="5dp"
+                android:text=""
+                android:textColor="#1F1F1F"
+                android:textSize="12sp" />
+
             <RelativeLayout
                 android:id="@+id/passwordContainer"
                 android:layout_width="280dp"
                 android:layout_height="50dp"
-                android:layout_below="@id/credContainer"
+                android:layout_below="@id/validationMessage"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="15dp"
                 android:padding="0dp">
@@ -206,7 +252,7 @@
                 android:layout_below="@id/loginText"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="20dp"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="0dp"
                 android:orientation="horizontal">
 
                 <ImageView

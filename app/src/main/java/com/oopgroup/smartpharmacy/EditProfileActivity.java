@@ -34,14 +34,15 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.request.RequestOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.hbb20.CountryCodePicker;
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.request.RequestOptions;
 import com.oopgroup.smartpharmacy.utils.AuthUtils;
 import com.softourtech.slt.SLTLoader;
 
@@ -100,7 +101,6 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_profile);
 
-        // Initialize SLTLoader with the activity's root view
         View activityRoot = findViewById(android.R.id.content);
         if (activityRoot == null || !(activityRoot instanceof ViewGroup)) {
             Log.e(TAG, "Activity root view not found or not a ViewGroup");
@@ -188,8 +188,8 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         Intent intent = getIntent();
         currentImageUrl = intent.getStringExtra("currentImageUrl");
         signInMethod = intent.getStringExtra("signInMethod");
-        pendingEmail = intent.getStringExtra("pendingEmail");
-        pendingPhoneNumber = intent.getStringExtra("pendingPhoneNumber");
+        pendingEmail = intent.getStringExtra("pendingEmail") != null ? intent.getStringExtra("pendingEmail") : "";
+        pendingPhoneNumber = intent.getStringExtra("pendingPhoneNumber") != null ? intent.getStringExtra("pendingPhoneNumber") : "";
 
         if (!currentUser.getProviderData().isEmpty()) {
             for (com.google.firebase.auth.UserInfo provider : currentUser.getProviderData()) {
@@ -372,8 +372,9 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
         ccp.setCcpClickable(false);
         ccp.setVisibility(View.GONE);
 
-        AuthUtils.setupDynamicInput(this, emailInput, null, null, null, emailValidationMessage);
-        emailInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        AuthUtils.setupDynamicInput(this, emailInput, null, null, null, emailValidationMessage, isPhone -> {
+            emailInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        });
 
         adjustPhoneInputPadding();
         restrictFieldsBasedOnSignInMethod();
@@ -556,18 +557,14 @@ public class EditProfileActivity extends AppCompatActivity implements ProfileAut
     private void loadProfileImage(Uri imageUri) {
         RequestOptions options = new RequestOptions()
                 .circleCrop()
-                .override(INNER_SIZE, INNER_SIZE)
                 .placeholder(R.drawable.default_profile)
-                .error(R.drawable.default_profile);
+                .error(R.drawable.default_profile)
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC);
 
-        if (imageUri != null) {
-            Glide.with(this)
-                    .load(imageUri)
-                    .apply(options)
-                    .into(profileImage);
-        } else {
-            profileImage.setImageResource(R.drawable.default_profile);
-        }
+        Glide.with(this)
+                .load(imageUri)
+                .apply(options)
+                .into(profileImage);
     }
 
     private void showDatePickerDialog() {

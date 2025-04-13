@@ -3,6 +3,8 @@ package com.oopgroup.smartpharmacy.fragments;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
@@ -12,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -28,20 +31,25 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.Source;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.oopgroup.smartpharmacy.MainActivity;
 import com.oopgroup.smartpharmacy.R;
 import com.oopgroup.smartpharmacy.adapters.BestsellerProductAdapter;
 import com.oopgroup.smartpharmacy.models.Product;
+import com.oopgroup.smartpharmacy.utils.NetworkUtils;
 
 public class ProductDetailsFragment extends Fragment implements BestsellerProductAdapter.OnAddToCartClickListener {
 
     private static final String TAG = "ProductDetailsFragment";
+    private static final long TOAST_COOLDOWN = 2000; // 2 seconds
 
     private ImageView productImage, addressSelectorIcon;
     private TextView productRating, productTitle, productQuantity, productPrice, productOriginalPrice;
@@ -58,6 +66,7 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
     private FirebaseAuth auth;
     private int cartItems = 0;
     private double cartTotal = 0.0;
+    private long lastToastTime = 0;
 
     public ProductDetailsFragment() {
         // Required empty public constructor
@@ -77,11 +86,20 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
         db = FirebaseFirestore.getInstance();
         auth = FirebaseAuth.getInstance();
 
+        // Check network status
+        if (!NetworkUtils.isNetworkAvailable(requireContext())) {
+            showToast("No internet. Please connect and try again.");
+            navigateToNoInternetFragment();
+            return;
+        }
+
         if (auth.getCurrentUser() == null) {
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, new LoginFragment())
-                    .commit();
+            if (isAdded()) {
+                requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new LoginFragment())
+                        .commit();
+            }
             return;
         }
 
@@ -91,7 +109,11 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
         // Toolbar setup
         Toolbar toolbar = view.findViewById(R.id.toolbar);
         toolbar.setTitle("Loading...");
-        toolbar.setNavigationOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
+        toolbar.setNavigationOnClickListener(v -> {
+            if (isAdded()) {
+                requireActivity().getSupportFragmentManager().popBackStack();
+            }
+        });
         toolbar.inflateMenu(R.menu.cart_menu);
         toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_cart) {
@@ -131,8 +153,9 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                 Log.d(TAG, "Product received: " + product.getName());
                 if (product.getCategoryId() != null && !product.getCategoryId().isEmpty()) {
                     db.collection("categories").document(product.getCategoryId())
-                            .get()
+                            .get(Source.CACHE)
                             .addOnSuccessListener(documentSnapshot -> {
+                                if (!isAdded()) return;
                                 if (documentSnapshot.exists()) {
                                     String fetchedName = documentSnapshot.getString("name");
                                     categoryName[0] = fetchedName != null ? fetchedName : "Product Details";
@@ -142,6 +165,7 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                                 }
                             })
                             .addOnFailureListener(e -> {
+                                if (!isAdded()) return;
                                 Log.e(TAG, "Failed to fetch category name: " + e.getMessage());
                                 toolbar.setTitle("Product Details");
                             });
@@ -178,16 +202,18 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
             }
             productDescription.setText(product.getDescription());
             deliveryDetails.setText("Expected Delivery By " + product.getDeliveryDate());
-            deliveryAddress.setTextColor(Color.BLACK); // Set address color to black
+            deliveryAddress.setTextColor(Color.BLACK);
         }
 
         // Description read more/less toggle
         productDescription.post(() -> {
+            if (!isAdded()) return;
             if (productDescription.getLineCount() > 3) {
                 readMore.setVisibility(View.VISIBLE);
             }
         });
         readMore.setOnClickListener(v -> {
+            if (!isAdded()) return;
             if (readMore.getText().toString().equals("READ MORE")) {
                 productDescription.setMaxLines(Integer.MAX_VALUE);
                 readMore.setText("READ LESS");
@@ -200,6 +226,10 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
         // Quantity controls
         quantityText.setText(String.valueOf(quantity));
         decreaseQuantity.setOnClickListener(v -> {
+            if (!isAdded() || !NetworkUtils.isNetworkAvailable(requireContext())) {
+                showToast("No internet. Please connect to proceed.");
+                return;
+            }
             if (quantity > 0) {
                 quantity--;
                 quantityText.setText(String.valueOf(quantity));
@@ -208,6 +238,10 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
             }
         });
         increaseQuantity.setOnClickListener(v -> {
+            if (!isAdded() || !NetworkUtils.isNetworkAvailable(requireContext())) {
+                showToast("No internet. Please connect to proceed.");
+                return;
+            }
             quantity++;
             quantityText.setText(String.valueOf(quantity));
             updateCartUI(1, priceToAdd);
@@ -219,10 +253,22 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
         fetchAndSetDeliveryAddress();
 
         // Address selector icon click
-        addressSelectorIcon.setOnClickListener(v -> showAddressDialog());
+        addressSelectorIcon.setOnClickListener(v -> {
+            if (!isAdded() || !NetworkUtils.isNetworkAvailable(requireContext())) {
+                showToast("No internet. Please connect to proceed.");
+                return;
+            }
+            showAddressDialog();
+        });
 
         // View cart button
-        viewCartButton.setOnClickListener(v -> navigateToCartFragment());
+        viewCartButton.setOnClickListener(v -> {
+            if (!isAdded() || !NetworkUtils.isNetworkAvailable(requireContext())) {
+                showToast("No internet. Please connect to proceed.");
+                return;
+            }
+            navigateToCartFragment();
+        });
 
         // Similar products setup
         similarProductList = new ArrayList<>();
@@ -232,6 +278,10 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
         fetchSimilarProducts();
 
         viewAll.setOnClickListener(v -> {
+            if (!isAdded() || !NetworkUtils.isNetworkAvailable(requireContext())) {
+                showToast("No internet. Please connect to proceed.");
+                return;
+            }
             ProductsFragment fragment = new ProductsFragment();
             Bundle viewAllArgs = new Bundle();
             viewAllArgs.putString("categoryId", product.getCategoryId());
@@ -260,6 +310,7 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
     }
 
     private void hideBottomNavigation() {
+        if (!isAdded()) return;
         if (requireActivity() instanceof MainActivity) {
             MainActivity mainActivity = (MainActivity) requireActivity();
             mainActivity.hideBottomNav();
@@ -270,11 +321,13 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
     }
 
     private void fetchAndSetDeliveryAddress() {
+        if (!isAdded()) return;
         String userId = auth.getCurrentUser().getUid();
         db.collection("users")
                 .document(userId)
-                .get()
+                .get(Source.CACHE)
                 .addOnSuccessListener(documentSnapshot -> {
+                    if (!isAdded()) return;
                     if (documentSnapshot.exists() && documentSnapshot.contains("lastSelectedAddressId")) {
                         String lastSelectedAddressId = documentSnapshot.getString("lastSelectedAddressId");
                         fetchAddressById(lastSelectedAddressId);
@@ -282,35 +335,45 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                         fetchDefaultAddress();
                     }
                 })
-                .addOnFailureListener(e -> fetchDefaultAddress());
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    fetchDefaultAddress();
+                });
     }
 
     private void fetchAddressById(String addressId) {
+        if (!isAdded()) return;
         String userId = auth.getCurrentUser().getUid();
         db.collection("users")
                 .document(userId)
                 .collection("addresses")
                 .document(addressId)
-                .get()
+                .get(Source.CACHE)
                 .addOnSuccessListener(doc -> {
+                    if (!isAdded()) return;
                     if (doc.exists()) {
                         setDeliveryAddress(doc.getId(), doc);
                     } else {
                         fetchDefaultAddress();
                     }
                 })
-                .addOnFailureListener(e -> fetchDefaultAddress());
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    fetchDefaultAddress();
+                });
     }
 
     private void fetchDefaultAddress() {
+        if (!isAdded()) return;
         String userId = auth.getCurrentUser().getUid();
         db.collection("users")
                 .document(userId)
                 .collection("addresses")
                 .whereEqualTo("isDefault", true)
                 .limit(1)
-                .get()
+                .get(Source.CACHE)
                 .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (!isAdded()) return;
                     if (!queryDocumentSnapshots.isEmpty()) {
                         DocumentSnapshot doc = queryDocumentSnapshots.getDocuments().get(0);
                         setDeliveryAddress(doc.getId(), doc);
@@ -319,31 +382,32 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                                 .document(userId)
                                 .collection("addresses")
                                 .limit(1)
-                                .get()
+                                .get(Source.CACHE)
                                 .addOnSuccessListener(allAddresses -> {
+                                    if (!isAdded()) return;
                                     if (!allAddresses.isEmpty()) {
                                         DocumentSnapshot doc = allAddresses.getDocuments().get(0);
                                         setDeliveryAddress(doc.getId(), doc);
                                     } else {
-                                        SpannableString spannableString = new SpannableString("Delivery Address: Not set");
-                                        spannableString.setSpan(new ForegroundColorSpan(Color.GRAY), 0, "Delivery Address: ".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                                        spannableString.setSpan(new ForegroundColorSpan(Color.BLACK), "Delivery Address: ".length(), "Delivery Address: Not set".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                                        deliveryAddress.setText(spannableString);
+                                        setNoAddress();
                                     }
                                 })
                                 .addOnFailureListener(e -> {
+                                    if (!isAdded()) return;
                                     Log.e(TAG, "Failed to fetch addresses: " + e.getMessage());
                                     setErrorAddress();
                                 });
                     }
                 })
                 .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
                     Log.e(TAG, "Failed to fetch default address: " + e.getMessage());
                     setErrorAddress();
                 });
     }
 
     private void setDeliveryAddress(String addressId, DocumentSnapshot doc) {
+        if (!isAdded()) return;
         String streetAddress = doc.getString("streetAddress");
         String city = doc.getString("city");
         String state = doc.getString("state");
@@ -373,7 +437,16 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
         }
     }
 
+    private void setNoAddress() {
+        if (!isAdded()) return;
+        SpannableString spannableString = new SpannableString("Delivery Address: Not set");
+        spannableString.setSpan(new ForegroundColorSpan(Color.GRAY), 0, "Delivery Address: ".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        spannableString.setSpan(new ForegroundColorSpan(Color.BLACK), "Delivery Address: ".length(), "Delivery Address: Not set".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        deliveryAddress.setText(spannableString);
+    }
+
     private void setErrorAddress() {
+        if (!isAdded()) return;
         SpannableString spannableString = new SpannableString("Delivery Address: Error loading");
         spannableString.setSpan(new ForegroundColorSpan(Color.GRAY), 0, "Delivery Address: ".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         spannableString.setSpan(new ForegroundColorSpan(Color.BLACK), "Delivery Address: ".length(), "Delivery Address: Error loading".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -381,8 +454,10 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
     }
 
     private void showAddressDialog() {
+        if (!isAdded()) return;
         AddressDialogFragment dialog = new AddressDialogFragment();
         dialog.setOnAddressSelectedListener((addressId, address) -> {
+            if (!isAdded()) return;
             String displayText = "Delivery Address: " + address;
             SpannableString spannableString = new SpannableString(displayText);
             spannableString.setSpan(new ForegroundColorSpan(Color.GRAY), 0, "Delivery Address: ".length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -416,7 +491,17 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                 .commit();
     }
 
+    private void navigateToNoInternetFragment() {
+        if (!isAdded()) return;
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, new NoInternetFragment())
+                .addToBackStack(null)
+                .commit();
+    }
+
     private void updateCartUI(int itemChange, double priceChange) {
+        if (!isAdded()) return;
         cartItems += itemChange;
         cartTotal += priceChange;
         if (cartItems < 0) cartItems = 0;
@@ -426,14 +511,15 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
     }
 
     private void fetchCartDataForProduct() {
-        if (product == null || product.getId() == null) return;
+        if (!isAdded() || product == null || product.getId() == null) return;
 
         String userId = auth.getCurrentUser().getUid();
         db.collection("cart").document(userId)
                 .collection("items")
                 .whereEqualTo("productId", product.getId())
-                .get()
+                .get(Source.CACHE)
                 .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (!isAdded()) return;
                     if (!queryDocumentSnapshots.isEmpty()) {
                         int totalQuantity = 0;
                         double totalPrice = 0.0;
@@ -482,12 +568,13 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                     }
                 })
                 .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
                     Log.e(TAG, "Failed to fetch cart data: " + e.getMessage());
                 });
     }
 
     private void updateFirestoreCart(int newQuantity) {
-        if (product == null || product.getId() == null) return;
+        if (!isAdded() || product == null || product.getId() == null) return;
 
         String userId = auth.getCurrentUser().getUid();
         DocumentReference cartItemRef = db.collection("cart").document(userId)
@@ -512,60 +599,88 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
 
             cartItemRef.set(cartItem)
                     .addOnSuccessListener(aVoid -> Log.d(TAG, "Cart updated: " + product.getName()))
-                    .addOnFailureListener(e -> Log.e(TAG, "Failed to update cart: " + e.getMessage()));
+                    .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
+                        Log.e(TAG, "Failed to update cart: " + e.getMessage());
+                    });
         } else {
             cartItemRef.delete()
                     .addOnSuccessListener(aVoid -> Log.d(TAG, "Cart item removed: " + product.getName()))
-                    .addOnFailureListener(e -> Log.e(TAG, "Failed to remove cart item: " + e.getMessage()));
+                    .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
+                        Log.e(TAG, "Failed to remove cart item: " + e.getMessage());
+                    });
         }
     }
 
     private void fetchSimilarProducts() {
-        if (product == null || product.getCategoryId() == null || product.getCategoryId().isEmpty()) return;
+        if (!isAdded() || product == null || product.getCategoryId() == null || product.getCategoryId().isEmpty()) return;
 
-        db.collection("products")
-                .whereEqualTo("categoryId", product.getCategoryId())
-                .whereNotEqualTo("id", product.getId())
-                .limit(5)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    similarProductList.clear();
-                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        String id = doc.getId();
-                        String name = doc.getString("name");
-                        Double price = doc.getDouble("price");
-                        String imageUrl = doc.getString("imageUrl");
-                        Long ratingLong = doc.getLong("rating");
-                        Long reviewCountLong = doc.getLong("reviewCount");
-                        String quantity = doc.getString("quantity");
-                        Double originalPrice = doc.getDouble("originalPrice");
-                        Double discountedPrice = doc.getDouble("discountedPrice");
-                        String description = doc.getString("description");
-                        String deliveryDate = doc.getString("deliveryDate");
-                        String categoryId = doc.getString("categoryId");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.execute(() -> {
+            try {
+                List<Product> tempList = new ArrayList<>();
+                db.collection("products")
+                        .whereEqualTo("categoryId", product.getCategoryId())
+                        .whereNotEqualTo("id", product.getId())
+                        .limit(5)
+                        .get(Source.CACHE)
+                        .addOnSuccessListener(queryDocumentSnapshots -> {
+                            for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                                String id = doc.getId();
+                                String name = doc.getString("name");
+                                Double price = doc.getDouble("price");
+                                String imageUrl = doc.getString("imageUrl");
+                                Long ratingLong = doc.getLong("rating");
+                                Long reviewCountLong = doc.getLong("reviewCount");
+                                String quantity = doc.getString("quantity");
+                                Double originalPrice = doc.getDouble("originalPrice");
+                                Double discountedPrice = doc.getDouble("discountedPrice");
+                                String description = doc.getString("description");
+                                String deliveryDate = doc.getString("deliveryDate");
+                                String categoryId = doc.getString("categoryId");
 
-                        if (name != null && price != null && imageUrl != null && ratingLong != null && reviewCountLong != null && description != null && categoryId != null) {
-                            int rating = ratingLong.intValue();
-                            int reviewCount = reviewCountLong.intValue();
-                            Product similarProduct = new Product(
-                                    id, name, price, imageUrl, rating, reviewCount, quantity,
-                                    originalPrice != null ? originalPrice : price,
-                                    discountedPrice != null ? discountedPrice : 0.0,
-                                    description,
-                                    deliveryDate != null ? deliveryDate : "N/A",
-                                    "N/A",
-                                    categoryId
-                            );
-                            similarProductList.add(similarProduct);
-                        }
-                    }
-                    similarProductAdapter.notifyDataSetChanged();
-                })
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to load similar products: " + e.getMessage()));
+                                if (name != null && price != null && imageUrl != null && ratingLong != null && reviewCountLong != null && description != null && categoryId != null) {
+                                    int rating = ratingLong.intValue();
+                                    int reviewCount = reviewCountLong.intValue();
+                                    Product similarProduct = new Product(
+                                            id, name, price, imageUrl, rating, reviewCount, quantity,
+                                            originalPrice != null ? originalPrice : price,
+                                            discountedPrice != null ? discountedPrice : 0.0,
+                                            description,
+                                            deliveryDate != null ? deliveryDate : "N/A",
+                                            "N/A",
+                                            categoryId
+                                    );
+                                    tempList.add(similarProduct);
+                                }
+                            }
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                if (!isAdded()) return;
+                                similarProductList.clear();
+                                similarProductList.addAll(tempList);
+                                similarProductAdapter.notifyDataSetChanged();
+                            });
+                        })
+                        .addOnFailureListener(e -> {
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                if (!isAdded()) return;
+                                Log.e(TAG, "Failed to load similar products: " + e.getMessage());
+                            });
+                        });
+            } finally {
+                executor.shutdown();
+            }
+        });
     }
 
     @Override
     public void onAddToCartClick(Product product) {
+        if (!isAdded() || !NetworkUtils.isNetworkAvailable(requireContext())) {
+            showToast("No internet. Please connect to proceed.");
+            return;
+        }
+
         String userId = auth.getCurrentUser().getUid();
         DocumentReference cartItemRef = db.collection("cart").document(userId)
                 .collection("items").document(product.getId());
@@ -576,15 +691,20 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
                 ((originalPrice - discountedPrice) / originalPrice) * 100 : 0;
 
         cartItemRef.get().addOnSuccessListener(documentSnapshot -> {
+            if (!isAdded()) return;
             if (documentSnapshot.exists()) {
                 int currentQuantity = documentSnapshot.getLong("quantity").intValue();
                 double currentTotal = documentSnapshot.getDouble("total");
 
                 cartItemRef.update(
-                        "quantity", currentQuantity + 1,
-                        "total", currentTotal + discountedPrice,
-                        "addedAt", Timestamp.now()
-                ).addOnSuccessListener(aVoid -> Log.d(TAG, "Cart updated: " + product.getName()));
+                                "quantity", currentQuantity + 1,
+                                "total", currentTotal + discountedPrice,
+                                "addedAt", Timestamp.now()
+                        ).addOnSuccessListener(aVoid -> Log.d(TAG, "Cart updated: " + product.getName()))
+                        .addOnFailureListener(e -> {
+                            if (!isAdded()) return;
+                            Log.e(TAG, "Failed to update cart: " + e.getMessage());
+                        });
             } else {
                 Map<String, Object> cartItem = new HashMap<>();
                 cartItem.put("addedAt", Timestamp.now());
@@ -599,8 +719,23 @@ public class ProductDetailsFragment extends Fragment implements BestsellerProduc
 
                 cartItemRef.set(cartItem)
                         .addOnSuccessListener(aVoid -> Log.d(TAG, "Added to cart: " + product.getName()))
-                        .addOnFailureListener(e -> Log.e(TAG, "Failed to add to cart: " + e.getMessage()));
+                        .addOnFailureListener(e -> {
+                            if (!isAdded()) return;
+                            Log.e(TAG, "Failed to add to cart: " + e.getMessage());
+                        });
             }
-        }).addOnFailureListener(e -> Log.e(TAG, "Failed to check cart item: " + e.getMessage()));
+        }).addOnFailureListener(e -> {
+            if (!isAdded()) return;
+            Log.e(TAG, "Failed to check cart item: " + e.getMessage());
+        });
+    }
+
+    private void showToast(String message) {
+        if (!isAdded()) return;
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastToastTime >= TOAST_COOLDOWN) {
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+            lastToastTime = currentTime;
+        }
     }
 }

@@ -10,27 +10,27 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:padding="12dp"
         android:weightSum="2">
 
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/bannerTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Banner Title"
-                android:textSize="18sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black"
-                android:padding="8dp"
                 android:maxLines="2"
                 android:ellipsize="end" />
 
@@ -39,10 +39,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="This is a placeholder description for the banner."
-                android:textSize="14sp"
+                android:textSize="12sp"
                 android:textColor="@android:color/black"
-                android:padding="8dp"
-                android:maxLines="3"
+                android:layout_marginTop="4dp"
+                android:maxLines="2"
                 android:ellipsize="end" />
 
             <TextView
@@ -50,30 +50,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Save Upto 50% off"
-                android:textSize="16sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="#F44336"
-                android:padding="8dp"
+                android:layout_marginTop="4dp"
                 android:maxLines="1" />
 
             <Button
-                android:id="@+id/orderNowButton"
+                android:id="@+id/copyCouponButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Order Now"
-                android:textSize="14sp"
+                android:text="Copy Code"
+                android:textSize="12sp"
                 android:background="@drawable/button_primary"
                 android:textColor="@android:color/white"
-                android:layout_gravity="start"
-                android:layout_marginTop="12dp"
-                android:padding="8dp"
-                android:minWidth="100dp" />
+                android:layout_marginTop="8dp"
+                android:padding="6dp"
+                android:minWidth="80dp" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/bannerImage"
             android:layout_width="0dp"
-            android:layout_height="150dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_delivery_person"

@@ -1,5 +1,7 @@
 package com.oopgroup.smartpharmacy.adapters;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -7,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -21,12 +24,10 @@ import java.util.List;
 public class BannerAdapter extends RecyclerView.Adapter<BannerAdapter.BannerViewHolder> {
     private Context context;
     private List<Banner> bannerList;
-    private OnOrderNowClickListener listener;
 
-    public BannerAdapter(Context context, List<Banner> bannerList, OnOrderNowClickListener listener) {
+    public BannerAdapter(Context context, List<Banner> bannerList) {
         this.context = context;
         this.bannerList = bannerList;
-        this.listener = listener;
     }
 
     @NonNull
@@ -60,11 +61,18 @@ public class BannerAdapter extends RecyclerView.Adapter<BannerAdapter.BannerView
             holder.bannerImage.setImageResource(R.drawable.ic_delivery_person);
         }
 
-        holder.orderNowButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onOrderNowClick(banner);
-            }
-        });
+        // Handle Copy Coupon Button
+        if (banner.getCouponCode() != null && !banner.getCouponCode().isEmpty()) {
+            holder.copyCouponButton.setVisibility(View.VISIBLE);
+            holder.copyCouponButton.setOnClickListener(v -> {
+                ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("Coupon Code", banner.getCouponCode());
+                clipboard.setPrimaryClip(clip);
+                Toast.makeText(context, "Coupon code copied: " + banner.getCouponCode(), Toast.LENGTH_SHORT).show();
+            });
+        } else {
+            holder.copyCouponButton.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -82,7 +90,7 @@ public class BannerAdapter extends RecyclerView.Adapter<BannerAdapter.BannerView
         TextView bannerTitle;
         TextView bannerDescription;
         TextView bannerDiscount;
-        Button orderNowButton;
+        Button copyCouponButton;
 
         BannerViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -90,17 +98,13 @@ public class BannerAdapter extends RecyclerView.Adapter<BannerAdapter.BannerView
             bannerTitle = itemView.findViewById(R.id.bannerTitle);
             bannerDescription = itemView.findViewById(R.id.bannerDescription);
             bannerDiscount = itemView.findViewById(R.id.bannerDiscount);
-            orderNowButton = itemView.findViewById(R.id.orderNowButton);
+            copyCouponButton = itemView.findViewById(R.id.copyCouponButton);
 
             if (bannerImage == null) android.util.Log.e("BannerViewHolder", "bannerImage not found");
             if (bannerTitle == null) android.util.Log.e("BannerViewHolder", "bannerTitle not found");
             if (bannerDescription == null) android.util.Log.e("BannerViewHolder", "bannerDescription not found");
             if (bannerDiscount == null) android.util.Log.e("BannerViewHolder", "bannerDiscount not found");
-            if (orderNowButton == null) android.util.Log.e("BannerViewHolder", "orderNowButton not found");
+            if (copyCouponButton == null) android.util.Log.e("BannerViewHolder", "copyCouponButton not found");
         }
-    }
-
-    public interface OnOrderNowClickListener {
-        void onOrderNowClick(Banner banner);
     }
 }

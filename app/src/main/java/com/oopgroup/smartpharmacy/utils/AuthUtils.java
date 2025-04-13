@@ -69,6 +69,10 @@ public class AuthUtils {
     private static String lastNormalizedInput = "";
     private static String lastNormalizedResult = "";
 
+    public interface InputTypeCallback {
+        void onInputTypeChanged(boolean isPhone);
+    }
+
     public static boolean isValidPhoneNumber(String phone) {
         if (phone == null) return false;
         if (phone.equals(lastValidatedPhone)) {
@@ -120,48 +124,39 @@ public class AuthUtils {
         String normalized = input.replaceAll("[^0-9+]", "");
         Log.d(TAG, "Normalizing input: " + input + ", cleaned: " + normalized);
 
+        // Handle input that already includes full country code with +
         if (normalized.startsWith("+")) {
             if (isValidPhoneNumber(normalized)) {
                 lockedCountryCode = getCountryCodeFromNumber(normalized);
                 updateCountryFlag(normalized, ccp);
-                Log.d(TAG, "Valid input with country code: " + normalized + ", Locked: " + lockedCountryCode);
-
+                Log.d(TAG, "Valid full number: " + normalized + ", Locked: " + lockedCountryCode);
                 lastNormalizedInput = input;
                 lastNormalizedResult = normalized;
                 return normalized;
             }
-            lockedCountryCode = null;
-            Log.w(TAG, "Input starts with +, but invalid: " + normalized);
-
-            lastNormalizedInput = input;
-            lastNormalizedResult = normalized;
-            return normalized;
+            Log.w(TAG, "Invalid full number with +: " + normalized);
         }
 
-        if (lockedCountryCode != null) {
-            String potentialNumber = lockedCountryCode + normalized;
-            if (isValidPhoneNumber(potentialNumber)) {
-                updateCountryFlag(potentialNumber, ccp);
-                Log.d(TAG, "Using locked country code: " + potentialNumber);
-
-                lastNormalizedInput = input;
-                lastNormalizedResult = potentialNumber;
-                return potentialNumber;
-            }
-            lockedCountryCode = null;
-            Log.d(TAG, "Unlocked country code due to invalid result: " + potentialNumber);
-        }
-
-        String countryCode = ccp != null ? ccp.getSelectedCountryCodeWithPlus() : (simCountry != null ? getCountryCodeFromSim(simCountry) : "+880");
+        // Handle input starting with country code digits (e.g., 60123456789)
+        String countryCode = ccp != null ? ccp.getSelectedCountryCodeWithPlus() : (simCountry != null ? getCountryCodeFromSim(simCountry) : "+60");
         String detectedCountry = detectCountry(normalized);
+        String potentialFullNumber = "+" + normalized;
+        if (isValidPhoneNumber(potentialFullNumber)) {
+            lockedCountryCode = getCountryCodeFromNumber(potentialFullNumber);
+            updateCountryFlag(potentialFullNumber, ccp);
+            Log.d(TAG, "Valid number with implied +: " + potentialFullNumber);
+            lastNormalizedInput = input;
+            lastNormalizedResult = potentialFullNumber;
+            return potentialFullNumber;
+        }
 
+        // Handle local formats based on detected country
         if (Pattern.matches(LOCAL_REGEX_BD, normalized) && detectedCountry.equals("BD")) {
             String result = "+880" + normalized.substring(1);
             if (isValidPhoneNumber(result)) {
                 lockedCountryCode = "+880";
                 updateCountryFlag(result, ccp);
                 Log.d(TAG, "Normalized BD local format: " + result);
-
                 lastNormalizedInput = input;
                 lastNormalizedResult = result;
                 return result;
@@ -172,7 +167,6 @@ public class AuthUtils {
                 lockedCountryCode = "+60";
                 updateCountryFlag(result, ccp);
                 Log.d(TAG, "Normalized MY local format: " + result);
-
                 lastNormalizedInput = input;
                 lastNormalizedResult = result;
                 return result;
@@ -183,28 +177,38 @@ public class AuthUtils {
                 lockedCountryCode = "+65";
                 updateCountryFlag(result, ccp);
                 Log.d(TAG, "Normalized SG local format: " + result);
-
                 lastNormalizedInput = input;
                 lastNormalizedResult = result;
                 return result;
             }
         }
 
+        // Try prepending CCP or SIM country code
+        String potentialNumber = countryCode + normalized;
+        if (isValidPhoneNumber(potentialNumber)) {
+            lockedCountryCode = countryCode;
+            updateCountryFlag(potentialNumber, ccp);
+            Log.d(TAG, "Prepended country code: " + potentialNumber);
+            lastNormalizedInput = input;
+            lastNormalizedResult = potentialNumber;
+            return potentialNumber;
+        }
+
+        // Fallback to detected country
         String detectedCode = getCountryCode(detectedCountry);
         if (!detectedCountry.equals("Unknown")) {
-            String potentialNumber = detectedCode + normalized;
+            potentialNumber = detectedCode + normalized;
             if (isValidPhoneNumber(potentialNumber)) {
                 lockedCountryCode = detectedCode;
                 updateCountryFlag(potentialNumber, ccp);
                 Log.d(TAG, "Prepended detected country code: " + potentialNumber);
-
                 lastNormalizedInput = input;
                 lastNormalizedResult = potentialNumber;
                 return potentialNumber;
             }
         }
 
-        Log.d(TAG, "No valid format detected, returning raw input: " + normalized);
+        Log.d(TAG, "No valid format detected, returning cleaned input: " + normalized);
         lastNormalizedInput = input;
         lastNormalizedResult = normalized;
         return normalized;
@@ -218,12 +222,12 @@ public class AuthUtils {
     }
 
     private static String getCountryCodeFromSim(String simCountry) {
-        if (simCountry == null) return "+880";
+        if (simCountry == null) return "+60";
         switch (simCountry.toUpperCase()) {
             case "BD": return "+880";
             case "MY": return "+60";
             case "SG": return "+65";
-            default: return "+880";
+            default: return "+60";
         }
     }
 
@@ -244,11 +248,16 @@ public class AuthUtils {
                 } else if (MY_PREFIXES.contains(prefix3) && !BD_PREFIXES.contains(prefix3) && input.length() <= 11) {
                     return "MY";
                 } else if (BD_PREFIXES.contains(prefix3) && MY_PREFIXES.contains(prefix3)) {
-                    return input.length() == 11 ? "BD" : input.length() == 10 ? "MY" : "Unknown";
+                    return input.length() == 11 ? "BD" : input.length() <= 10 ? "MY" : "Unknown";
                 }
             }
             return "Unknown";
         }
+
+        // Check for country code without +
+        if (input.startsWith("60") && input.length() >= 10) return "MY";
+        if (input.startsWith("880") && input.length() >= 11) return "BD";
+        if (input.startsWith("65") && input.length() >= 9) return "SG";
 
         return "Unknown";
     }
@@ -258,7 +267,7 @@ public class AuthUtils {
             case "BD": return "+880";
             case "MY": return "+60";
             case "SG": return "+65";
-            default: return "+880";
+            default: return "+60";
         }
     }
 
@@ -280,7 +289,7 @@ public class AuthUtils {
         }
     }
 
-    public static void fetchSimNumber(Activity activity, EditText credInput) {
+    public static void fetchSimNumber(Activity activity, EditText credInput, CountryCodePicker ccp) {
         if (activity == null || credInput == null) {
             Log.e(TAG, "Activity or EditText null");
             return;
@@ -289,10 +298,6 @@ public class AuthUtils {
             Log.w(TAG, "Phone state permission not granted, skipping SIM fetch");
             return;
         }
-        retrieveSimNumber(activity, credInput);
-    }
-
-    private static void retrieveSimNumber(Activity activity, EditText credInput) {
         try {
             TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
             if (tm == null) {
@@ -302,25 +307,58 @@ public class AuthUtils {
             String simNumber = tm.getLine1Number();
             String simCountry = tm.getSimCountryIso() != null ? tm.getSimCountryIso().toUpperCase() : null;
             if (simNumber != null && !simNumber.isEmpty()) {
-                String normalizedSimNumber = normalizePhoneNumberForBackend(simNumber, null, simCountry);
+                String normalizedSimNumber = normalizePhoneNumberForBackend(simNumber, ccp, simCountry);
                 if (isValidPhoneNumber(normalizedSimNumber)) {
-                    credInput.setText(normalizedSimNumber);
-                    Log.d(TAG, "Set SIM number: " + normalizedSimNumber);
+                    String displayNumber = normalizedSimNumber;
+                    String countryCode = getCountryCodeFromNumber(normalizedSimNumber);
+                    String country = detectCountry(normalizedSimNumber.replace("+", ""));
+                    if (countryCode != null) {
+                        displayNumber = normalizedSimNumber.replace(countryCode, "");
+                        // Adjust for local format
+                        if (country.equals("MY") && !displayNumber.startsWith("0")) {
+                            displayNumber = "0" + displayNumber; // e.g., 123456789 -> 0123456789
+                        } else if (country.equals("BD") && !displayNumber.startsWith("0")) {
+                            displayNumber = "0" + displayNumber; // e.g., 1712345678 -> 01712345678
+                        }
+                        // SG numbers (e.g., 91234567) don't need prefix
+                    }
+                    String finalDisplayNumber = displayNumber;
+                    String finalCountry = country;
+                    activity.runOnUiThread(() -> {
+                        credInput.setText(finalDisplayNumber);
+                        if (ccp != null) {
+                            switch (finalCountry) {
+                                case "BD":
+                                    ccp.setCountryForNameCode("BD");
+                                    break;
+                                case "MY":
+                                    ccp.setCountryForNameCode("MY");
+                                    break;
+                                case "SG":
+                                    ccp.setCountryForNameCode("SG");
+                                    break;
+                                default:
+                                    ccp.setCountryForNameCode("MY");
+                            }
+                        }
+                        Log.d(TAG, "Set SIM number: " + normalizedSimNumber + ", Display: " + finalDisplayNumber + ", Country: " + finalCountry);
+                    });
                 } else {
                     Log.w(TAG, "Invalid SIM number: " + normalizedSimNumber);
                 }
             } else {
-                Log.w(TAG, "SIM number unavailable");
+                Log.w(TAG, "SIM number unavailable or empty");
             }
         } catch (SecurityException e) {
             Log.e(TAG, "Permission denied: " + e.getMessage());
         } catch (Exception e) {
-            Log.e(TAG, "Error fetching SIM: " + e.getMessage());
+            Log.e(TAG, "Error fetching SIM: " + e.getMessage(), e);
         }
     }
 
     public static void setupDynamicInput(Activity activity, EditText credInput, CountryCodePicker ccp,
-                                         ImageView emailIcon, ImageView phoneIcon, TextView validationMessage) {
+                                         ImageView emailIcon, ImageView phoneIcon, TextView validationMessage,
+                                         InputTypeCallback inputTypeCallback) {
         if (activity == null || credInput == null) {
             Log.e(TAG, "Activity or EditText null");
             return;
@@ -331,7 +369,7 @@ public class AuthUtils {
         if (ccp != null) {
             ccp.registerCarrierNumberEditText(credInput);
             ccp.setNumberAutoFormattingEnabled(false);
-            ccp.setCountryForNameCode(null);
+            ccp.setCountryForNameCode("MY");
             Log.d(TAG, "Registered EditText with CCP");
         } else {
             Log.w(TAG, "CountryCodePicker is null");
@@ -360,6 +398,9 @@ public class AuthUtils {
                     isProcessingInput = true;
                     processInput(activity, currentInput, credInput, ccp, emailIcon, phoneIcon,
                             validationMessage, simCountry, lastToastTime, t -> lastToastTime = t);
+                    if (inputTypeCallback != null) {
+                        inputTypeCallback.onInputTypeChanged(!looksLikeEmail(currentInput));
+                    }
                     lastProcessedInputHolder[0] = currentInput;
                     isProcessingInput = false;
                 };
@@ -373,18 +414,23 @@ public class AuthUtils {
 
     public static String getSimCountry(Activity activity) {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            return "BD"; // Default to BD if permission denied
+            return "MY";
         }
         try {
             TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
             if (tm != null) {
                 String simCountry = tm.getSimCountryIso();
-                return simCountry != null && simCountry.length() == 2 ? simCountry.toUpperCase() : "BD";
+                if (simCountry != null && simCountry.length() == 2) {
+                    simCountry = simCountry.toUpperCase();
+                    if ("BD".equals(simCountry) || "MY".equals(simCountry) || "SG".equals(simCountry)) {
+                        return simCountry;
+                    }
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting SIM country: " + e.getMessage());
         }
-        return "BD";
+        return "MY";
     }
 
     private static void processInput(Activity activity, String input, EditText credInput, CountryCodePicker ccp,
@@ -435,7 +481,7 @@ public class AuthUtils {
                     "Invalid format (e.g., +8801712345678, +60123456789, +6591234567)",
                     android.R.color.holo_red_dark, activity);
             if (ccp != null) {
-                ccp.setCountryForNameCode(null);
+                ccp.setCountryForNameCode("MY");
                 ccp.setVisibility(View.GONE);
                 adjustPadding(credInput, 12, activity);
             }
@@ -443,7 +489,7 @@ public class AuthUtils {
             updateUI(emailIcon, phoneIcon, ccp, validationMessage, credInput, false,
                     "Typing phone number...", android.R.color.black, activity);
             if (ccp != null && detectedCountry.equals("Unknown")) {
-                ccp.setCountryForNameCode(null);
+                ccp.setCountryForNameCode("MY");
                 ccp.setVisibility(View.GONE);
                 adjustPadding(credInput, 12, activity);
             }
@@ -495,10 +541,10 @@ public class AuthUtils {
 
     private static void resetUI(ImageView emailIcon, ImageView phoneIcon, CountryCodePicker ccp,
                                 TextView validationMessage, EditText credInput) {
-        if (emailIcon != null) emailIcon.setVisibility(View.GONE);
+        if (emailIcon != null) emailIcon.setVisibility(View.VISIBLE);
         if (phoneIcon != null) phoneIcon.setVisibility(View.GONE);
         if (ccp != null) {
-            ccp.setCountryForNameCode(null);
+            ccp.setCountryForNameCode("MY");
             ccp.setVisibility(View.GONE);
             adjustPadding(credInput, 12, (Activity) credInput.getContext());
         }
@@ -522,14 +568,13 @@ public class AuthUtils {
                     return true;
                 }
             }
-            ccp.setCountryForNameCode(null);
+            ccp.setCountryForNameCode("MY");
             return false;
         } finally {
             isUpdatingCountryCode.set(false);
         }
     }
 
-    // Firebase Authentication Methods
     public static void firebaseAuthWithGoogle(Activity activity, String idToken, FirebaseFirestore firestore, AuthCallback callback) {
         if (!validateAuthParams(activity, firestore, callback)) return;
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
@@ -717,7 +762,6 @@ public class AuthUtils {
                 .addOnFailureListener(e -> callback.onUsernameGenerated(baseUsername + new java.util.Random().nextInt(1000)));
     }
 
-    // Interfaces
     public interface AuthCallback {
         void onSuccess(FirebaseUser user);
         void onFailure(String errorMessage);

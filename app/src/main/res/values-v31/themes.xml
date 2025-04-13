@@ -1,0 +1,44 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+        <!-- Main App Theme for API 31+ -->
+        <style name="Theme.MyApp" parent="Theme.MaterialComponents.Light.NoActionBar">
+                <!-- Primary colors -->
+                <item name="colorPrimary">@color/accent_blue</item>
+                <item name="colorPrimaryVariant">@color/accent_blue_dark</item>
+                <item name="colorOnPrimary">@color/white</item>
+
+                <!-- Secondary colors -->
+                <item name="colorSecondary">@color/accent_blue</item>
+                <item name="colorSecondaryVariant">@color/accent_blue_dark</item>
+                <item name="colorOnSecondary">@color/white</item>
+
+                <!-- Background and surface colors -->
+                <item name="android:colorBackground">@color/white</item>
+                <item name="colorSurface">@color/white</item>
+                <item name="colorOnSurface">@color/black</item>
+
+                <!-- Status bar -->
+                <item name="android:statusBarColor">@color/background_light</item>
+                <item name="android:windowLightStatusBar">true</item>
+
+
+
+                <!-- System splash screen (Android 12+) -->
+                <item name="android:windowSplashScreenBackground">@color/background_light</item>
+                <item name="android:windowSplashScreenAnimatedIcon">@null</item>
+                <item name="android:windowSplashScreenAnimationDuration">0</item>
+                <item name="postSplashScreenTheme">@style/Theme.MyApp</item>
+
+                <!-- Button styling -->
+                <item name="materialButtonStyle">@style/Widget.App.Button</item>
+                <item name="textAppearanceButton">@style/TextAppearance.MaterialComponents.Button</item>
+                <item name="textAppearanceBody1">@style/TextAppearance.MaterialComponents.Body1</item>
+                <item name="textAppearanceBody2">@style/TextAppearance.MaterialComponents.Body2</item>
+        </style>
+
+        <!-- Splash Screen Theme for API 31+ -->
+        <style name="Theme.SplashScreen" parent="Theme.MaterialComponents.Light.NoActionBar">
+                <item name="android:windowBackground">@color/background_light</item>
+                <item name="android:statusBarColor">@android:color/transparent</item>
+                <item name="android:navigationBarColor">@android:color/transparent</item>
+        </style>
+</resources>

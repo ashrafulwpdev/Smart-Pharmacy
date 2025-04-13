@@ -7,6 +7,8 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -18,6 +20,7 @@ import android.view.animation.ScaleAnimation;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -48,6 +51,7 @@ import com.oopgroup.smartpharmacy.utils.LogoutConfirmationDialog;
 import com.softourtech.slt.SLTLoader;
 
 import java.util.Objects;
+import java.util.concurrent.Executor;
 
 public class ProfileFragment extends Fragment {
 
@@ -58,12 +62,15 @@ public class ProfileFragment extends Fragment {
     private static final String KEY_LAST_FETCH_SUCCESS = "last_fetch_success";
     private static final int EDIT_PROFILE_REQUEST = 1;
     private static final long VERIFICATION_TIMEOUT = 10 * 60 * 1000;
+    // CHANGE: Added for debouncing refresh
+    private static final long REFRESH_COOLDOWN = 2000; // 2 seconds
+    private long lastRefreshTime = 0;
 
     // UI Elements
     private RelativeLayout backButton;
     private ImageView profileImage;
     private TextView profileTitle, userName, userPhone, verificationStatus, verificationTimer;
-    private RelativeLayout editProfileLayout, changePasswordLayout, allOrdersLayout, paymentsLayout, notificationsLayout, termsLayout;
+    private RelativeLayout editProfileLayout, changePasswordLayout, allOrdersLayout, paymentsLayout, notificationsLayout, teamLayout;
     private Button logoutButton, cancelVerificationButton, adminButton;
     private SwipeRefreshLayout swipeRefreshLayout;
     private FrameLayout rootLayout;
@@ -148,7 +155,11 @@ public class ProfileFragment extends Fragment {
         setupLogoutListener();
         setupAdminButton();
         swipeRefreshLayout.setOnRefreshListener(this::onRefresh);
-        backButton.setOnClickListener(v -> requireActivity().onBackPressed());
+        backButton.setOnClickListener(v -> {
+            if (isAdded()) {
+                requireActivity().onBackPressed();
+            }
+        });
 
         // Display initial data and start real-time listener
         displayCachedProfileData();
@@ -190,7 +201,7 @@ public class ProfileFragment extends Fragment {
         allOrdersLayout = view.findViewById(R.id.allOrdersLayout);
         paymentsLayout = view.findViewById(R.id.paymentsLayout);
         notificationsLayout = view.findViewById(R.id.notificationsLayout);
-        termsLayout = view.findViewById(R.id.termsLayout);
+        teamLayout = view.findViewById(R.id.teamLayout);
         logoutButton = view.findViewById(R.id.logoutButton);
         cancelVerificationButton = view.findViewById(R.id.cancelVerificationButton);
         adminButton = view.findViewById(R.id.adminButton);
@@ -226,7 +237,15 @@ public class ProfileFragment extends Fragment {
                     .commit();
         });
 
-        paymentsLayout.setOnClickListener(v -> animateClick(v));
+        paymentsLayout.setOnClickListener(v -> {
+            animateClick(v);
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new PaymentsFragment())
+                    .addToBackStack("PaymentsFragment")
+                    .commit();
+        });
+
         notificationsLayout.setOnClickListener(v -> {
             animateClick(v);
             requireActivity().getSupportFragmentManager()
@@ -235,7 +254,15 @@ public class ProfileFragment extends Fragment {
                     .addToBackStack("NotificationFragment")
                     .commit();
         });
-        termsLayout.setOnClickListener(v -> animateClick(v));
+
+        teamLayout.setOnClickListener(v -> {
+            animateClick(v);
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new TeamFragment())
+                    .addToBackStack("TeamFragment")
+                    .commit();
+        });
     }
 
     private void animateClick(View v) {
@@ -281,22 +308,29 @@ public class ProfileFragment extends Fragment {
                         }
                     })
                     .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
                         hideLoader();
-                        if (isAdded()) {
-                            showCustomToast("Failed to verify role: " + e.getMessage(), false);
-                        }
+                        showCustomToast("Failed to verify role: " + e.getMessage(), false);
                     });
         });
     }
 
     private void setupFirestoreRealtimeListener() {
+        // CHANGE: Optimized with Executor to reduce main thread load
         if (firestoreListener != null) {
             firestoreListener.remove();
             firestoreListener = null;
         }
+        if (!isAdded()) return;
 
         firestoreListener = firestore.collection("users").document(currentUser.getUid())
-                .addSnapshotListener((documentSnapshot, e) -> {
+                .addSnapshotListener(new Executor() {
+                    @Override
+                    public void execute(Runnable command) {
+                        new Handler(Looper.getMainLooper()).post(command);
+                    }
+                }, (documentSnapshot, e) -> {
+                    if (!isAdded()) return;
                     if (e != null) {
                         Log.e("ProfileFragment", "Listen failed: " + e.getMessage());
                         showCustomToast("Failed to load profile: " + e.getMessage(), false);
@@ -431,23 +465,17 @@ public class ProfileFragment extends Fragment {
             }
         }
 
-        profileImage.setImageDrawable(null);
         RequestOptions options = new RequestOptions()
                 .circleCrop()
-                .override(INNER_SIZE, INNER_SIZE)
                 .placeholder(R.drawable.default_profile)
                 .error(R.drawable.default_profile)
-                .diskCacheStrategy(DiskCacheStrategy.ALL);
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC);
 
-        if (cachedImageUrl != null && !cachedImageUrl.isEmpty()) {
-            Glide.with(this)
-                    .load(cachedImageUrl)
-                    .apply(options)
-                    .transition(DrawableTransitionOptions.withCrossFade())
-                    .into(profileImage);
-        } else {
-            profileImage.setImageResource(R.drawable.default_profile);
-        }
+        Glide.with(this)
+                .load(cachedImageUrl)
+                .apply(options)
+                .transition(DrawableTransitionOptions.withCrossFade())
+                .into(profileImage);
 
         if (authHelper == null) {
             authHelper = new ProfileAuthHelper(requireActivity(), new ProfileAuthHelper.OnAuthCompleteListener() {
@@ -585,9 +613,18 @@ public class ProfileFragment extends Fragment {
     }
 
     private void onRefresh() {
+        // CHANGE: Added debouncing to prevent rapid refreshes
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastRefreshTime < REFRESH_COOLDOWN) {
+            swipeRefreshLayout.setRefreshing(false);
+            return;
+        }
+        lastRefreshTime = currentTime;
+
         showCustomLoader();
         swipeRefreshLayout.setRefreshing(true);
         currentUser.reload().addOnCompleteListener(task -> {
+            if (!isAdded()) return;
             if (task.isSuccessful()) {
                 setupFirestoreRealtimeListener();
             } else {
@@ -631,15 +668,33 @@ public class ProfileFragment extends Fragment {
     }
 
     private void logoutAndRedirectToLogin() {
+        // CHANGE: Enhanced cleanup before logout
         if (firestoreListener != null) {
             firestoreListener.remove();
             firestoreListener = null;
+            Log.d("ProfileFragment", "Firestore listener removed");
         }
+        if (countdownTimer != null) {
+            countdownTimer.cancel();
+            countdownTimer = null;
+            Log.d("ProfileFragment", "Countdown timer cancelled");
+        }
+        if (sltLoader != null) {
+            sltLoader.hideLoader();
+            sltLoader.onDestroy();
+            sltLoader = null;
+            Log.d("ProfileFragment", "SLTLoader cleaned up during logout");
+        }
+
+        // Sign out and navigate
         mAuth.signOut();
-        Intent intent = new Intent(requireContext(), LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        requireActivity().finish();
+        if (isAdded()) {
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            requireActivity().finish();
+            Log.d("ProfileFragment", "Logout completed, activity finished");
+        }
     }
 
     private void redirectToLogin() {

@@ -74,6 +74,26 @@ dependencies {
     // ViewPager2
     implementation "androidx.viewpager2:viewpager2:1.0.0"
     implementation 'com.github.ashrafulwpdev:SLTLoader:v1.0.0'
+
+    // ZXing for QR code scanning
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+
+    // OkHttp for API calls
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+
+    // ML Kit Text Recognition
+    implementation 'com.google.mlkit:text-recognition:16.0.0'
+
+    implementation 'me.xdrop:fuzzywuzzy:1.4.0'
+
+    implementation('androidx.emoji2:emoji2:1.4.0') {
+        exclude group: 'androidx.emoji2'
+    }
+    implementation 'androidx.lifecycle:lifecycle-process:2.8.7'
+
+    implementation 'com.google.firebase:firebase-dynamic-links'
+
+    implementation 'com.google.firebase:firebase-auth'
 }
 
 configurations.configureEach {
